@@ -22,7 +22,7 @@ const MAP_SIZE = 256;
 /** Match hero mobile tier — text block drags pass through for future scroll. */
 const MOBILE_BREAKPOINT = 768;
 /** Lift the lens above the touch point so the finger doesn't cover it. */
-const TOUCH_LENS_OFFSET_Y = -72;
+const TOUCH_LENS_OFFSET_Y = -150;
 /** Displacement concentrated toward the rim (sharp center, warped edges). */
 const RIM_EXPONENT = 3.5;
 /** Edge displacement strength as a fraction of lens radius. */
