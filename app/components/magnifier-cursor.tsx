@@ -17,6 +17,9 @@ const FOCUS_EXPAND_PERCENT = 130;
 const EXPAND_SIZE_TRANSITION =
   "width 800ms cubic-bezier(0.22, 1, 0.36, 1), height 800ms cubic-bezier(0.22, 1, 0.36, 1)";
 const SHRINK_SIZE_TRANSITION = "width 280ms ease-out, height 280ms ease-out";
+const RETREAT_TRANSITION_MS = 320;
+const RETREAT_SCALE = 0.12;
+const LENS_PRESENTATION_TRANSITION = `transform ${RETREAT_TRANSITION_MS}ms ease-out, opacity ${RETREAT_TRANSITION_MS}ms ease-out`;
 
 const MAP_SIZE = 256;
 /** Match hero mobile tier — text block drags pass through for future scroll. */
@@ -108,13 +111,30 @@ function applyContentPosition(
   localY: number,
   sceneWidth: number,
   sceneHeight: number,
+  lensSize: number,
 ) {
   if (!el) return;
   el.style.width = `${sceneWidth}px`;
   el.style.height = `${sceneHeight}px`;
-  el.style.left = `calc(50% - ${localX * ZOOM}px)`;
-  el.style.top = `calc(50% - ${localY * ZOOM}px)`;
+  // Pin scene sample point to the lens center (avoid % containing-block ambiguity).
+  el.style.left = `${lensSize / 2 - localX * ZOOM}px`;
+  el.style.top = `${lensSize / 2 - localY * ZOOM}px`;
   el.style.transform = `scale(${ZOOM})`;
+}
+
+function measureSceneRect(container: HTMLElement | null) {
+  const sceneEl =
+    container?.querySelector<HTMLElement>("[data-hero-scene]") ?? container;
+  if (!sceneEl) {
+    return { width: 0, height: 0, left: 0, top: 0 };
+  }
+  const rect = sceneEl.getBoundingClientRect();
+  return {
+    width: rect.width,
+    height: rect.height,
+    left: rect.left,
+    top: rect.top,
+  };
 }
 
 export default function MagnifierCursor({
@@ -138,11 +158,18 @@ export default function MagnifierCursor({
   const activeRef = useRef(false);
   const touchScrollPassthroughRef = useRef(false);
   const isMobileViewportRef = useRef(false);
+  const retreatTimerRef = useRef<number>(0);
+  const enteringRafRef = useRef<number>(0);
+  const enterAnimStartedRef = useRef(false);
+  const sizeSyncRafRef = useRef<number>(0);
+  const sizeSyncTimeoutRef = useRef<number>(0);
   const filterId = `magnifier-lens-${useId().replace(/:/g, "")}`;
 
   const [mounted, setMounted] = useState(false);
   const [enabled, setEnabled] = useState(false);
   const [active, setActive] = useState(false);
+  const [entering, setEntering] = useState(false);
+  const [retreating, setRetreating] = useState(false);
   const [scene, setScene] = useState({ width: 0, height: 0, left: 0, top: 0 });
   const [dispMap, setDispMap] = useState("");
 
@@ -162,14 +189,100 @@ export default function MagnifierCursor({
       : LENS_SIZE;
   }, []);
 
+  const getRenderedLensSize = useCallback((lens: HTMLDivElement | null) => {
+    if (!lens) return getLensSize();
+    const { width } = lens.getBoundingClientRect();
+    return width > 0 ? width : getLensSize();
+  }, [getLensSize]);
+
+  const cancelSizeSync = useCallback(() => {
+    if (sizeSyncRafRef.current) {
+      cancelAnimationFrame(sizeSyncRafRef.current);
+      sizeSyncRafRef.current = 0;
+    }
+    if (sizeSyncTimeoutRef.current) {
+      window.clearTimeout(sizeSyncTimeoutRef.current);
+      sizeSyncTimeoutRef.current = 0;
+    }
+  }, []);
+
+  const cancelEnterAnimation = useCallback(() => {
+    if (enteringRafRef.current) {
+      cancelAnimationFrame(enteringRafRef.current);
+      enteringRafRef.current = 0;
+    }
+    enterAnimStartedRef.current = false;
+    setEntering(false);
+  }, []);
+
+  const finishEnterAnimation = useCallback(() => {
+    enterAnimStartedRef.current = false;
+    setEntering(false);
+  }, []);
+
+  const deactivateMagnifier = useCallback(() => {
+    cancelEnterAnimation();
+    cancelSizeSync();
+    if (retreatTimerRef.current) {
+      window.clearTimeout(retreatTimerRef.current);
+      retreatTimerRef.current = 0;
+    }
+    setRetreating(false);
+    if (!activeRef.current) return;
+    activeRef.current = false;
+    setActive(false);
+    onMagnifierActiveChange?.(false);
+  }, [cancelEnterAnimation, cancelSizeSync, onMagnifierActiveChange]);
+
   const setMagnifierActive = useCallback(
     (next: boolean) => {
       if (activeRef.current === next) return;
-      setActive(next);
-      onMagnifierActiveChange?.(next);
+      if (next) {
+        if (retreatTimerRef.current) {
+          window.clearTimeout(retreatTimerRef.current);
+          retreatTimerRef.current = 0;
+        }
+        setRetreating(false);
+        setActive(true);
+        activeRef.current = true;
+        onMagnifierActiveChange?.(true);
+        return;
+      }
+      deactivateMagnifier();
     },
-    [onMagnifierActiveChange],
+    [deactivateMagnifier, onMagnifierActiveChange],
   );
+
+  const isPointerInContainer = useCallback((clientX: number, clientY: number) => {
+    const el = containerRef.current;
+    if (!el) return false;
+    const rect = el.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  const beginRetreat = useCallback(() => {
+    if (!activeRef.current) return;
+    if (retreatTimerRef.current) return;
+    cancelEnterAnimation();
+    setRetreating(true);
+    retreatTimerRef.current = window.setTimeout(() => {
+      retreatTimerRef.current = 0;
+      deactivateMagnifier();
+    }, RETREAT_TRANSITION_MS);
+  }, [cancelEnterAnimation, deactivateMagnifier]);
+
+  const cancelRetreat = useCallback(() => {
+    if (retreatTimerRef.current) {
+      window.clearTimeout(retreatTimerRef.current);
+      retreatTimerRef.current = 0;
+    }
+    setRetreating(false);
+  }, []);
 
   const getLensClientCoords = useCallback((clientX: number, clientY: number) => {
     return {
@@ -182,13 +295,15 @@ export default function MagnifierCursor({
 
   const applyLensPosition = useCallback(
     (clientX: number, clientY: number) => {
-      const s = sceneRef.current;
-      if (s.width <= 0) return;
+      const next = measureSceneRect(containerRef.current);
+      if (next.width <= 0) return;
+      sceneRef.current = next;
 
       const { x: lensX, y: lensY } = getLensClientCoords(clientX, clientY);
-      const localX = lensX - s.left;
-      const localY = lensY - s.top;
+      const localX = lensX - next.left;
+      const localY = lensY - next.top;
       const lens = lensRef.current;
+      const size = getRenderedLensSize(lens);
 
       if (lens) {
         lens.style.left = `${lensX}px`;
@@ -199,33 +314,69 @@ export default function MagnifierCursor({
         sharpContentRef.current,
         localX,
         localY,
-        s.width,
-        s.height,
+        next.width,
+        next.height,
+        size,
       );
       applyContentPosition(
         overlayContentRef.current,
         localX,
         localY,
-        s.width,
-        s.height,
+        next.width,
+        next.height,
+        size,
       );
     },
-    [getLensClientCoords],
+    [getLensClientCoords, getRenderedLensSize],
   );
 
-  const updateScene = useCallback(() => {
-    const el = containerRef.current;
-    if (!el) return;
-    const rect = el.getBoundingClientRect();
-    const next = {
-      width: rect.width,
-      height: rect.height,
-      left: rect.left,
-      top: rect.top,
-    };
+  const runSizeSyncLoop = useCallback(
+    (durationMs: number) => {
+      cancelSizeSync();
+      const tick = () => {
+        applyLensPosition(pendingRef.current.x, pendingRef.current.y);
+        sizeSyncRafRef.current = requestAnimationFrame(tick);
+      };
+      sizeSyncRafRef.current = requestAnimationFrame(tick);
+      sizeSyncTimeoutRef.current = window.setTimeout(cancelSizeSync, durationMs);
+    },
+    [applyLensPosition, cancelSizeSync],
+  );
+
+  const syncSceneAndLens = useCallback(() => {
+    const next = measureSceneRect(containerRef.current);
+    if (next.width <= 0) return;
+
     sceneRef.current = next;
     setScene(next);
-  }, []);
+
+    if (!activeRef.current) return;
+
+    const { x, y } = pendingRef.current;
+    applyLensPosition(x, y);
+
+    const s = sceneRef.current;
+    if (onCursorMove && s.width > 0) {
+      const { x: lensX, y: lensY } = getLensClientCoords(x, y);
+      onCursorMove(lensX - s.left, lensY - s.top, {
+        width: s.width,
+        height: s.height,
+      });
+    }
+
+    if (!isPointerInContainer(x, y)) {
+      beginRetreat();
+    } else {
+      cancelRetreat();
+    }
+  }, [
+    applyLensPosition,
+    beginRetreat,
+    cancelRetreat,
+    getLensClientCoords,
+    isPointerInContainer,
+    onCursorMove,
+  ]);
 
   useLayoutEffect(() => {
     const lens = lensRef.current;
@@ -234,19 +385,77 @@ export default function MagnifierCursor({
     const size = getLensSize();
     lens.style.width = `${size}px`;
     lens.style.height = `${size}px`;
-    lens.style.transform = "translate(-50%, -50%)";
-    lens.style.transition = focused
+
+    const sizeTransition = focused
       ? EXPAND_SIZE_TRANSITION
       : SHRINK_SIZE_TRANSITION;
 
+    if (retreating) {
+      lens.style.transition = `${sizeTransition}, ${LENS_PRESENTATION_TRANSITION}`;
+      lens.style.transform = `translate(-50%, -50%) scale(${RETREAT_SCALE})`;
+      lens.style.opacity = "0";
+    } else if (entering && !enterAnimStartedRef.current) {
+      enterAnimStartedRef.current = true;
+      lens.style.transition = "none";
+      lens.style.transform = `translate(-50%, -50%) scale(${RETREAT_SCALE})`;
+      lens.style.opacity = "0";
+      void lens.offsetWidth;
+
+      enteringRafRef.current = requestAnimationFrame(() => {
+        enteringRafRef.current = 0;
+        const currentLens = lensRef.current;
+        if (!currentLens || !activeRef.current) {
+          finishEnterAnimation();
+          return;
+        }
+
+        currentLens.style.transition = `${sizeTransition}, ${LENS_PRESENTATION_TRANSITION}`;
+        currentLens.style.transform = "translate(-50%, -50%) scale(1)";
+        currentLens.style.opacity = "1";
+
+        let finished = false;
+        const finishOnce = () => {
+          if (finished) return;
+          finished = true;
+          currentLens.removeEventListener("transitionend", onTransitionEnd);
+          finishEnterAnimation();
+        };
+
+        const onTransitionEnd = (event: TransitionEvent) => {
+          if (event.target !== currentLens) return;
+          if (event.propertyName !== "opacity") return;
+          finishOnce();
+        };
+        currentLens.addEventListener("transitionend", onTransitionEnd);
+        window.setTimeout(finishOnce, RETREAT_TRANSITION_MS + 80);
+      });
+    } else if (!entering) {
+      lens.style.transition = `${sizeTransition}, ${LENS_PRESENTATION_TRANSITION}`;
+      lens.style.transform = "translate(-50%, -50%) scale(1)";
+      lens.style.opacity = "1";
+    }
+
     applyLensPosition(pendingRef.current.x, pendingRef.current.y);
-  }, [focused, focusExpandPercent, applyLensPosition, getLensSize]);
+
+    if (activeRef.current && !retreating && !entering) {
+      runSizeSyncLoop(focused ? 820 : 300);
+    }
+  }, [
+    focused,
+    focusExpandPercent,
+    applyLensPosition,
+    getLensSize,
+    retreating,
+    entering,
+    finishEnterAnimation,
+    runSizeSyncLoop,
+  ]);
 
   useEffect(() => {
     setMounted(true);
     setEnabled(true);
     setDispMap(buildDisplacementMap());
-    updateScene();
+    syncSceneAndLens();
 
     const mobileMq = window.matchMedia(
       `(max-width: ${MOBILE_BREAKPOINT}px)`,
@@ -257,14 +466,29 @@ export default function MagnifierCursor({
     syncMobile();
     mobileMq.addEventListener("change", syncMobile);
 
-    window.addEventListener("resize", updateScene);
-    window.addEventListener("scroll", updateScene, true);
+    window.addEventListener("resize", syncSceneAndLens);
+    window.addEventListener("scroll", syncSceneAndLens, true);
     return () => {
       mobileMq.removeEventListener("change", syncMobile);
-      window.removeEventListener("resize", updateScene);
-      window.removeEventListener("scroll", updateScene, true);
+      window.removeEventListener("resize", syncSceneAndLens);
+      window.removeEventListener("scroll", syncSceneAndLens, true);
+      window.clearTimeout(retreatTimerRef.current);
+      cancelEnterAnimation();
+      cancelSizeSync();
     };
-  }, [updateScene]);
+  }, [syncSceneAndLens, cancelEnterAnimation, cancelSizeSync]);
+
+  useEffect(() => {
+    const onDocumentMouseMove = (e: MouseEvent) => {
+      if (isMobileViewportRef.current) return;
+      if (!activeRef.current && !retreatTimerRef.current) return;
+      if (isPointerInContainer(e.clientX, e.clientY)) return;
+      beginRetreat();
+    };
+
+    document.addEventListener("mousemove", onDocumentMouseMove);
+    return () => document.removeEventListener("mousemove", onDocumentMouseMove);
+  }, [beginRetreat, isPointerInContainer]);
 
   const isPointInHeroTextBlock = useCallback((clientX: number, clientY: number) => {
     const block = containerRef.current?.querySelector(
@@ -305,6 +529,19 @@ export default function MagnifierCursor({
     [applyLensPosition, getLensClientCoords, onCursorMove],
   );
 
+  const activateFromHeroEntry = useCallback(
+    (clientX: number, clientY: number) => {
+      if (isMobileViewportRef.current) return;
+      cancelRetreat();
+      cancelEnterAnimation();
+      pendingRef.current = { x: clientX, y: clientY };
+      setMagnifierActive(true);
+      setEntering(true);
+      schedulePointerUpdate(clientX, clientY);
+    },
+    [cancelEnterAnimation, cancelRetreat, schedulePointerUpdate, setMagnifierActive],
+  );
+
   useEffect(() => {
     const el = containerRef.current;
     if (!el) return;
@@ -322,10 +559,10 @@ export default function MagnifierCursor({
   }, [schedulePointerUpdate]);
 
   useEffect(() => {
-    if (scene.width > 0) {
+    if (scene.width > 0 && activeRef.current) {
       applyLensPosition(pendingRef.current.x, pendingRef.current.y);
     }
-  }, [scene.width, scene.height, applyLensPosition]);
+  }, [scene.width, scene.height, scene.left, scene.top, applyLensPosition]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
     schedulePointerUpdate(e.clientX, e.clientY);
@@ -496,13 +733,12 @@ export default function MagnifierCursor({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       onDragStart={(e) => e.preventDefault()}
-      onMouseEnter={() => {
-        if (isMobileViewportRef.current) return;
-        setMagnifierActive(true);
+      onMouseEnter={(e) => {
+        activateFromHeroEntry(e.clientX, e.clientY);
       }}
       onMouseLeave={() => {
         if (isMobileViewportRef.current) return;
-        setMagnifierActive(false);
+        beginRetreat();
       }}
     >
       {children}

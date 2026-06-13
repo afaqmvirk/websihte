@@ -1,5 +1,11 @@
 import Hero from "./components/hero";
+import EventsSection from "./components/events-section";
 
 export default function Home() {
-  return <Hero />;
+  return (
+    <main className="min-h-0">
+      <Hero />
+      <EventsSection />
+    </main>
+  );
 }

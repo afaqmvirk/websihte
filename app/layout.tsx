@@ -23,9 +23,9 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${arialNarrowWeb.variable} overflow-hidden antialiased`}
+      className={`${arialNarrowWeb.variable} antialiased`}
     >
-      <body className="overflow-hidden">
+      <body>
         <ViewportHeightSync />
         {children}
       </body>

@@ -28,12 +28,19 @@ const TABLET_HIDDEN_RELIC_IDS = new Set([10, 11, 12, 13]);
 
 type ViewportTier = "mobile" | "tablet" | "desktop";
 
-/** Slightly shrink relic photos relative to Figma layout. */
-const RELIC_SCALE = 0.9;
+/** Relic photos scaled from center relative to Figma layout (1 = full Figma size). */
+const RELIC_SCALE = 1.1;
+
+/** Pull content inward from viewport edges (Figma px); extra top/bottom breathing room. */
+const SCENE_INSET = {
+  desktop: { top: 72, bottom: 72, left: 44, right: 44 },
+  tablet: { top: 72, bottom: 72, left: 44, right: 44 },
+  mobile: { top: 96, bottom: 96, left: 36, right: 36 },
+} as const;
 /** Extra overlap in px at the bubble anchor (scaled to viewport height). */
 const BUBBLE_OVERLAP = 6;
 /** Relics above this Figma Y get bubbles anchored to the image bottom. */
-const TOP_RELIC_Y = 100;
+const TOP_RELIC_Y = 130;
 const BUBBLE_ANCHOR_Y = 0.7;
 /** Extra distance (Figma px, scaled to scene) before the lens shrinks after leaving a relic. */
 const FOCUS_SHRINK_PADDING = 40;
@@ -52,6 +59,8 @@ type Relic = {
   objectFit?: "cover" | "contain" | "bottom";
   zIndex?: number;
   caption?: string;
+  /** Override automatic left/center/right bubble anchoring. */
+  bubbleAlign?: "left" | "center" | "right";
 };
 
 type LayoutConfig = {
@@ -64,18 +73,20 @@ type LayoutConfig = {
   headline: { figma: number; min: number; max: number };
   body: { figma: number; min: number; max: number };
   blockGap: number;
+  inset: (typeof SCENE_INSET)[keyof typeof SCENE_INSET];
 };
 
 const DESKTOP_LAYOUT: LayoutConfig = {
   width: FIGMA_WIDTH,
   height: FIGMA_HEIGHT,
-  textLeft: 62,
-  textWidth: 914,
+  textLeft: 140,
+  textWidth:999,
   textBottom: 35,
   ctaLabel: "hover",
   headline: { figma: 72, min: 28, max: 72 },
   body: { figma: 24, min: 14, max: 24 },
   blockGap: 4,
+  inset: SCENE_INSET.desktop,
 };
 
 const TABLET_LAYOUT: LayoutConfig = {
@@ -89,6 +100,7 @@ const TABLET_LAYOUT: LayoutConfig = {
   headline: { figma: 96, min: 40, max: 64 },
   body: { figma: 30, min: 18, max: 28 },
   blockGap: 4,
+  inset: SCENE_INSET.tablet,
 };
 
 const MOBILE_LAYOUT: LayoutConfig = {
@@ -101,6 +113,7 @@ const MOBILE_LAYOUT: LayoutConfig = {
   headline: { figma: 72, min: 22, max: 46 },
   body: { figma: 24, min: 13, max: 17 },
   blockGap: 4,
+  inset: SCENE_INSET.mobile,
 };
 
 /** Shared line-height tokens (tighter than Figma defaults). */
@@ -138,19 +151,36 @@ function getLayout(tier: ViewportTier): LayoutConfig {
   return DESKTOP_LAYOUT;
 }
 
+function getLayoutMappers(layout: LayoutConfig) {
+  const { width: w, height: h, inset } = layout;
+  const contentW = w - inset.left - inset.right;
+  const contentH = h - inset.top - inset.bottom;
+
+  return {
+    mapX: (px: number) => inset.left + (px / w) * contentW,
+    mapY: (px: number) => inset.top + (px / h) * contentH,
+    mapW: (px: number) => (px / w) * contentW,
+    mapH: (px: number) => (px / h) * contentH,
+    mapBottom: (px: number) => inset.bottom + (px / h) * contentH,
+  };
+}
+
 function createPctHelpers(layout: LayoutConfig) {
   const w = layout.width;
   const h = layout.height;
+  const { mapX, mapY, mapW, mapH, mapBottom } = getLayoutMappers(layout);
+
   return {
-    pctX: (px: number) => `${(px / w) * 100}%`,
-    pctY: (px: number) => `${(px / h) * 100}%`,
-    pctW: (px: number) => `${(px / w) * 100}%`,
-    pctH: (px: number) => `${(px / h) * 100}%`,
+    pctX: (px: number) => `${(mapX(px) / w) * 100}%`,
+    pctY: (px: number) => `${(mapY(px) / h) * 100}%`,
+    pctBottom: (px: number) => `${(mapBottom(px) / h) * 100}%`,
+    pctW: (px: number) => `${(mapW(px) / w) * 100}%`,
+    pctH: (px: number) => `${(mapH(px) / h) * 100}%`,
     figmaFont: (px: number, minPx: number, maxPx: number = px) =>
       `clamp(${minPx}px, ${(px / w) * 100}vw, ${maxPx}px)`,
     figmaSpaceY: (px: number) =>
-      `calc(${(px / h) * 100} * var(--app-height) / 100)`,
-    figmaPx: (px: number) => `${(px / w) * 100}vw`,
+      `calc(${(mapH(px) / h) * 100} * var(--app-height) / 100)`,
+    figmaPx: (px: number) => `${(mapW(px) / w) * 100}vw`,
   };
 }
 
@@ -207,7 +237,7 @@ const relics: Relic[] = [
     src: "/1.png",
     width: 375,
     height: 166,
-    figmaX: 45,
+    figmaX: 149,
     figmaY: 81,
     figmaW: 374.82,
     figmaH: 165.49,
@@ -220,22 +250,22 @@ const relics: Relic[] = [
     id: 2,
     src: "/2.png",
     width: 278,
-    height: 207,
-    figmaX: 65.41,
-    figmaY: 238.01,
+    height: 177,
+    figmaX: 104.41,
+    figmaY: 268.01,
     figmaW: 261.09,
     figmaH: 206.17,
     objectFit: "bottom",
     zIndex: 2,
-    caption: "an electronic breadboard with a mess of colorful jumper wires",
+    caption: "breadboard",
   },
   {
     id: 3,
     src: "/3.png",
     width: 292,
     height: 313,
-    figmaX: 104,
-    figmaY: 436,
+    figmaX: 412,
+    figmaY: 283,
     figmaW: 286.2,
     figmaH: 310.87,
     objectFit: "bottom",
@@ -247,24 +277,25 @@ const relics: Relic[] = [
     src: "/4.png",
     width: 238,
     height: 249,
-    figmaX: 449,
-    figmaY: 468,
+    figmaX: 629,
+    figmaY: 428,
     figmaW: 237.14,
     figmaH: 249,
     objectFit: "bottom",
     zIndex: 5,
-    caption: "a phone with an sih sticker on the back",
+    caption: "stihcker",
   },
   {
     id: 5,
     src: "/5.png",
     width: 368,
     height: 246,
-    figmaX: 382,
-    figmaY: 223,
+    figmaX: 180,
+    figmaY: 430,
+
     figmaW: 367.93,
     figmaH: 245.32,
-    objectFit: "cover",
+    objectFit: "bottom",
     zIndex: 3,
     caption: "three people posing in front of an i heart smu sign",
   },
@@ -273,8 +304,8 @@ const relics: Relic[] = [
     src: "/6.png",
     width: 296,
     height: 257,
-    figmaX: 428,
-    figmaY: -21,
+    figmaX: 468,
+    figmaY: 10,
     figmaW: 295.87,
     figmaH: 277.38,
     objectFit: "bottom",
@@ -286,8 +317,8 @@ const relics: Relic[] = [
     src: "/7.png",
     width: 330,
     height: 240,
-    figmaX: 718,
-    figmaY: 21,
+    figmaX: 671,
+    figmaY: 188,
     figmaW: 330,
     figmaH: 240,
     objectFit: "bottom",
@@ -298,35 +329,36 @@ const relics: Relic[] = [
     id: 8,
     src: "/8.png",
     width: 224,
-    height: 275,
-    figmaX: 771,
-    figmaY: 268,
+    height: 275,       
+    figmaX: 1142,
+    figmaY: 400.06, 
     figmaW: 223.36,
     figmaH: 274.7,
     objectFit: "bottom",
     zIndex: 5,
-    caption: "someone wearing a giant yellow sponge on their head",
+    caption: "wearing da bob",
   },
   {
     id: 9,
     src: "/9.png",
     width: 311,
-    height: 185,
-    figmaX: 774,
-    figmaY: 549,
+    height: 195,
+    figmaX: 844,
+    figmaY: 539,
     figmaW: 294.6,
     figmaH: 185,
     objectFit: "bottom",
     zIndex: 4,
-    caption: "a stupid ideas hackathon flyer surrounded by star toys",
+    caption: "stupid @ socratica",
   },
   {
     id: 10,
     src: "/10.png",
     width: 304,
     height: 265,
-    figmaX: 1164,
-    figmaY: 685,
+    figmaX: 945,
+    figmaY: 242,
+
     figmaW: 303.54,
     figmaH: 264.63,
     objectFit: "bottom",
@@ -338,8 +370,8 @@ const relics: Relic[] = [
     src: "/11.png",
     width: 285,
     height: 214,
-    figmaX: 1192,
-    figmaY: 517.06,
+    figmaX: 938,
+    figmaY: 81,
     figmaW: 284.68,
     figmaH: 173.23,
     objectFit: "bottom",
@@ -351,20 +383,22 @@ const relics: Relic[] = [
     src: "/12.png",
     width: 255,
     height: 288,
-    figmaX: 1025,
-    figmaY: 212,
+    figmaX: 1188,
+    figmaY: 110,
     figmaW: 253.99,
     figmaH: 284.65,
+    objectFit: "bottom",
     zIndex: 5,
+    bubbleAlign: "center",
     caption: "stupid ideas are back — justin bieber edition",
   },
   {
     id: 13,
     src: "/13.png",
     width: 271,
-    height: 314,
-    figmaX: 1198,
-    figmaY: 20,
+    height: 314,     
+    figmaX: 1064,
+    figmaY: 635,
     figmaW: 241.39,
     figmaH: 313.4,
     objectFit: "bottom",
@@ -382,41 +416,59 @@ function getRelicLayoutRect(relic: Relic) {
   };
 }
 
-/** Stretch visible tablet relics to fill the desktop artboard width. */
+/** Stretch visible tablet relics to fill the content area (tablet margins only). */
 function computeTabletSpread() {
+  const layout = TABLET_LAYOUT;
   let minLeft = Infinity;
   let maxRight = 0;
+  let minTop = Infinity;
+  let maxBottom = 0;
 
   for (const relic of relics) {
     if (TABLET_HIDDEN_RELIC_IDS.has(relic.id)) continue;
     const { left, width } = getRelicLayoutRect(relic);
     minLeft = Math.min(minLeft, left);
     maxRight = Math.max(maxRight, left + width);
+    minTop = Math.min(minTop, relic.figmaY);
+    maxBottom = Math.max(maxBottom, relic.figmaY + relic.figmaH);
   }
 
-  const targetLeft = minLeft;
-  const targetRight = FIGMA_WIDTH - DESKTOP_LAYOUT.textLeft;
+  const targetLeft = layout.textLeft;
+  const targetRight = layout.width - layout.textLeft;
+  /** Room for headline + body above the bottom inset. */
+  const textReserve = 210;
+  const targetTop = layout.inset.top;
+  const targetBottom = layout.height - layout.textBottom - textReserve;
+
+  const contentWidth = maxRight - minLeft;
+  const contentHeight = maxBottom - minTop;
 
   return {
     minLeft,
-    scale: (targetRight - targetLeft) / (maxRight - minLeft),
+    minTop,
+    scaleX: contentWidth > 0 ? (targetRight - targetLeft) / contentWidth : 1,
+    scaleY: contentHeight > 0 ? (targetBottom - targetTop) / contentHeight : 1,
     targetLeft,
+    targetTop,
   };
 }
 
 const TABLET_SPREAD = computeTabletSpread();
 
 function spreadRelicForTablet(relic: Relic): Relic {
-  const { minLeft, scale, targetLeft } = TABLET_SPREAD;
+  const { minLeft, minTop, scaleX, scaleY, targetLeft, targetTop } =
+    TABLET_SPREAD;
   const { left } = getRelicLayoutRect(relic);
-  const newLeft = targetLeft + (left - minLeft) * scale;
-  const newFigmaW = relic.figmaW * scale;
+  const newLeft = targetLeft + (left - minLeft) * scaleX;
+  const newFigmaY = targetTop + (relic.figmaY - minTop) * scaleY;
+  const newFigmaW = relic.figmaW * scaleX;
   const newScaledW = newFigmaW * RELIC_SCALE;
   const newOffsetX = (newFigmaW - newScaledW) / 2;
 
   return {
     ...relic,
     figmaX: newLeft - newOffsetX,
+    figmaY: newFigmaY,
     figmaW: newFigmaW,
   };
 }
@@ -432,21 +484,23 @@ function getRelicSceneRect(
   sceneHeight: number,
   paddingFigmaPx = 0,
 ) {
+  const { mapX, mapY, mapW, mapH } = getLayoutMappers(layout);
   const scaledW = relic.figmaW * RELIC_SCALE;
   const scaledH = relic.figmaH * RELIC_SCALE;
   const offsetX = (relic.figmaW - scaledW) / 2;
   const offsetY = (relic.figmaH - scaledH) / 2;
   const padX = (paddingFigmaPx / layout.width) * sceneWidth;
   const padY = (paddingFigmaPx / layout.height) * sceneHeight;
+  const left = mapX(relic.figmaX + offsetX);
+  const top = mapY(relic.figmaY + offsetY);
+  const width = mapW(scaledW);
+  const height = mapH(scaledH);
 
   return {
-    left: ((relic.figmaX + offsetX) / layout.width) * sceneWidth - padX,
-    top: ((relic.figmaY + offsetY) / layout.height) * sceneHeight - padY,
-    right:
-      ((relic.figmaX + offsetX + scaledW) / layout.width) * sceneWidth + padX,
-    bottom:
-      ((relic.figmaY + offsetY + scaledH) / layout.height) * sceneHeight +
-      padY,
+    left: (left / layout.width) * sceneWidth - padX,
+    top: (top / layout.height) * sceneHeight - padY,
+    right: ((left + width) / layout.width) * sceneWidth + padX,
+    bottom: ((top + height) / layout.height) * sceneHeight + padY,
   };
 }
 
@@ -505,7 +559,10 @@ function RelicSpeechBubble({
   const { figmaFont, figmaSpaceY, figmaPx } = createPctHelpers(layout);
   const bubbleRef = useRef<HTMLDivElement>(null);
   const isTopRelic = relic.figmaY < TOP_RELIC_Y;
-  const [align, setAlign] = useState(() => getBubbleAlign(relic, layout));
+  const fixedAlign = relic.bubbleAlign;
+  const [align, setAlign] = useState(
+    () => fixedAlign ?? getBubbleAlign(relic, layout),
+  );
   const [nudge, setNudge] = useState({ x: 0, y: 0 });
 
   useLayoutEffect(() => {
@@ -528,7 +585,7 @@ function RelicSpeechBubble({
     }
     if (rect.right > sceneRect.right - pad) {
       dx -= rect.right - (sceneRect.right - pad);
-      if (align === "center") setAlign("right");
+      if (align === "center" && !fixedAlign) setAlign("right");
     }
     if (rect.top < sceneRect.top + pad) {
       dy += sceneRect.top + pad - rect.top;
@@ -538,7 +595,7 @@ function RelicSpeechBubble({
     }
 
     setNudge({ x: dx, y: dy });
-  }, [relic.id, relic.caption, align, isTopRelic, lensOnly]);
+  }, [relic.id, relic.caption, align, isTopRelic, lensOnly, fixedAlign]);
 
   if (!relic.caption) return null;
 
@@ -588,13 +645,25 @@ function RelicSpeechBubble({
   );
 }
 
-function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
+function HeroTextBlock({
+  layout,
+  fitScale,
+  onFitScaleChange,
+  measureFit = true,
+}: {
+  layout: LayoutConfig;
+  fitScale: number;
+  onFitScaleChange?: (scale: number) => void;
+  /** Only the visible scene measures; the lens clone reuses the same scale. */
+  measureFit?: boolean;
+}) {
   const blockRef = useRef<HTMLDivElement>(null);
-  const [fitScale, setFitScale] = useState(1);
-  const { pctX, pctY, pctW, figmaFont, figmaSpaceY, figmaPx } =
+  const { pctX, pctY, pctBottom, pctW, figmaFont, figmaSpaceY, figmaPx } =
     createPctHelpers(layout);
 
   useLayoutEffect(() => {
+    if (!measureFit || !onFitScaleChange) return;
+
     const block = blockRef.current;
     const scene = block?.closest("[data-hero-scene]") as HTMLElement | null;
     if (!block || !scene) return;
@@ -611,16 +680,16 @@ function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
           0.72,
           (blockRect.height - overflow) / blockRect.height,
         );
-        setFitScale(next);
+        onFitScaleChange(next);
       } else {
-        setFitScale(1);
+        onFitScaleChange(1);
       }
     };
 
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, [layout.width, layout.height]);
+  }, [layout.width, layout.height, measureFit, onFitScaleChange]);
 
   return (
     <div
@@ -629,7 +698,7 @@ function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
       className="hero-text-block pointer-events-none absolute z-10 box-border flex flex-col items-start"
       style={{
         left: pctX(layout.textLeft),
-        bottom: `calc(${pctY(layout.textBottom)} + env(safe-area-inset-bottom, 0px))`,
+        bottom: `calc(${pctBottom(layout.textBottom)} + env(safe-area-inset-bottom, 0px))`,
         width: pctW(layout.textWidth),
         maxWidth: `calc(100% - ${pctX(layout.textLeft * 2)})`,
         gap: figmaSpaceY(layout.blockGap),
@@ -767,6 +836,9 @@ type HeroSceneProps = {
   magnifierActive?: boolean;
   /** Speech bubbles only — magnifier overlay above glass. */
   bubblesOnly?: boolean;
+  textFitScale?: number;
+  onTextFitScaleChange?: (scale: number) => void;
+  measureTextFit?: boolean;
 };
 
 function HeroScene({
@@ -778,6 +850,9 @@ function HeroScene({
   lensExpanded = false,
   magnifierActive = false,
   bubblesOnly = false,
+  textFitScale = 1,
+  onTextFitScaleChange,
+  measureTextFit = false,
 }: HeroSceneProps) {
   const isMobile = viewportTier === "mobile";
   const layout = getLayout(viewportTier);
@@ -894,7 +969,14 @@ function HeroScene({
         );
       })}
 
-      {!bubblesOnly && <HeroTextBlock layout={layout} />}
+      {!bubblesOnly && (
+        <HeroTextBlock
+          layout={layout}
+          fitScale={textFitScale}
+          onFitScaleChange={onTextFitScaleChange}
+          measureFit={measureTextFit}
+        />
+      )}
     </div>
   );
 }
@@ -904,6 +986,7 @@ export default function Hero() {
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [lensExpanded, setLensExpanded] = useState(false);
   const [magnifierActive, setMagnifierActive] = useState(false);
+  const [textFitScale, setTextFitScale] = useState(1);
 
   const handleCursorMove = useCallback(
     (
@@ -961,6 +1044,8 @@ export default function Hero() {
     onHover: handleRelicHover,
     viewportTier,
     magnifierActive,
+    textFitScale,
+    onTextFitScaleChange: setTextFitScale,
   };
 
   return (
@@ -974,13 +1059,24 @@ export default function Hero() {
           interactive={false}
           forceFullColor
           lensExpanded={lensExpanded}
+          measureTextFit={false}
         />
       }
       overlay={
-        <HeroScene {...sceneProps} interactive={false} bubblesOnly />
+        <HeroScene
+          {...sceneProps}
+          interactive={false}
+          bubblesOnly
+          measureTextFit={false}
+        />
       }
     >
-      <HeroScene {...sceneProps} interactive lensExpanded={lensExpanded} />
+      <HeroScene
+        {...sceneProps}
+        interactive
+        lensExpanded={lensExpanded}
+        measureTextFit
+      />
     </MagnifierCursor>
   );
 }
