@@ -10,6 +10,7 @@ import {
   type CSSProperties,
 } from "react";
 import MagnifierCursor from "./magnifier-cursor";
+import RelicHalftoneImage from "./relic-halftone-image";
 
 /** Hero artboard dimensions from Figma "Final Design" → hero frame (24:88). */
 const FIGMA_WIDTH = 1512;
@@ -707,7 +708,32 @@ function renderRelicImage(
   relic: Relic & RelicOverride,
   layout: LayoutConfig,
   interactive: boolean,
+  halftoneActive: boolean,
+  enableHalftoneLayer: boolean,
 ) {
+  const objectFit =
+    relic.objectFit === "cover"
+      ? "cover"
+      : relic.objectFit === "bottom"
+        ? "bottom"
+        : "contain";
+
+  if (enableHalftoneLayer) {
+    return (
+      <RelicHalftoneImage
+        src={relic.src}
+        alt={interactive ? `relic ${relic.id}` : ""}
+        width={relic.width}
+        height={relic.height}
+        sizes={relicImageSizes(relic, layout)}
+        objectFit={objectFit}
+        priority={interactive && relic.id <= 4}
+        halftoneActive={halftoneActive}
+        aria-hidden={!interactive}
+      />
+    );
+  }
+
   return (
     <Image
       src={relic.src}
@@ -737,7 +763,7 @@ type HeroSceneProps = {
   /** Lens clone always renders full color. */
   forceFullColor?: boolean;
   lensExpanded?: boolean;
-  /** Touch-drag magnifier engaged — mobile grayscale only while true. */
+  /** Touch-drag magnifier engaged — mobile halftone only while true. */
   magnifierActive?: boolean;
   /** Speech bubbles only — magnifier overlay above glass. */
   bubblesOnly?: boolean;
@@ -756,11 +782,12 @@ function HeroScene({
   const isMobile = viewportTier === "mobile";
   const layout = getLayout(viewportTier);
   const { pctX, pctY, pctW, pctH } = createPctHelpers(layout);
-  const grayscaleRelics =
+  const halftoneRelics =
     !forceFullColor &&
     interactive &&
     lensExpanded &&
     (!isMobile || magnifierActive);
+  const enableHalftoneLayer = !forceFullColor && interactive;
 
   const relicStyle = (relic: Relic & RelicOverride) => {
     const scaledW = relic.figmaW * RELIC_SCALE;
@@ -848,7 +875,6 @@ function HeroScene({
             style={{
               ...relicStyle(resolved),
               zIndex: isHovered ? 20 : (relic.zIndex ?? 1),
-              filter: grayscaleRelics ? "grayscale(100%)" : "none",
             }}
             onMouseEnter={
               interactive && !isMobile ? () => onHover(relic.id) : undefined
@@ -857,7 +883,13 @@ function HeroScene({
               interactive && !isMobile ? () => onHover(null) : undefined
             }
           >
-            {renderRelicImage(resolved, layout, interactive)}
+            {renderRelicImage(
+              resolved,
+              layout,
+              interactive,
+              halftoneRelics,
+              enableHalftoneLayer,
+            )}
           </div>
         );
       })}
