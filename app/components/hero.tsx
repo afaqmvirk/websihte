@@ -37,7 +37,7 @@ const BUBBLE_ANCHOR_Y = 0.7;
 /** Extra distance (Figma px, scaled to scene) before the lens shrinks after leaving a relic. */
 const FOCUS_SHRINK_PADDING = 40;
 
-const FONT_ARIAL_NARROW = '"Arial Narrow", Arial, sans-serif';
+const FONT_ARIAL_NARROW = "var(--font-arial-narrow)";
 
 type Relic = {
   id: number;
@@ -652,7 +652,7 @@ function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
         the stupid ideas hackathon community.
       </h1>
       <div
-        className="max-w-full font-sans text-black"
+        className="max-w-full font-arial-narrow text-black"
         style={{
           fontSize: figmaFont(
             layout.body.figma,
@@ -670,7 +670,7 @@ function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
       </div>
       <div className="flex max-w-full flex-wrap items-center">
         <span
-          className="inline-flex shrink-0 items-center justify-center rounded-full border border-black bg-white font-sans text-black"
+          className="inline-flex shrink-0 items-center justify-center rounded-full border border-black bg-white font-arial-narrow text-black"
           style={{
             padding: `${figmaSpaceY(4)} ${figmaPx(16)}`,
             fontSize: figmaFont(
@@ -685,7 +685,7 @@ function HeroTextBlock({ layout }: { layout: LayoutConfig }) {
           {layout.ctaLabel}
         </span>
         <span
-          className="font-sans text-black"
+          className="font-arial-narrow text-black"
           style={{
             fontSize: figmaFont(
               layout.body.figma,
@@ -737,6 +737,8 @@ type HeroSceneProps = {
   /** Lens clone always renders full color. */
   forceFullColor?: boolean;
   lensExpanded?: boolean;
+  /** Touch-drag magnifier engaged — mobile grayscale only while true. */
+  magnifierActive?: boolean;
   /** Speech bubbles only — magnifier overlay above glass. */
   bubblesOnly?: boolean;
 };
@@ -748,12 +750,17 @@ function HeroScene({
   interactive = true,
   forceFullColor = false,
   lensExpanded = false,
+  magnifierActive = false,
   bubblesOnly = false,
 }: HeroSceneProps) {
   const isMobile = viewportTier === "mobile";
   const layout = getLayout(viewportTier);
   const { pctX, pctY, pctW, pctH } = createPctHelpers(layout);
-  const grayscaleRelics = !forceFullColor && interactive && lensExpanded;
+  const grayscaleRelics =
+    !forceFullColor &&
+    interactive &&
+    lensExpanded &&
+    (!isMobile || magnifierActive);
 
   const relicStyle = (relic: Relic & RelicOverride) => {
     const scaledW = relic.figmaW * RELIC_SCALE;
@@ -864,6 +871,7 @@ export default function Hero() {
   const viewportTier = useHeroViewport();
   const [hoveredId, setHoveredId] = useState<number | null>(null);
   const [lensExpanded, setLensExpanded] = useState(false);
+  const [magnifierActive, setMagnifierActive] = useState(false);
 
   const handleCursorMove = useCallback(
     (
@@ -908,22 +916,26 @@ export default function Hero() {
     }
   }, []);
 
-  const handleCursorLeave = useCallback(() => {
-    setLensExpanded(false);
-    setHoveredId(null);
+  const handleMagnifierActiveChange = useCallback((active: boolean) => {
+    setMagnifierActive(active);
+    if (!active) {
+      setLensExpanded(false);
+      setHoveredId(null);
+    }
   }, []);
 
   const sceneProps = {
     hoveredId,
     onHover: handleRelicHover,
     viewportTier,
+    magnifierActive,
   };
 
   return (
     <MagnifierCursor
       focused={lensExpanded}
       onCursorMove={handleCursorMove}
-      onCursorLeave={handleCursorLeave}
+      onMagnifierActiveChange={handleMagnifierActiveChange}
       clone={
         <HeroScene
           {...sceneProps}

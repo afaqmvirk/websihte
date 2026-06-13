@@ -17,8 +17,8 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  --font-arial-narrow:
+    "Arial Narrow", var(--font-arial-narrow-web), Arial, sans-serif;
 }
 
 html {
@@ -28,7 +28,7 @@ html {
 body {
   background: #ffffff;
   color: var(--foreground);
-  font-family: "Arial Narrow", Arial, sans-serif;
+  font-family: var(--font-arial-narrow);
   overflow: hidden;
 }
 

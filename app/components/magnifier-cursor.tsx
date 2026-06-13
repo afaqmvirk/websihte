@@ -21,6 +21,8 @@ const SHRINK_SIZE_TRANSITION = "width 280ms ease-out, height 280ms ease-out";
 const MAP_SIZE = 256;
 /** Match hero mobile tier — text block drags pass through for future scroll. */
 const MOBILE_BREAKPOINT = 768;
+/** Lift the lens above the touch point so the finger doesn't cover it. */
+const TOUCH_LENS_OFFSET_Y = -72;
 /** Displacement concentrated toward the rim (sharp center, warped edges). */
 const RIM_EXPONENT = 3.5;
 /** Edge displacement strength as a fraction of lens radius. */
@@ -97,7 +99,7 @@ type MagnifierCursorProps = {
     localY: number,
     scene: { width: number; height: number },
   ) => void;
-  onCursorLeave?: () => void;
+  onMagnifierActiveChange?: (active: boolean) => void;
 };
 
 function applyContentPosition(
@@ -122,7 +124,7 @@ export default function MagnifierCursor({
   focused = false,
   focusExpandPercent = FOCUS_EXPAND_PERCENT,
   onCursorMove,
-  onCursorLeave,
+  onMagnifierActiveChange,
 }: MagnifierCursorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLDivElement>(null);
@@ -160,34 +162,56 @@ export default function MagnifierCursor({
       : LENS_SIZE;
   }, []);
 
-  const applyLensPosition = useCallback((clientX: number, clientY: number) => {
-    const s = sceneRef.current;
-    if (s.width <= 0) return;
+  const setMagnifierActive = useCallback(
+    (next: boolean) => {
+      if (activeRef.current === next) return;
+      setActive(next);
+      onMagnifierActiveChange?.(next);
+    },
+    [onMagnifierActiveChange],
+  );
 
-    const localX = clientX - s.left;
-    const localY = clientY - s.top;
-    const lens = lensRef.current;
-
-    if (lens) {
-      lens.style.left = `${clientX}px`;
-      lens.style.top = `${clientY}px`;
-    }
-
-    applyContentPosition(
-      sharpContentRef.current,
-      localX,
-      localY,
-      s.width,
-      s.height,
-    );
-    applyContentPosition(
-      overlayContentRef.current,
-      localX,
-      localY,
-      s.width,
-      s.height,
-    );
+  const getLensClientCoords = useCallback((clientX: number, clientY: number) => {
+    return {
+      x: clientX,
+      y: isMobileViewportRef.current
+        ? clientY + TOUCH_LENS_OFFSET_Y
+        : clientY,
+    };
   }, []);
+
+  const applyLensPosition = useCallback(
+    (clientX: number, clientY: number) => {
+      const s = sceneRef.current;
+      if (s.width <= 0) return;
+
+      const { x: lensX, y: lensY } = getLensClientCoords(clientX, clientY);
+      const localX = lensX - s.left;
+      const localY = lensY - s.top;
+      const lens = lensRef.current;
+
+      if (lens) {
+        lens.style.left = `${lensX}px`;
+        lens.style.top = `${lensY}px`;
+      }
+
+      applyContentPosition(
+        sharpContentRef.current,
+        localX,
+        localY,
+        s.width,
+        s.height,
+      );
+      applyContentPosition(
+        overlayContentRef.current,
+        localX,
+        localY,
+        s.width,
+        s.height,
+      );
+    },
+    [getLensClientCoords],
+  );
 
   const updateScene = useCallback(() => {
     const el = containerRef.current;
@@ -267,7 +291,8 @@ export default function MagnifierCursor({
 
           const s = sceneRef.current;
           if (onCursorMove && s.width > 0) {
-            onCursorMove(x - s.left, y - s.top, {
+            const { x: lensX, y: lensY } = getLensClientCoords(x, y);
+            onCursorMove(lensX - s.left, lensY - s.top, {
               width: s.width,
               height: s.height,
             });
@@ -277,7 +302,7 @@ export default function MagnifierCursor({
         });
       }
     },
-    [applyLensPosition, onCursorMove],
+    [applyLensPosition, getLensClientCoords, onCursorMove],
   );
 
   useEffect(() => {
@@ -320,7 +345,7 @@ export default function MagnifierCursor({
       return;
     }
 
-    setActive(true);
+    setMagnifierActive(true);
     schedulePointerUpdate(touch.clientX, touch.clientY);
   };
 
@@ -332,8 +357,7 @@ export default function MagnifierCursor({
       return;
     }
     if (e.touches.length > 0) return;
-    setActive(false);
-    onCursorLeave?.();
+    setMagnifierActive(false);
   };
 
   const showLens =
@@ -472,10 +496,13 @@ export default function MagnifierCursor({
       onTouchEnd={handleTouchEnd}
       onTouchCancel={handleTouchEnd}
       onDragStart={(e) => e.preventDefault()}
-      onMouseEnter={() => setActive(true)}
+      onMouseEnter={() => {
+        if (isMobileViewportRef.current) return;
+        setMagnifierActive(true);
+      }}
       onMouseLeave={() => {
-        setActive(false);
-        onCursorLeave?.();
+        if (isMobileViewportRef.current) return;
+        setMagnifierActive(false);
       }}
     >
       {children}
