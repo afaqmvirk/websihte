@@ -918,14 +918,7 @@ function HeroScene({
       className="relative h-full w-full select-none overflow-hidden bg-white"
       onDragStart={(e) => e.preventDefault()}
     >
-      <div
-        className="pointer-events-none absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2"
-        style={{
-          width: pctW(1572),
-          height: pctH(1204),
-          zIndex: 0,
-        }}
-      >
+      <div className="pointer-events-none absolute inset-0 z-0 overflow-hidden">
         <Image
           src="/Texturelabs_Paper_312XL 1.png"
           alt=""
