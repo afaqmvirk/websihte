@@ -1,0 +1,148 @@
+@import "tailwindcss";
+
+:root {
+  --background: #ffffff;
+  --foreground: #171717;
+}
+
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --font-sans: var(--font-geist-sans);
+  --font-mono: var(--font-geist-mono);
+}
+
+@media (prefers-color-scheme: dark) {
+  :root {
+    --background: #0a0a0a;
+    --foreground: #ededed;
+  }
+}
+
+body {
+  background: var(--background);
+  color: var(--foreground);
+  font-family: "Arial Narrow", Arial, sans-serif;
+  overflow-x: hidden;
+}
+
+.magnifier-root {
+  cursor: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.magnifier-root img,
+.magnifier-lens img,
+[data-hero-scene] img {
+  -webkit-user-drag: none;
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+[data-hero-scene] {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+.magnifier-lens {
+  contain: layout style paint;
+  user-select: none;
+  -webkit-user-select: none;
+  box-shadow:
+    0 6px 24px rgba(0, 0, 0, 0.12),
+    0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+@media (pointer: coarse) {
+  .magnifier-root {
+    cursor: auto;
+  }
+}
+
+.magnifier-content {
+  transform-origin: 0 0;
+  will-change: transform, left, top;
+}
+
+/* Edge ring: slightly higher zoom than center, masked to outer rim only */
+.magnifier-viewport--edge {
+  z-index: 1;
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 58%,
+    rgb(0 0 0 / 0.55) 72%,
+    black 84%,
+    black 100%
+  );
+  mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 58%,
+    rgb(0 0 0 / 0.55) 72%,
+    black 84%,
+    black 100%
+  );
+}
+
+/* Content chromatic aberration — offset channel copies, rim only */
+.magnifier-viewport--chroma {
+  z-index: 2;
+  pointer-events: none;
+  -webkit-mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 64%,
+    rgb(0 0 0 / 0.55) 78%,
+    black 88%,
+    black 100%
+  );
+  mask-image: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 64%,
+    rgb(0 0 0 / 0.55) 78%,
+    black 88%,
+    black 100%
+  );
+}
+
+.magnifier-viewport--chroma-red {
+  opacity: 0.22;
+}
+
+.magnifier-content--chroma-red {
+  filter: saturate(1.15) hue-rotate(-8deg);
+}
+
+.magnifier-viewport--chroma-blue {
+  opacity: 0.2;
+}
+
+.magnifier-content--chroma-blue {
+  filter: saturate(1.15) hue-rotate(8deg);
+}
+
+.magnifier-glass {
+  z-index: 3;
+  border: 1.5px solid rgba(255, 255, 255, 0.85);
+  opacity: 0.38;
+  background:
+    radial-gradient(
+      circle at 32% 28%,
+      rgba(255, 255, 255, 0.45) 0%,
+      rgba(255, 255, 255, 0.12) 45%,
+      rgba(255, 255, 255, 0.04) 100%
+    ),
+    linear-gradient(
+      145deg,
+      rgba(255, 255, 255, 0.28) 0%,
+      rgba(255, 255, 255, 0.08) 55%,
+      rgba(0, 0, 0, 0.03) 100%
+    );
+  box-shadow:
+    inset 0 0 18px 6px rgba(255, 255, 255, 0.25),
+    inset 0 1px 2px rgba(255, 255, 255, 0.5),
+    inset 0 -8px 16px rgba(0, 0, 0, 0.06);
+}
