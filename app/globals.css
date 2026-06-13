@@ -3,6 +3,15 @@
 :root {
   --background: #ffffff;
   --foreground: #171717;
+  color-scheme: light;
+  /** Visible viewport height — svh baseline, refined by ViewportHeightSync on mobile. */
+  --app-height: 100svh;
+}
+
+@supports not (height: 100svh) {
+  :root {
+    --app-height: 100dvh;
+  }
 }
 
 @theme inline {
@@ -12,22 +21,35 @@
   --font-mono: var(--font-geist-mono);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html {
+  background: #ffffff;
 }
 
 body {
-  background: var(--background);
+  background: #ffffff;
   color: var(--foreground);
   font-family: "Arial Narrow", Arial, sans-serif;
-  overflow-x: hidden;
+  overflow: hidden;
+}
+
+html,
+body {
+  height: 100svh;
+  height: var(--app-height);
+  min-height: 100svh;
+  max-height: var(--app-height);
+}
+
+.h-app {
+  height: 100svh;
+  height: var(--app-height);
+  min-height: 100svh;
+  max-height: var(--app-height);
 }
 
 .magnifier-root {
   cursor: none;
+  touch-action: none;
   user-select: none;
   -webkit-user-select: none;
 }
@@ -43,6 +65,13 @@ body {
 [data-hero-scene] {
   user-select: none;
   -webkit-user-select: none;
+}
+
+@media (max-width: 768px) {
+  [data-hero-text-block] {
+    pointer-events: auto;
+    touch-action: pan-y;
+  }
 }
 
 .magnifier-lens {

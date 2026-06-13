@@ -19,6 +19,8 @@ const EXPAND_SIZE_TRANSITION =
 const SHRINK_SIZE_TRANSITION = "width 280ms ease-out, height 280ms ease-out";
 
 const MAP_SIZE = 256;
+/** Match hero mobile tier — text block drags pass through for future scroll. */
+const MOBILE_BREAKPOINT = 768;
 /** Displacement concentrated toward the rim (sharp center, warped edges). */
 const RIM_EXPONENT = 3.5;
 /** Edge displacement strength as a fraction of lens radius. */
@@ -131,6 +133,9 @@ export default function MagnifierCursor({
   const sceneRef = useRef({ width: 0, height: 0, left: 0, top: 0 });
   const focusedRef = useRef(focused);
   const focusExpandRef = useRef(focusExpandPercent);
+  const activeRef = useRef(false);
+  const touchScrollPassthroughRef = useRef(false);
+  const isMobileViewportRef = useRef(false);
   const filterId = `magnifier-lens-${useId().replace(/:/g, "")}`;
 
   const [mounted, setMounted] = useState(false);
@@ -141,6 +146,7 @@ export default function MagnifierCursor({
 
   focusedRef.current = focused;
   focusExpandRef.current = focusExpandPercent;
+  activeRef.current = active;
   sceneRef.current = scene;
 
   const lensSize = focused
@@ -214,16 +220,81 @@ export default function MagnifierCursor({
 
   useEffect(() => {
     setMounted(true);
-    setEnabled(!window.matchMedia("(pointer: coarse)").matches);
+    setEnabled(true);
     setDispMap(buildDisplacementMap());
     updateScene();
+
+    const mobileMq = window.matchMedia(
+      `(max-width: ${MOBILE_BREAKPOINT}px)`,
+    );
+    const syncMobile = () => {
+      isMobileViewportRef.current = mobileMq.matches;
+    };
+    syncMobile();
+    mobileMq.addEventListener("change", syncMobile);
+
     window.addEventListener("resize", updateScene);
     window.addEventListener("scroll", updateScene, true);
     return () => {
+      mobileMq.removeEventListener("change", syncMobile);
       window.removeEventListener("resize", updateScene);
       window.removeEventListener("scroll", updateScene, true);
     };
   }, [updateScene]);
+
+  const isPointInHeroTextBlock = useCallback((clientX: number, clientY: number) => {
+    const block = containerRef.current?.querySelector(
+      "[data-hero-text-block]",
+    );
+    if (!block) return false;
+    const rect = block.getBoundingClientRect();
+    return (
+      clientX >= rect.left &&
+      clientX <= rect.right &&
+      clientY >= rect.top &&
+      clientY <= rect.bottom
+    );
+  }, []);
+
+  const schedulePointerUpdate = useCallback(
+    (clientX: number, clientY: number) => {
+      pendingRef.current = { x: clientX, y: clientY };
+
+      if (!rafRef.current) {
+        rafRef.current = requestAnimationFrame(() => {
+          const { x, y } = pendingRef.current;
+          applyLensPosition(x, y);
+
+          const s = sceneRef.current;
+          if (onCursorMove && s.width > 0) {
+            onCursorMove(x - s.left, y - s.top, {
+              width: s.width,
+              height: s.height,
+            });
+          }
+
+          rafRef.current = 0;
+        });
+      }
+    },
+    [applyLensPosition, onCursorMove],
+  );
+
+  useEffect(() => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    const onTouchMove = (e: TouchEvent) => {
+      if (touchScrollPassthroughRef.current) return;
+      if (!activeRef.current || e.touches.length !== 1) return;
+      e.preventDefault();
+      const touch = e.touches[0];
+      schedulePointerUpdate(touch.clientX, touch.clientY);
+    };
+
+    el.addEventListener("touchmove", onTouchMove, { passive: false });
+    return () => el.removeEventListener("touchmove", onTouchMove);
+  }, [schedulePointerUpdate]);
 
   useEffect(() => {
     if (scene.width > 0) {
@@ -232,24 +303,37 @@ export default function MagnifierCursor({
   }, [scene.width, scene.height, applyLensPosition]);
 
   const handleMouseMove = (e: React.MouseEvent) => {
-    pendingRef.current = { x: e.clientX, y: e.clientY };
+    schedulePointerUpdate(e.clientX, e.clientY);
+  };
 
-    if (!rafRef.current) {
-      rafRef.current = requestAnimationFrame(() => {
-        const { x, y } = pendingRef.current;
-        applyLensPosition(x, y);
+  const handleTouchStart = (e: React.TouchEvent) => {
+    if (e.touches.length !== 1) return;
 
-        const s = sceneRef.current;
-        if (onCursorMove && s.width > 0) {
-          onCursorMove(x - s.left, y - s.top, {
-            width: s.width,
-            height: s.height,
-          });
-        }
+    touchScrollPassthroughRef.current = false;
 
-        rafRef.current = 0;
-      });
+    const touch = e.touches[0];
+    if (
+      isMobileViewportRef.current &&
+      isPointInHeroTextBlock(touch.clientX, touch.clientY)
+    ) {
+      touchScrollPassthroughRef.current = true;
+      return;
     }
+
+    setActive(true);
+    schedulePointerUpdate(touch.clientX, touch.clientY);
+  };
+
+  const handleTouchEnd = (e: React.TouchEvent) => {
+    if (touchScrollPassthroughRef.current) {
+      if (e.touches.length === 0) {
+        touchScrollPassthroughRef.current = false;
+      }
+      return;
+    }
+    if (e.touches.length > 0) return;
+    setActive(false);
+    onCursorLeave?.();
   };
 
   const showLens =
@@ -382,8 +466,11 @@ export default function MagnifierCursor({
   return (
     <div
       ref={containerRef}
-      className="magnifier-root relative min-h-screen w-full select-none"
+      className="magnifier-root h-app relative w-full touch-none overflow-hidden select-none"
       onMouseMove={handleMouseMove}
+      onTouchStart={handleTouchStart}
+      onTouchEnd={handleTouchEnd}
+      onTouchCancel={handleTouchEnd}
       onDragStart={(e) => e.preventDefault()}
       onMouseEnter={() => setActive(true)}
       onMouseLeave={() => {
