@@ -443,8 +443,8 @@ type HeroSceneProps = {
   /** Lens clone always renders full color. */
   forceFullColor?: boolean;
   lensExpanded?: boolean;
-  /** Skip text and bubbles — used for magnifier rim layer. */
-  imagesOnly?: boolean;
+  /** Speech bubbles only — magnifier overlay above glass. */
+  bubblesOnly?: boolean;
 };
 
 function HeroScene({
@@ -453,9 +453,44 @@ function HeroScene({
   interactive = true,
   forceFullColor = false,
   lensExpanded = false,
-  imagesOnly = false,
+  bubblesOnly = false,
 }: HeroSceneProps) {
   const grayscaleRelics = !forceFullColor && interactive && lensExpanded;
+
+  if (bubblesOnly) {
+    return (
+      <div
+        data-hero-scene
+        className="pointer-events-none relative h-full min-h-screen w-full overflow-hidden"
+      >
+        {relics.map((relic) => {
+          if (!relic.caption) return null;
+          const isHovered = hoveredId === relic.id;
+          const scaledW = relic.figmaW * RELIC_SCALE;
+          const scaledH = relic.figmaH * RELIC_SCALE;
+          const offsetX = (relic.figmaW - scaledW) / 2;
+          const offsetY = (relic.figmaH - scaledH) / 2;
+
+          return (
+            <div
+              key={relic.id}
+              className="pointer-events-none absolute"
+              style={{
+                top: pctY(relic.figmaY + offsetY),
+                left: pctX(relic.figmaX + offsetX),
+                width: pctW(scaledW),
+                height: pctH(scaledH),
+                zIndex: isHovered ? 20 : (relic.zIndex ?? 1),
+              }}
+            >
+              <RelicSpeechBubble relic={relic} lensOnly />
+            </div>
+          );
+        })}
+      </div>
+    );
+  }
+
   return (
     <div
       data-hero-scene
@@ -505,9 +540,6 @@ function HeroScene({
             }
             onMouseLeave={interactive ? () => onHover(null) : undefined}
           >
-            {forceFullColor && !imagesOnly && relic.caption && (
-              <RelicSpeechBubble relic={relic} lensOnly />
-            )}
             <Image
               src={relic.src}
               alt={interactive ? `relic ${relic.id}` : ""}
@@ -528,7 +560,7 @@ function HeroScene({
         );
       })}
 
-      {!imagesOnly && <HeroTextBlock />}
+      {!bubblesOnly && <HeroTextBlock />}
     </div>
   );
 }
@@ -592,14 +624,12 @@ export default function Hero() {
           lensExpanded={lensExpanded}
         />
       }
-      edgeClone={
+      overlay={
         <HeroScene
           hoveredId={hoveredId}
           onHover={handleRelicHover}
           interactive={false}
-          forceFullColor
-          lensExpanded={lensExpanded}
-          imagesOnly
+          bubblesOnly
         />
       }
     >

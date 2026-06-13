@@ -46,12 +46,13 @@ body {
 }
 
 .magnifier-lens {
-  contain: layout style paint;
+  contain: layout style;
   user-select: none;
   -webkit-user-select: none;
+  /* Figma Drop shadow on Ellipse 1 */
   box-shadow:
-    0 6px 24px rgba(0, 0, 0, 0.12),
-    0 2px 8px rgba(0, 0, 0, 0.08);
+    0 10px 40px rgb(0 0 0 / 0.16),
+    0 4px 14px rgb(0 0 0 / 0.1);
 }
 
 @media (pointer: coarse) {
@@ -65,84 +66,38 @@ body {
   will-change: transform, left, top;
 }
 
-/* Edge ring: slightly higher zoom than center, masked to outer rim only */
-.magnifier-viewport--edge {
-  z-index: 1;
-  -webkit-mask-image: radial-gradient(
-    circle at center,
-    transparent 0%,
-    transparent 58%,
-    rgb(0 0 0 / 0.55) 72%,
-    black 84%,
-    black 100%
-  );
-  mask-image: radial-gradient(
-    circle at center,
-    transparent 0%,
-    transparent 58%,
-    rgb(0 0 0 / 0.55) 72%,
-    black 84%,
-    black 100%
-  );
-}
-
-/* Content chromatic aberration — offset channel copies, rim only */
-.magnifier-viewport--chroma {
-  z-index: 2;
-  pointer-events: none;
-  -webkit-mask-image: radial-gradient(
-    circle at center,
-    transparent 0%,
-    transparent 64%,
-    rgb(0 0 0 / 0.55) 78%,
-    black 88%,
-    black 100%
-  );
-  mask-image: radial-gradient(
-    circle at center,
-    transparent 0%,
-    transparent 64%,
-    rgb(0 0 0 / 0.55) 78%,
-    black 88%,
-    black 100%
-  );
-}
-
-.magnifier-viewport--chroma-red {
-  opacity: 0.22;
-}
-
-.magnifier-content--chroma-red {
-  filter: saturate(1.15) hue-rotate(-8deg);
-}
-
-.magnifier-viewport--chroma-blue {
-  opacity: 0.2;
-}
-
-.magnifier-content--chroma-blue {
-  filter: saturate(1.15) hue-rotate(8deg);
-}
-
-.magnifier-glass {
+/* Dark glass vignette at the very rim (Figma: dark bezel around lens) */
+.magnifier-glass-edge {
   z-index: 3;
-  border: 1.5px solid rgba(255, 255, 255, 0.85);
-  opacity: 0.38;
+  pointer-events: none;
+  background: radial-gradient(
+    circle at center,
+    transparent 0%,
+    transparent 76%,
+    rgb(20 18 16 / 0.18) 88%,
+    rgb(14 12 10 / 0.42) 97%,
+    rgb(10 8 6 / 0.55) 100%
+  );
+}
+
+/* Specular rim + inner bevel (Figma Ellipse highlight) */
+.magnifier-glass-specular {
+  z-index: 4;
+  pointer-events: none;
+  border: 1.5px solid rgb(255 255 255 / 0.7);
   background:
     radial-gradient(
-      circle at 32% 28%,
-      rgba(255, 255, 255, 0.45) 0%,
-      rgba(255, 255, 255, 0.12) 45%,
-      rgba(255, 255, 255, 0.04) 100%
-    ),
-    linear-gradient(
-      145deg,
-      rgba(255, 255, 255, 0.28) 0%,
-      rgba(255, 255, 255, 0.08) 55%,
-      rgba(0, 0, 0, 0.03) 100%
+      circle at 30% 22%,
+      rgb(255 255 255 / 0.32) 0%,
+      rgb(255 255 255 / 0.06) 30%,
+      transparent 52%
     );
   box-shadow:
-    inset 0 0 18px 6px rgba(255, 255, 255, 0.25),
-    inset 0 1px 2px rgba(255, 255, 255, 0.5),
-    inset 0 -8px 16px rgba(0, 0, 0, 0.06);
+    inset 0 1px 2px rgb(255 255 255 / 0.6),
+    inset 0 0 0 1px rgb(255 255 255 / 0.18),
+    inset 0 -10px 24px rgb(0 0 0 / 0.12);
+}
+
+.magnifier-bubble-overlay {
+  z-index: 5;
 }
