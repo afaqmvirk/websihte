@@ -131,18 +131,18 @@ type RelicOverride = {
 };
 
 const MOBILE_RELIC_OVERRIDES: Partial<Record<number, RelicOverride>> = {
-  1: { figmaX: 35, figmaY: 52 },
-  2: { figmaX: 353.16, figmaY: 209, figmaW: 261.09, figmaH: 206.17 },
+  1: { figmaX: 115, figmaY: 22 },
+  2: { figmaX: 353.16, figmaY: 179, figmaW: 261.09, figmaH: 206.17 },
   3: {
     figmaX: 5,
-    figmaY: 237,
+    figmaY: 207,
     figmaW: 286.2,
     figmaH: 310.87,
     rotation: -13.73,
   },
-  4: { figmaX: 351, figmaY: 392 },
-  7: { figmaX: 23, figmaY: 548, figmaW: 330, figmaH: 240 },
-  8: { figmaX: 421, figmaY: 633, figmaW: 223.36, figmaH: 274.7 },
+  4: { figmaX: 351, figmaY: 362 },
+  7: { figmaX: 23, figmaY: 518, figmaW: 330, figmaH: 240 },
+  8: { figmaX: 451, figmaY: 603, figmaW: 223.36, figmaH: 274.7 },
 };
 
 function getLayout(tier: ViewportTier): LayoutConfig {
@@ -1032,6 +1032,26 @@ export default function Hero() {
     }
   }, []);
 
+  const shouldCaptureTouch = useCallback(
+    (
+      localX: number,
+      localY: number,
+      scene: { width: number; height: number },
+    ) => {
+      if (viewportTier !== "mobile") return true;
+      return (
+        hitTestRelics(
+          localX,
+          localY,
+          scene.width,
+          scene.height,
+          viewportTier,
+        ) !== null
+      );
+    },
+    [viewportTier],
+  );
+
   const sceneProps = {
     hoveredId,
     onHover: handleRelicHover,
@@ -1046,6 +1066,7 @@ export default function Hero() {
       focused={lensExpanded}
       onCursorMove={handleCursorMove}
       onMagnifierActiveChange={handleMagnifierActiveChange}
+      shouldCaptureTouch={shouldCaptureTouch}
       clone={
         <HeroScene
           {...sceneProps}

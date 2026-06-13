@@ -22,7 +22,7 @@ const RETREAT_SCALE = 0.12;
 const LENS_PRESENTATION_TRANSITION = `transform ${RETREAT_TRANSITION_MS}ms ease-out, opacity ${RETREAT_TRANSITION_MS}ms ease-out`;
 
 const MAP_SIZE = 256;
-/** Match hero mobile tier — text block drags pass through for future scroll. */
+/** Match hero mobile tier — scroll passthrough when touch is not on a relic. */
 const MOBILE_BREAKPOINT = 768;
 /** Lift the lens above the touch point so the finger doesn't cover it. */
 const TOUCH_LENS_OFFSET_Y = -150;
@@ -103,6 +103,12 @@ type MagnifierCursorProps = {
     scene: { width: number; height: number },
   ) => void;
   onMagnifierActiveChange?: (active: boolean) => void;
+  /** Mobile: return true to engage the lens; false allows page scroll (e.g. text / empty areas). */
+  shouldCaptureTouch?: (
+    localX: number,
+    localY: number,
+    scene: { width: number; height: number },
+  ) => boolean;
 };
 
 function applyContentPosition(
@@ -145,6 +151,7 @@ export default function MagnifierCursor({
   focusExpandPercent = FOCUS_EXPAND_PERCENT,
   onCursorMove,
   onMagnifierActiveChange,
+  shouldCaptureTouch,
 }: MagnifierCursorProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const lensRef = useRef<HTMLDivElement>(null);
@@ -490,20 +497,6 @@ export default function MagnifierCursor({
     return () => document.removeEventListener("mousemove", onDocumentMouseMove);
   }, [beginRetreat, isPointerInContainer]);
 
-  const isPointInHeroTextBlock = useCallback((clientX: number, clientY: number) => {
-    const block = containerRef.current?.querySelector(
-      "[data-hero-text-block]",
-    );
-    if (!block) return false;
-    const rect = block.getBoundingClientRect();
-    return (
-      clientX >= rect.left &&
-      clientX <= rect.right &&
-      clientY >= rect.top &&
-      clientY <= rect.bottom
-    );
-  }, []);
-
   const schedulePointerUpdate = useCallback(
     (clientX: number, clientY: number) => {
       pendingRef.current = { x: clientX, y: clientY };
@@ -574,12 +567,17 @@ export default function MagnifierCursor({
     touchScrollPassthroughRef.current = false;
 
     const touch = e.touches[0];
-    if (
-      isMobileViewportRef.current &&
-      isPointInHeroTextBlock(touch.clientX, touch.clientY)
-    ) {
-      touchScrollPassthroughRef.current = true;
-      return;
+    if (isMobileViewportRef.current) {
+      const s = measureSceneRect(containerRef.current);
+      const localX = touch.clientX - s.left;
+      const localY = touch.clientY - s.top;
+      const capture =
+        s.width > 0 &&
+        (shouldCaptureTouch?.(localX, localY, s) ?? false);
+      if (!capture) {
+        touchScrollPassthroughRef.current = true;
+        return;
+      }
     }
 
     setMagnifierActive(true);
@@ -727,7 +725,7 @@ export default function MagnifierCursor({
   return (
     <div
       ref={containerRef}
-      className="magnifier-root h-app relative w-full touch-none overflow-hidden select-none"
+      className="magnifier-root h-app relative w-full overflow-hidden select-none max-md:touch-pan-y md:touch-none"
       onMouseMove={handleMouseMove}
       onTouchStart={handleTouchStart}
       onTouchEnd={handleTouchEnd}
