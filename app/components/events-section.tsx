@@ -26,7 +26,7 @@ export const EVENT_YEARS: EventYear[] = [
   {
     year: 2026,
     events: [
-      { city: "ottawa", date: "2026-09-12", href: "#" },
+      { city: "ottawa", date: "2026-09-12", href: "https://stupideas-ottawa-f26.devpost.com/" },
       { city: "singapore", date: "2026-05-02", href: "https://singapore-stupidhacks.devpost.com/" },
       { city: "waterloo", date: "2026-03-29", href: "https://sih-waterloo-w26.devpost.com/" },
       { city: "toronto", date: "2026-03-28", href: "https://sih-toronto-w26.devpost.com/" },
