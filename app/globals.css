@@ -244,3 +244,81 @@ body {
     opacity: 0;
   }
 }
+
+/* First-load splash */
+html.loading-screen-active,
+html.loading-screen-active body {
+  overflow: hidden;
+}
+
+html.loading-screen-active #app-content {
+  visibility: hidden;
+}
+
+.loading-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 100000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: #ffffff;
+  color: #000000;
+  opacity: 1;
+  will-change: opacity;
+  contain: strict;
+  transition: opacity 480ms ease-out;
+}
+
+.loading-screen--exit {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.loading-screen__inner {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 28px;
+  padding: 24px;
+  text-align: center;
+}
+
+.loading-screen__title {
+  margin: 0;
+  font-size: clamp(14px, 3.2vw, 22px);
+  line-height: 1.6;
+  letter-spacing: 0.04em;
+  text-transform: lowercase;
+  image-rendering: pixelated;
+}
+
+.loading-screen__slots {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+}
+
+.loading-screen__slot {
+  width: 10px;
+  height: 10px;
+  background: #000000;
+  opacity: 0.14;
+  image-rendering: pixelated;
+  transition: opacity 70ms steps(1, end);
+}
+
+.loading-screen__slot--on {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .loading-screen {
+    transition: none;
+  }
+
+  .loading-screen__slot {
+    transition: none;
+  }
+}

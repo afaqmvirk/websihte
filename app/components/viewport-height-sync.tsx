@@ -1,6 +1,7 @@
 "use client";
 
 import { useLayoutEffect } from "react";
+import { markAppReady } from "./app-ready";
 
 export function readViewportHeightPx() {
   if (typeof window === "undefined") return 900;
@@ -29,7 +30,10 @@ export default function ViewportHeightSync() {
     };
 
     sync();
-    requestAnimationFrame(sync);
+    requestAnimationFrame(() => {
+      sync();
+      markAppReady("viewport");
+    });
 
     window.visualViewport?.addEventListener("resize", sync);
     window.visualViewport?.addEventListener("scroll", sync);

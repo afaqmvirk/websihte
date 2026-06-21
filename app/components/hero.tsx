@@ -11,6 +11,7 @@ import {
 } from "react";
 import MagnifierCursor from "./magnifier-cursor";
 import RelicHalftoneImage from "./relic-halftone-image";
+import { markAppReady } from "./app-ready";
 
 /** Hero artboard dimensions from Figma "Final Design" → hero frame (24:88). */
 const FIGMA_WIDTH = 1512;
@@ -210,9 +211,15 @@ function relicImageSizes(relic: Relic, layout: LayoutConfig): string {
 }
 
 function useHeroViewport(): ViewportTier {
-  const [tier, setTier] = useState<ViewportTier>("desktop");
+  const [tier, setTier] = useState<ViewportTier>(() => {
+    if (typeof window === "undefined") return "desktop";
+    const width = window.innerWidth;
+    if (width <= MOBILE_BREAKPOINT) return "mobile";
+    if (width <= TABLET_MAX_WIDTH) return "tablet";
+    return "desktop";
+  });
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     const update = () => {
       const width = window.innerWidth;
       if (width <= MOBILE_BREAKPOINT) {
@@ -687,6 +694,10 @@ function HeroTextBlock({
     };
 
     measure();
+    requestAnimationFrame(() => {
+      measure();
+      markAppReady("hero-layout");
+    });
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
   }, [layout.width, layout.height, measureFit, onFitScaleChange]);
