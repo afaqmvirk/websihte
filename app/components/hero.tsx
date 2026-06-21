@@ -257,7 +257,7 @@ const relics: Relic[] = [
     figmaH: 206.17,
     objectFit: "bottom",
     zIndex: 2,
-    caption: "breadboard",
+    caption: "the soon to be lickatron3000 (09.27.2025)",
   },
   {
     id: 3,
@@ -270,7 +270,7 @@ const relics: Relic[] = [
     figmaH: 310.87,
     objectFit: "bottom",
     zIndex: 4,
-    caption: "a pink-tinted polaroid from rio de janeiro",
+    caption: "catch a mirror selfie back to 2016",
   },
   {
     id: 4,
@@ -283,7 +283,7 @@ const relics: Relic[] = [
     figmaH: 249,
     objectFit: "bottom",
     zIndex: 5,
-    caption: "stihcker",
+    caption: "sihck stihcker (03.30.2026)",
   },
   {
     id: 5,
@@ -297,7 +297,7 @@ const relics: Relic[] = [
     figmaH: 245.32,
     objectFit: "bottom",
     zIndex: 3,
-    caption: "three people posing in front of an i heart smu sign",
+    caption: "we love singapore stupid hacks",
   },
   {
     id: 6,
@@ -310,7 +310,7 @@ const relics: Relic[] = [
     figmaH: 277.38,
     objectFit: "bottom",
     zIndex: 2,
-    caption: "a party favor box spilling colorful goodies",
+    caption: "catch us at socratica symposium 2026",
   },
   {
     id: 7,
@@ -323,7 +323,7 @@ const relics: Relic[] = [
     figmaH: 240,
     objectFit: "bottom",
     zIndex: 6,
-    caption: "two friends in matching pink beanies",
+    caption: "stupid fits",
   },
   {
     id: 8,
@@ -336,7 +336,7 @@ const relics: Relic[] = [
     figmaH: 274.7,
     objectFit: "bottom",
     zIndex: 5,
-    caption: "wearing da bob",
+    caption: "spongebob... or is it cheese",
   },
   {
     id: 9,
@@ -349,7 +349,7 @@ const relics: Relic[] = [
     figmaH: 185,
     objectFit: "bottom",
     zIndex: 4,
-    caption: "stupid @ socratica",
+    caption: "pitched sih to hundreds",
   },
   {
     id: 10,
@@ -363,7 +363,7 @@ const relics: Relic[] = [
     figmaH: 264.63,
     objectFit: "bottom",
     zIndex: 5,
-    caption: "a builder deep in laptop flow on the floor",
+    caption: "hard at work or hardly working?",
   },
   {
     id: 11,
@@ -376,7 +376,7 @@ const relics: Relic[] = [
     figmaH: 173.23,
     objectFit: "bottom",
     zIndex: 4,
-    caption: "a zoom call where everyone is a wizard",
+    caption: "yer a sihzard!",
   },
   {
     id: 12,
@@ -390,7 +390,7 @@ const relics: Relic[] = [
     objectFit: "bottom",
     zIndex: 5,
     bubbleAlign: "center",
-    caption: "stupid ideas are back — justin bieber edition",
+    caption: "jb pls sponsor us!",
   },
   {
     id: 13,
@@ -403,7 +403,7 @@ const relics: Relic[] = [
     figmaH: 313.4,
     objectFit: "bottom",
     zIndex: 3,
-    caption: "two people building a tall spindly contraption",
+    caption: "diy lightning in a bottle",
   },
 ];
 

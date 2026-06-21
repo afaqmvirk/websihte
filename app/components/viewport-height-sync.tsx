@@ -2,7 +2,14 @@
 
 import { useLayoutEffect } from "react";
 
-function readViewportHeight() {
+export function readViewportHeightPx() {
+  if (typeof window === "undefined") return 900;
+
+  const bodyVal = parseFloat(
+    getComputedStyle(document.body).getPropertyValue("--app-height"),
+  );
+  if (Number.isFinite(bodyVal) && bodyVal > 200) return bodyVal;
+
   const visual = window.visualViewport?.height ?? 0;
   const inner = window.innerHeight ?? 0;
   return Math.max(visual, inner, 320);
@@ -17,7 +24,7 @@ export default function ViewportHeightSync() {
     const root = document.body;
 
     const sync = () => {
-      const height = readViewportHeight();
+      const height = readViewportHeightPx();
       root.style.setProperty("--app-height", `${Math.round(height)}px`);
     };
 
