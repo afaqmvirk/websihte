@@ -11,8 +11,9 @@ const ROTATION_START_VIEWPORT_RATIO = 0.4;
 /** Scroll distance (as a fraction of viewport height) the tear plays out over.
  *  Larger = slower tear. */
 const CURL_SCROLL_SPAN_RATIO = 0.85;
-/** Curl progress at which the peel rotation begins (it stays flat until then). */
-const ROTATION_START_PROGRESS = 0.42;
+/** Curl progress at which the peel rotation begins (it stays flat until then).
+ *  Earlier start spreads the smootherstep over more scroll = gentler ramp. */
+const ROTATION_START_PROGRESS = 0.3;
 
 /** Portion of the sheet that rolls into the curl, as a fraction of width.
  *  1 = the whole page curls (no flat remainder). */
