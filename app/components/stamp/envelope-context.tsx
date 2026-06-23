@@ -8,8 +8,8 @@ import {
   useState,
   type ReactNode,
 } from "react";
-import type { StampPhoto } from "./section-layout";
-import { ENVELOPE_CONFIG } from "./stamp-config";
+import type { StampPhoto } from "@/components/shared/section-layout";
+import { ENVELOPE_CONFIG } from "@/components/stamp/stamp-config";
 
 export type FlyLaunchMeta = {
   fromEl: HTMLElement;

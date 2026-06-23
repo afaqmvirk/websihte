@@ -1,7 +1,7 @@
 "use client";
 
 import { useLayoutEffect } from "react";
-import { markAppReady } from "./app-ready";
+import { markAppReady } from "@/components/shared/app-ready";
 
 /** Deterministic viewport-height fallback for SSR and the first client render. */
 export const SSR_VIEWPORT_HEIGHT = 900;

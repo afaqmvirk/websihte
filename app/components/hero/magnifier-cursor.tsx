@@ -10,7 +10,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
-import { BREAKPOINT } from "./breakpoints";
+import { BREAKPOINT } from "@/components/shared/breakpoints";
 
 const LENS_SIZE = 150;
 const ZOOM = 1.25;

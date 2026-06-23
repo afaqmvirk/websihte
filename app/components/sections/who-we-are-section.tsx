@@ -1,8 +1,8 @@
 import Image from "next/image";
-import FramedPhotoArc from "./framed-photo-arc";
-import { getArcConfig } from "./stamp-config";
-import { SECTION_BG, SECTION_SHELL_CLASS, STAMP_PHOTOS, sectionFont, sectionPx } from "./section-layout";
-import WhoWeAreScrollOverlay from "./who-we-are-scroll-overlay";
+import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
+import { getArcConfig } from "@/components/stamp/stamp-config";
+import { SECTION_BG, SECTION_SHELL_CLASS, STAMP_PHOTOS, sectionFont, sectionPx } from "@/components/shared/section-layout";
+import WhoWeAreScrollOverlay from "@/components/sections/who-we-are-scroll-overlay";
 
 const bodyStyle = {
   fontSize: sectionFont(20, 15, 20),

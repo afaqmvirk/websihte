@@ -7,11 +7,11 @@ import {
   ENVELOPE_BODY_WIDTH_RATIO,
   useEnvelopeFlap,
   useFlapPolygonSync,
-} from "./envelope-svg";
-import { ENVELOPE_CONFIG, STAMP_FRAME, stampPhotoTransform } from "./stamp-config";
-import { useEnvelope, type FlyRequest } from "./envelope-context";
-import { BREAKPOINT } from "./breakpoints";
-import StampSheen from "./stamp-sheen";
+} from "@/components/stamp/envelope-svg";
+import { ENVELOPE_CONFIG, STAMP_FRAME, stampPhotoTransform } from "@/components/stamp/stamp-config";
+import { useEnvelope, type FlyRequest } from "@/components/stamp/envelope-context";
+import { BREAKPOINT } from "@/components/shared/breakpoints";
+import StampSheen from "@/components/stamp/stamp-sheen";
 
 const PHOTO_INSET = STAMP_FRAME.photoInset;
 const PHOTO_W = STAMP_FRAME.photoWidth;

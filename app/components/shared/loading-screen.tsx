@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { pressStart2P } from "../fonts";
-import { whenAppReady } from "./app-ready";
+import { pressStart2P } from "@/fonts";
+import { whenAppReady } from "@/components/shared/app-ready";
 
 const MIN_MS = 500;
 const EXIT_MS = 420;

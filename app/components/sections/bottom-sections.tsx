@@ -1,11 +1,11 @@
 "use client";
 
-import { EnvelopeProvider } from "./envelope-context";
-import EventsSection from "./events-section";
-import FramedPhotoArc from "./framed-photo-arc";
-import { SectionEnvelope } from "./section-envelope";
-import WhoWeAreSection from "./who-we-are-section";
-import { SECTION_BG, STAMP_PHOTOS } from "./section-layout";
+import { EnvelopeProvider } from "@/components/stamp/envelope-context";
+import EventsSection from "@/components/sections/events-section";
+import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
+import { SectionEnvelope } from "@/components/sections/section-envelope";
+import WhoWeAreSection from "@/components/sections/who-we-are-section";
+import { SECTION_BG, STAMP_PHOTOS } from "@/components/shared/section-layout";
 
 /** Who we are + events/sponsor with one shared sticky envelope. */
 export default function BottomSections() {

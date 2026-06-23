@@ -2,7 +2,7 @@
 
 import Image from "next/image";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { useEnvelope } from "./envelope-context";
+import { useEnvelope } from "@/components/stamp/envelope-context";
 import {
   getArcConfig,
   stampPhotoTransform,
@@ -10,11 +10,11 @@ import {
   STAMP_PHOTO_RATIOS,
   type StampArcCorner,
   type StampArcEllipseConfig,
-} from "./stamp-config";
-import { readViewportHeightPx, SSR_VIEWPORT_HEIGHT } from "./viewport-height-sync";
-import type { StampPhoto } from "./section-layout";
-import { BREAKPOINT } from "./breakpoints";
-import StampSheen from "./stamp-sheen";
+} from "@/components/stamp/stamp-config";
+import { readViewportHeightPx, SSR_VIEWPORT_HEIGHT } from "@/components/shared/viewport-height-sync";
+import type { StampPhoto } from "@/components/shared/section-layout";
+import { BREAKPOINT } from "@/components/shared/breakpoints";
+import StampSheen from "@/components/stamp/stamp-sheen";
 
 const STAMP_SIZE = STAMP_FRAME.size;
 const MOBILE_STAMP_SIZE = 72;

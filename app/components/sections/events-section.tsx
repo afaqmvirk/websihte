@@ -1,7 +1,7 @@
 import Image from "next/image";
-import FramedPhotoArc from "./framed-photo-arc";
-import OutlineCtaButton from "./outline-cta-button";
-import { getArcConfig } from "./stamp-config";
+import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
+import OutlineCtaButton from "@/components/shared/outline-cta-button";
+import { getArcConfig } from "@/components/stamp/stamp-config";
 import {
   SECTION_BG,
   SECTION_BODY_MAX_PX,
@@ -9,7 +9,7 @@ import {
   STAMP_PHOTOS,
   sectionFont,
   sectionPx,
-} from "./section-layout";
+} from "@/components/shared/section-layout";
 
 type EventItem = {
   city: string;

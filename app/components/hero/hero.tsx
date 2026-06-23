@@ -8,11 +8,11 @@ import {
   useCallback,
   type CSSProperties,
 } from "react";
-import MagnifierCursor from "./magnifier-cursor";
-import RelicHalftoneImage, { relicObjectFitClass } from "./relic-halftone-image";
-import { markAppReady } from "./app-ready";
-import { DESIGN_WIDTH } from "./section-layout";
-import { BREAKPOINT } from "./breakpoints";
+import MagnifierCursor from "@/components/hero/magnifier-cursor";
+import RelicHalftoneImage, { relicObjectFitClass } from "@/components/hero/relic-halftone-image";
+import { markAppReady } from "@/components/shared/app-ready";
+import { DESIGN_WIDTH } from "@/components/shared/section-layout";
+import { BREAKPOINT } from "@/components/shared/breakpoints";
 
 /** Hero design-canvas dimensions (shares DESIGN_WIDTH with the dark sections). */
 const DESIGN_HEIGHT = 982;

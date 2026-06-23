@@ -1,7 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { arialNarrowWeb, pressStart2P } from "./fonts";
-import LoadingScreen from "./components/loading-screen";
-import ViewportHeightSync from "./components/viewport-height-sync";
+import LoadingScreen from "@/components/shared/loading-screen";
+import ViewportHeightSync from "@/components/shared/viewport-height-sync";
 import "./globals.css";
 
 export const metadata: Metadata = {
