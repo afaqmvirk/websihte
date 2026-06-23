@@ -4,6 +4,7 @@ import { EnvelopeProvider } from "@/components/stamp/envelope-context";
 import EventsSection from "@/components/sections/events-section";
 import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
 import { SectionEnvelope } from "@/components/sections/section-envelope";
+import WhoWeAreScrollOverlay from "@/components/sections/who-we-are-scroll-overlay";
 import WhoWeAreSection from "@/components/sections/who-we-are-section";
 import { SECTION_BG, STAMP_PHOTOS } from "@/components/shared/section-layout";
 
@@ -12,6 +13,7 @@ export default function BottomSections() {
   return (
     <EnvelopeProvider>
       <div id="dark-sections" className="relative overflow-x-clip overflow-y-visible">
+        <WhoWeAreScrollOverlay />
         <WhoWeAreSection />
 
         {/* Mobile — stamp row between sections; clips at viewport edges */}
