@@ -29,7 +29,7 @@ export default function RootLayout({
       <body>
         <LoadingScreen />
         <ViewportHeightSync />
-        <div id="app-content">{children}</div>
+        {children}
       </body>
     </html>
   );

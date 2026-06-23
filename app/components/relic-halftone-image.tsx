@@ -16,6 +16,16 @@ type RelicHalftoneImageProps = {
   "aria-hidden"?: boolean;
 };
 
+/** Tailwind classes for rendering a relic image at a given object-fit mode. */
+export function relicObjectFitClass(
+  objectFit: RelicHalftoneImageProps["objectFit"],
+): string {
+  if (objectFit === "cover") return "h-full w-full select-none object-cover";
+  if (objectFit === "bottom")
+    return "h-full w-full select-none object-contain object-bottom";
+  return "h-full w-full select-none object-contain";
+}
+
 /** Dot pitch in CSS pixels. */
 const HALFTONE_PITCH_CSS = 2;
 /** Extra resolution when building the luminance field. */
@@ -183,12 +193,7 @@ export default function RelicHalftoneImage({
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
 
-  const imageClassName =
-    objectFit === "cover"
-      ? "h-full w-full select-none object-cover"
-      : objectFit === "bottom"
-        ? "h-full w-full select-none object-contain object-bottom"
-        : "h-full w-full select-none object-contain";
+  const imageClassName = relicObjectFitClass(objectFit);
 
   useEffect(() => {
     const container = containerRef.current;

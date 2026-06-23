@@ -1,45 +1,22 @@
-/** Figma dark sections — artboard 1512×1063 (combined bottom panel). */
-export const SECTION_FIGMA_WIDTH = 1512;
-export const SECTION_FIGMA_HEIGHT = 1063;
+/**
+ * Desktop design-canvas width — the single source for vw-based scaling.
+ * The hero and the dark sections share this canvas width.
+ */
+export const DESIGN_WIDTH = 1512;
 
-export const SECTION_BG = "#0e0e0e";
-
-/** Hero headline band — matches hero.tsx LayoutConfig textLeft / textWidth. */
-export const HERO_TEXT_BAND = {
-  mobile: { left: 55, width: 533, artboard: 644 },
-  tablet: { left: 62, width: 1388, artboard: 1512 },
-  desktop: { left: 140, width: 999, artboard: 1512 },
-} as const;
-
-/** Hero text left edge as % of viewport — matches hero pctX(textLeft). */
-export const HERO_TEXT_EDGE_VW = {
-  mobile: 13.176,
-  tablet: 6.772,
-  desktop: 11.63,
-} as const;
+/** Dark sections background — resolves to the `--section-bg` token in globals.css. */
+export const SECTION_BG = "var(--section-bg)";
 
 /** Full-bleed shell — horizontal padding via `.section-shell` in globals.css. */
 export const SECTION_SHELL_CLASS = "section-shell";
 
-/** @deprecated Shell is full-bleed; padding lives in `.section-shell` CSS. */
-export const SECTION_SHELL_STYLE = {} as const;
+/** Max width for left-aligned body copy — matches hero desktop text block (`DESKTOP_LAYOUT.textWidth` in hero.tsx). */
+export const SECTION_BODY_MAX_PX = 999;
 
-/** @deprecated Use SECTION_SHELL_CLASS — same gutters as left shell. */
-export const SECTION_SHELL_RIGHT_STYLE = SECTION_SHELL_STYLE;
-
-/** Max width for left-aligned body copy — same as hero text block. */
-export const SECTION_BODY_MAX_PX = HERO_TEXT_BAND.desktop.width;
-
-export const pctX = (px: number) =>
-  `${(px / SECTION_FIGMA_WIDTH) * 100}%`;
-export const pctY = (px: number) =>
-  `${(px / SECTION_FIGMA_HEIGHT) * 100}%`;
-export const pctW = (px: number) =>
-  `${(px / SECTION_FIGMA_WIDTH) * 100}%`;
 export const sectionFont = (px: number, minPx: number, maxPx: number = px) =>
-  `clamp(${minPx}px, ${(px / SECTION_FIGMA_WIDTH) * 100}vw, ${maxPx}px)`;
+  `clamp(${minPx}px, ${(px / DESIGN_WIDTH) * 100}vw, ${maxPx}px)`;
 export const sectionPx = (px: number) =>
-  `${(px / SECTION_FIGMA_WIDTH) * 100}vw`;
+  `${(px / DESIGN_WIDTH) * 100}vw`;
 
 export type StampPhoto = {
   src: string;
@@ -48,7 +25,7 @@ export type StampPhoto = {
   objectScale?: number;
 };
 
-/** Stamp gallery photos from Figma Frame 39 (Rectangle 1196–1207). */
+/** Stamp gallery photos. */
 export const STAMP_PHOTOS: StampPhoto[] = [
   { src: "/sections/stamps/1.jpg" },
   { src: "/sections/stamps/2.jpg" },

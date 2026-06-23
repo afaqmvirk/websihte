@@ -10,6 +10,7 @@ import {
   useState,
 } from "react";
 import { createPortal } from "react-dom";
+import { BREAKPOINT } from "./breakpoints";
 
 const LENS_SIZE = 150;
 const ZOOM = 1.25;
@@ -23,7 +24,7 @@ const LENS_PRESENTATION_TRANSITION = `transform ${RETREAT_TRANSITION_MS}ms ease-
 
 const MAP_SIZE = 256;
 /** Match hero mobile tier — scroll passthrough when touch is not on a relic. */
-const MOBILE_BREAKPOINT = 768;
+const MOBILE_BREAKPOINT = BREAKPOINT.heroMobileMax;
 /** Lift the lens above the touch point so the finger doesn't cover it. */
 const TOUCH_LENS_OFFSET_Y = -150;
 /** Displacement concentrated toward the rim (sharp center, warped edges). */

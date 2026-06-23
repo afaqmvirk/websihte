@@ -9,7 +9,7 @@ import {
   type ReactNode,
 } from "react";
 import type { StampPhoto } from "./section-layout";
-import { ENVELOPE_CONFIG } from "./stamp-arc-config";
+import { ENVELOPE_CONFIG } from "./stamp-config";
 
 export type FlyLaunchMeta = {
   fromEl: HTMLElement;

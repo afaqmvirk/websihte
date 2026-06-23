@@ -3,8 +3,11 @@
 import { useLayoutEffect } from "react";
 import { markAppReady } from "./app-ready";
 
+/** Deterministic viewport-height fallback for SSR and the first client render. */
+export const SSR_VIEWPORT_HEIGHT = 900;
+
 export function readViewportHeightPx() {
-  if (typeof window === "undefined") return 900;
+  if (typeof window === "undefined") return SSR_VIEWPORT_HEIGHT;
 
   const bodyVal = parseFloat(
     getComputedStyle(document.body).getPropertyValue("--app-height"),

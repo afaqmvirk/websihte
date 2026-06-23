@@ -8,16 +8,17 @@ import {
   useEnvelopeFlap,
   useFlapPolygonSync,
 } from "./envelope-svg";
-import { ENVELOPE_CONFIG, stampPhotoTransform } from "./stamp-arc-config";
+import { ENVELOPE_CONFIG, STAMP_FRAME, stampPhotoTransform } from "./stamp-config";
 import { useEnvelope, type FlyRequest } from "./envelope-context";
+import { BREAKPOINT } from "./breakpoints";
 import StampSheen from "./stamp-sheen";
 
-const PHOTO_INSET = 12.56;
-const PHOTO_W = 159.1;
-const PHOTO_H = 161.2;
-const STAMP_SIZE = 183;
+const PHOTO_INSET = STAMP_FRAME.photoInset;
+const PHOTO_W = STAMP_FRAME.photoWidth;
+const PHOTO_H = STAMP_FRAME.photoHeight;
+const STAMP_SIZE = STAMP_FRAME.size;
 const DRAG_THRESHOLD_PX = 8;
-const MOBILE_MAX_WIDTH = 1023;
+const MOBILE_MAX_WIDTH = BREAKPOINT.desktopMin - 1;
 
 const POP_MS = 200;
 const FLY_MS = 1080;
@@ -507,7 +508,7 @@ export function SectionEnvelope() {
           <button
             ref={assignEnvelopeRef}
             type="button"
-            className={`group absolute bottom-0 left-1/2 z-0 max-w-none overflow-visible border-0 bg-transparent p-0 shadow-none outline-none select-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0e0e0e] ${isVisible ? "pointer-events-auto" : "pointer-events-none"} ${dragEnabled ? (isDragging ? "cursor-grabbing touch-none" : "cursor-grab touch-none") : "cursor-pointer"}`}
+            className={`group absolute bottom-0 left-1/2 z-0 max-w-none overflow-visible border-0 bg-transparent p-0 shadow-none outline-none select-none focus-visible:ring-2 focus-visible:ring-white/50 focus-visible:ring-offset-2 focus-visible:ring-offset-section-bg ${isVisible ? "pointer-events-auto" : "pointer-events-none"} ${dragEnabled ? (isDragging ? "cursor-grabbing touch-none" : "cursor-grab touch-none") : "cursor-pointer"}`}
             style={{
               width: shellWidth,
               transform: shellTransform,

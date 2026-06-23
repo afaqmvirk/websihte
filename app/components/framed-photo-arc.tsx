@@ -6,20 +6,23 @@ import { useEnvelope } from "./envelope-context";
 import {
   getArcConfig,
   stampPhotoTransform,
+  STAMP_FRAME,
+  STAMP_PHOTO_RATIOS,
   type StampArcCorner,
   type StampArcEllipseConfig,
-} from "./stamp-arc-config";
-import { readViewportHeightPx } from "./viewport-height-sync";
+} from "./stamp-config";
+import { readViewportHeightPx, SSR_VIEWPORT_HEIGHT } from "./viewport-height-sync";
 import type { StampPhoto } from "./section-layout";
+import { BREAKPOINT } from "./breakpoints";
 import StampSheen from "./stamp-sheen";
 
-const STAMP_SIZE = 183;
+const STAMP_SIZE = STAMP_FRAME.size;
 const MOBILE_STAMP_SIZE = 72;
 const MOBILE_LINE_GAP = 36;
-const MOBILE_BREAKPOINT = 1024;
-const PHOTO_INSET_RATIO = 12.56 / STAMP_SIZE;
-const PHOTO_W_RATIO = 159.1 / STAMP_SIZE;
-const PHOTO_H_RATIO = 161.2 / STAMP_SIZE;
+const MOBILE_BREAKPOINT = BREAKPOINT.desktopMin;
+const PHOTO_INSET_RATIO = STAMP_PHOTO_RATIOS.inset;
+const PHOTO_W_RATIO = STAMP_PHOTO_RATIOS.width;
+const PHOTO_H_RATIO = STAMP_PHOTO_RATIOS.height;
 
 const HOVER_SCALE = 1.3;
 const TILT_DEG = 52;
@@ -257,7 +260,11 @@ export default function FramedPhotoArc({
   const arcConfig = getArcConfig(corner);
   const trackRef = useRef<HTMLDivElement>(null);
   const stampRefs = useRef<(HTMLDivElement | null)[]>([]);
-  const layoutRef = useRef<TrackLayout>(layoutForCorner(900, arcConfig));
+  // Initial layout must be deterministic so SSR and the first client render
+  // match; syncLayout() swaps in the real viewport height after mount.
+  const layoutRef = useRef<TrackLayout>(
+    layoutForCorner(SSR_VIEWPORT_HEIGHT, arcConfig),
+  );
   const isMobileLineRef = useRef(false);
   const phaseRef = useRef(0);
   const phaseBaseRef = useRef(0);

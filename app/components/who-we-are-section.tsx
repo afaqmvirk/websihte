@@ -1,7 +1,8 @@
 import Image from "next/image";
 import FramedPhotoArc from "./framed-photo-arc";
-import { getArcConfig } from "./stamp-arc-config";
+import { getArcConfig } from "./stamp-config";
 import { SECTION_BG, SECTION_SHELL_CLASS, STAMP_PHOTOS, sectionFont, sectionPx } from "./section-layout";
+import WhoWeAreScrollOverlay from "./who-we-are-scroll-overlay";
 
 const bodyStyle = {
   fontSize: sectionFont(20, 15, 20),
@@ -20,6 +21,7 @@ export default function WhoWeAreSection() {
       style={{ backgroundColor: SECTION_BG }}
       aria-label="who we are"
     >
+      <WhoWeAreScrollOverlay />
       <div
         className={`${SECTION_SHELL_CLASS} relative flex w-full flex-col gap-10 py-[max(2rem,6vw)] pb-0 min-[1024px]:flex-row min-[1024px]:items-start min-[1024px]:justify-between min-[1024px]:gap-8 min-[1024px]:py-[100px]`}
       >
@@ -65,7 +67,7 @@ export default function WhoWeAreSection() {
               build something extremely impractical, and fail spectacularly.
             </p>
 
-            <div className="relative mt-2 aspect-[4096/2731] w-full max-w-full overflow-hidden rounded-[4px] border-[16px] border-[#0e0e0e] min-[1024px]:border-[12px]">
+            <div className="relative mt-2 aspect-[4096/2731] w-full max-w-full overflow-hidden rounded-[4px] border-[16px] border-section-bg min-[1024px]:border-[12px]">
               <Image
                 src="/sections/who-we-are-photo.png"
                 alt="hackathon participants working together at a long table"

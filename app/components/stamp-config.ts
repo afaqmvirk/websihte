@@ -5,6 +5,24 @@
 
 export type StampArcCorner = "bottom-left" | "top-right";
 
+/**
+ * Stamp-frame geometry in px within the 183×183 stamp-frame.png artwork —
+ * the single source for both the orbiting arc and the flying/landed stamp.
+ */
+export const STAMP_FRAME = {
+  size: 183,
+  photoInset: 12.56,
+  photoWidth: 159.1,
+  photoHeight: 161.2,
+} as const;
+
+/** Photo window placement as fractions of the stamp size. */
+export const STAMP_PHOTO_RATIOS = {
+  inset: STAMP_FRAME.photoInset / STAMP_FRAME.size,
+  width: STAMP_FRAME.photoWidth / STAMP_FRAME.size,
+  height: STAMP_FRAME.photoHeight / STAMP_FRAME.size,
+} as const;
+
 /** Ellipse + motion for one stamp arc. */
 export type StampArcEllipseConfig = {
   /** Vertical semi-axis as a fraction of viewport height (e.g. 0.5 = half screen). */
@@ -48,15 +66,18 @@ export type EnvelopeConfig = {
   entryWidth: string;
 };
 
-/** Shared defaults — corner blocks override any field. */
+/**
+ * Shared defaults — the single source for values common to every arc.
+ * Corner blocks list ONLY the fields that differ from these.
+ */
 const ARC_DEFAULTS: StampArcEllipseConfig = {
-  bViewportRatio: 0.5,
-  aRatio: 1.25,
+  bViewportRatio: 0.7,
+  aRatio: 0.85,
   lapDurationS: 52,
   clipMarginTop: -0.48,
   clipMarginBottom: -0.48,
-  insetXPx: 72,
-  insetYPx: 0,
+  insetXPx: -242,
+  insetYPx: 200,
   photoRotateDeg: 90,
 };
 
@@ -67,25 +88,13 @@ export const STAMP_ARC_CONFIG: Record<
   /** Who we are — arc peeks from bottom-right, bottom-left quadrant visible. */
   "bottom-left": {
     ...ARC_DEFAULTS,
-    bViewportRatio: 0.7,
-    aRatio: 0.85,
-    lapDurationS: 52,
-    clipMarginTop: -0.48,
-    clipMarginBottom: -0.48,
-    insetXPx: -242,
-    insetYPx: 200,
-    photoRotateDeg: 90,
   },
   /** Events / sponsor — arc peeks from top-left, top-right quadrant visible. */
   "top-right": {
     ...ARC_DEFAULTS,
-    bViewportRatio: .75,
-    aRatio: .95,
-    lapDurationS: 52,
-    clipMarginTop: -0.48,
-    clipMarginBottom: -0.48,
+    bViewportRatio: 0.75,
+    aRatio: 0.95,
     insetXPx: -62,
-    insetYPx: 200,
     photoRotateDeg: 270,
   },
 };

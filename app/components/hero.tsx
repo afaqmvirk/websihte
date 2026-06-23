@@ -6,33 +6,33 @@ import {
   useRef,
   useLayoutEffect,
   useCallback,
-  useEffect,
   type CSSProperties,
 } from "react";
 import MagnifierCursor from "./magnifier-cursor";
-import RelicHalftoneImage from "./relic-halftone-image";
+import RelicHalftoneImage, { relicObjectFitClass } from "./relic-halftone-image";
 import { markAppReady } from "./app-ready";
+import { DESIGN_WIDTH } from "./section-layout";
+import { BREAKPOINT } from "./breakpoints";
 
-/** Hero artboard dimensions from Figma "Final Design" → hero frame (24:88). */
-const FIGMA_WIDTH = 1512;
-const FIGMA_HEIGHT = 982;
-/** Mobile hero frame (113:64 "hero - mobile"). */
-const MOBILE_FIGMA_WIDTH = 644;
-const MOBILE_FIGMA_HEIGHT = 1214;
-const MOBILE_BREAKPOINT = 768;
+/** Hero design-canvas dimensions (shares DESIGN_WIDTH with the dark sections). */
+const DESIGN_HEIGHT = 982;
+/** Mobile hero design canvas. */
+const MOBILE_DESIGN_WIDTH = 644;
+const MOBILE_DESIGN_HEIGHT = 1214;
+const MOBILE_BREAKPOINT = BREAKPOINT.heroMobileMax;
 /** Up to this width: desktop layout but hide crowded right-column relics (e.g. iPad Air). */
-const TABLET_MAX_WIDTH = 1024;
-/** Relic ids visible on mobile (Figma hero - mobile). */
+const TABLET_MAX_WIDTH = BREAKPOINT.heroTabletMax;
+/** Relic ids visible on the mobile hero. */
 const MOBILE_RELIC_IDS = new Set([1, 2, 3, 4, 7, 8]);
-/** Rightmost relics hidden on tablet widths (desktop artboard). */
+/** Rightmost relics hidden on tablet widths (desktop canvas). */
 const TABLET_HIDDEN_RELIC_IDS = new Set([10, 11, 12, 13]);
 
 type ViewportTier = "mobile" | "tablet" | "desktop";
 
-/** Relic photos scaled from center relative to Figma layout (1 = full Figma size). */
+/** Relic photos scaled from center relative to the design layout (1 = full design size). */
 const RELIC_SCALE = 1.1;
 
-/** Pull content inward from viewport edges (Figma px); extra top/bottom breathing room. */
+/** Pull content inward from viewport edges (design px); extra top/bottom breathing room. */
 const SCENE_INSET = {
   desktop: { top: 72, bottom: 72, left: 44, right: 44 },
   tablet: { top: 72, bottom: 72, left: 44, right: 44 },
@@ -40,10 +40,10 @@ const SCENE_INSET = {
 } as const;
 /** Extra overlap in px at the bubble anchor (scaled to viewport height). */
 const BUBBLE_OVERLAP = 6;
-/** Relics above this Figma Y get bubbles anchored to the image bottom. */
+/** Relics above this design Y get bubbles anchored to the image bottom. */
 const TOP_RELIC_Y = 130;
 const BUBBLE_ANCHOR_Y = 0.7;
-/** Extra distance (Figma px, scaled to scene) before the lens shrinks after leaving a relic. */
+/** Extra distance (design px, scaled to scene) before the lens shrinks after leaving a relic. */
 const FOCUS_SHRINK_PADDING = 40;
 
 const FONT_ARIAL_NARROW = "var(--font-arial-narrow)";
@@ -53,10 +53,10 @@ type Relic = {
   src: string;
   width: number;
   height: number;
-  figmaX: number;
-  figmaY: number;
-  figmaW: number;
-  figmaH: number;
+  designX: number;
+  designY: number;
+  designW: number;
+  designH: number;
   objectFit?: "cover" | "contain" | "bottom";
   zIndex?: number;
   caption?: string;
@@ -71,79 +71,79 @@ type LayoutConfig = {
   textWidth: number;
   textBottom: number;
   ctaLabel: "hover" | "drag";
-  headline: { figma: number; min: number; max: number };
-  body: { figma: number; min: number; max: number };
+  headline: { design: number; min: number; max: number };
+  body: { design: number; min: number; max: number };
   blockGap: number;
   inset: (typeof SCENE_INSET)[keyof typeof SCENE_INSET];
 };
 
 const DESKTOP_LAYOUT: LayoutConfig = {
-  width: FIGMA_WIDTH,
-  height: FIGMA_HEIGHT,
+  width: DESIGN_WIDTH,
+  height: DESIGN_HEIGHT,
   textLeft: 140,
   textWidth:999,
   textBottom: 35,
   ctaLabel: "hover",
-  headline: { figma: 72, min: 28, max: 72 },
-  body: { figma: 24, min: 14, max: 24 },
+  headline: { design: 72, min: 28, max: 72 },
+  body: { design: 24, min: 14, max: 24 },
   blockGap: 4,
   inset: SCENE_INSET.desktop,
 };
 
 const TABLET_LAYOUT: LayoutConfig = {
-  width: FIGMA_WIDTH,
-  height: FIGMA_HEIGHT,
+  width: DESIGN_WIDTH,
+  height: DESIGN_HEIGHT,
   textLeft: 62,
-  /** Nearly full artboard width so copy spans the scene on iPad-sized viewports. */
-  textWidth: FIGMA_WIDTH - 62 * 2,
+  /** Nearly full canvas width so copy spans the scene on iPad-sized viewports. */
+  textWidth: DESIGN_WIDTH - 62 * 2,
   textBottom: 35,
   ctaLabel: "hover",
-  headline: { figma: 96, min: 40, max: 64 },
-  body: { figma: 30, min: 18, max: 28 },
+  headline: { design: 96, min: 40, max: 64 },
+  body: { design: 30, min: 18, max: 28 },
   blockGap: 4,
   inset: SCENE_INSET.tablet,
 };
 
 const MOBILE_LAYOUT: LayoutConfig = {
-  width: MOBILE_FIGMA_WIDTH,
-  height: MOBILE_FIGMA_HEIGHT,
+  width: MOBILE_DESIGN_WIDTH,
+  height: MOBILE_DESIGN_HEIGHT,
   textLeft: 55,
   textWidth: 533,
   textBottom: 60,
   ctaLabel: "drag",
-  headline: { figma: 72, min: 22, max: 46 },
-  body: { figma: 24, min: 13, max: 17 },
+  headline: { design: 72, min: 22, max: 46 },
+  body: { design: 24, min: 13, max: 17 },
   blockGap: 4,
   inset: SCENE_INSET.mobile,
 };
 
-/** Shared line-height tokens (tighter than Figma defaults). */
+/** Shared line-height tokens (tighter than the design defaults). */
 const HEADLINE_LINE_HEIGHT = 1.02;
 const BODY_LINE_HEIGHT = 1.1;
 
 type RelicOverride = {
-  figmaX?: number;
-  figmaY?: number;
-  figmaW?: number;
-  figmaH?: number;
+  designX?: number;
+  designY?: number;
+  designW?: number;
+  designH?: number;
   objectFit?: Relic["objectFit"];
   rotation?: number;
   borderRadius?: string;
 };
 
 const MOBILE_RELIC_OVERRIDES: Partial<Record<number, RelicOverride>> = {
-  1: { figmaX: 115, figmaY: 22 },
-  2: { figmaX: 353.16, figmaY: 179, figmaW: 261.09, figmaH: 206.17 },
+  1: { designX: 115, designY: 22 },
+  2: { designX: 353.16, designY: 179, designW: 261.09, designH: 206.17 },
   3: {
-    figmaX: 5,
-    figmaY: 207,
-    figmaW: 286.2,
-    figmaH: 310.87,
+    designX: 5,
+    designY: 207,
+    designW: 286.2,
+    designH: 310.87,
     rotation: -13.73,
   },
-  4: { figmaX: 351, figmaY: 362 },
-  7: { figmaX: 23, figmaY: 518, figmaW: 330, figmaH: 240 },
-  8: { figmaX: 451, figmaY: 603, figmaW: 223.36, figmaH: 274.7 },
+  4: { designX: 351, designY: 362 },
+  7: { designX: 23, designY: 518, designW: 330, designH: 240 },
+  8: { designX: 451, designY: 603, designW: 223.36, designH: 274.7 },
 };
 
 function getLayout(tier: ViewportTier): LayoutConfig {
@@ -177,11 +177,11 @@ function createPctHelpers(layout: LayoutConfig) {
     pctBottom: (px: number) => `${(mapBottom(px) / h) * 100}%`,
     pctW: (px: number) => `${(mapW(px) / w) * 100}%`,
     pctH: (px: number) => `${(mapH(px) / h) * 100}%`,
-    figmaFont: (px: number, minPx: number, maxPx: number = px) =>
+    designFont: (px: number, minPx: number, maxPx: number = px) =>
       `clamp(${minPx}px, ${(px / w) * 100}vw, ${maxPx}px)`,
-    figmaSpaceY: (px: number) =>
+    designSpaceY: (px: number) =>
       `calc(${(mapH(px) / h) * 100} * var(--app-height) / 100)`,
-    figmaPx: (px: number) => `${(mapW(px) / w) * 100}vw`,
+    designPx: (px: number) => `${(mapW(px) / w) * 100}vw`,
   };
 }
 
@@ -200,12 +200,12 @@ function resolveRelic(
   return relic;
 }
 
-function relicImageSizes(relic: Relic, layout: LayoutConfig): string {
+function relicImageSizes(relic: Relic): string {
   const mobileVw = Math.ceil(
-    ((relic.figmaW * RELIC_SCALE) / MOBILE_FIGMA_WIDTH) * 100,
+    ((relic.designW * RELIC_SCALE) / MOBILE_DESIGN_WIDTH) * 100,
   );
   const desktopVw = Math.ceil(
-    ((relic.figmaW * RELIC_SCALE) / FIGMA_WIDTH) * 100,
+    ((relic.designW * RELIC_SCALE) / DESIGN_WIDTH) * 100,
   );
   return `(max-width: ${MOBILE_BREAKPOINT}px) ${mobileVw}vw, ${desktopVw}vw`;
 }
@@ -244,10 +244,10 @@ const relics: Relic[] = [
     src: "/1.png",
     width: 375,
     height: 166,
-    figmaX: 149,
-    figmaY: 81,
-    figmaW: 374.82,
-    figmaH: 165.49,
+    designX: 149,
+    designY: 81,
+    designW: 374.82,
+    designH: 165.49,
     objectFit: "bottom",
     zIndex: 3,
     caption:
@@ -258,10 +258,10 @@ const relics: Relic[] = [
     src: "/2.png",
     width: 278,
     height: 177,
-    figmaX: 104.41,
-    figmaY: 268.01,
-    figmaW: 261.09,
-    figmaH: 206.17,
+    designX: 104.41,
+    designY: 268.01,
+    designW: 261.09,
+    designH: 206.17,
     objectFit: "bottom",
     zIndex: 2,
     caption: "the soon to be lickatron3000 (09.27.2025)",
@@ -271,10 +271,10 @@ const relics: Relic[] = [
     src: "/3.png",
     width: 292,
     height: 313,
-    figmaX: 412,
-    figmaY: 283,
-    figmaW: 286.2,
-    figmaH: 310.87,
+    designX: 412,
+    designY: 283,
+    designW: 286.2,
+    designH: 310.87,
     objectFit: "bottom",
     zIndex: 4,
     caption: "catch a mirror selfie back to 2016",
@@ -284,10 +284,10 @@ const relics: Relic[] = [
     src: "/4.png",
     width: 238,
     height: 249,
-    figmaX: 629,
-    figmaY: 428,
-    figmaW: 237.14,
-    figmaH: 249,
+    designX: 629,
+    designY: 428,
+    designW: 237.14,
+    designH: 249,
     objectFit: "bottom",
     zIndex: 5,
     caption: "sihck stihcker (03.30.2026)",
@@ -297,11 +297,11 @@ const relics: Relic[] = [
     src: "/5.png",
     width: 368,
     height: 246,
-    figmaX: 180,
-    figmaY: 430,
+    designX: 180,
+    designY: 430,
 
-    figmaW: 367.93,
-    figmaH: 245.32,
+    designW: 367.93,
+    designH: 245.32,
     objectFit: "bottom",
     zIndex: 3,
     caption: "we love singapore stupid hacks",
@@ -311,10 +311,10 @@ const relics: Relic[] = [
     src: "/6.png",
     width: 296,
     height: 257,
-    figmaX: 468,
-    figmaY: 10,
-    figmaW: 295.87,
-    figmaH: 277.38,
+    designX: 468,
+    designY: 10,
+    designW: 295.87,
+    designH: 277.38,
     objectFit: "bottom",
     zIndex: 2,
     caption: "catch us at socratica symposium 2026",
@@ -324,10 +324,10 @@ const relics: Relic[] = [
     src: "/7.png",
     width: 330,
     height: 240,
-    figmaX: 671,
-    figmaY: 188,
-    figmaW: 330,
-    figmaH: 240,
+    designX: 671,
+    designY: 188,
+    designW: 330,
+    designH: 240,
     objectFit: "bottom",
     zIndex: 6,
     caption: "stupid fits",
@@ -337,10 +337,10 @@ const relics: Relic[] = [
     src: "/8.png",
     width: 224,
     height: 275,       
-    figmaX: 1142,
-    figmaY: 400.06, 
-    figmaW: 223.36,
-    figmaH: 274.7,
+    designX: 1142,
+    designY: 400.06, 
+    designW: 223.36,
+    designH: 274.7,
     objectFit: "bottom",
     zIndex: 5,
     caption: "spongebob... or is it cheese",
@@ -350,10 +350,10 @@ const relics: Relic[] = [
     src: "/9.png",
     width: 311,
     height: 195,
-    figmaX: 844,
-    figmaY: 539,
-    figmaW: 294.6,
-    figmaH: 185,
+    designX: 844,
+    designY: 539,
+    designW: 294.6,
+    designH: 185,
     objectFit: "bottom",
     zIndex: 4,
     caption: "pitched sih to hundreds",
@@ -363,11 +363,11 @@ const relics: Relic[] = [
     src: "/10.png",
     width: 304,
     height: 265,
-    figmaX: 945,
-    figmaY: 242,
+    designX: 945,
+    designY: 242,
 
-    figmaW: 303.54,
-    figmaH: 264.63,
+    designW: 303.54,
+    designH: 264.63,
     objectFit: "bottom",
     zIndex: 5,
     caption: "hard at work or hardly working?",
@@ -377,10 +377,10 @@ const relics: Relic[] = [
     src: "/11.png",
     width: 285,
     height: 214,
-    figmaX: 938,
-    figmaY: 81,
-    figmaW: 284.68,
-    figmaH: 173.23,
+    designX: 938,
+    designY: 81,
+    designW: 284.68,
+    designH: 173.23,
     objectFit: "bottom",
     zIndex: 4,
     caption: "yer a sihzard!",
@@ -390,10 +390,10 @@ const relics: Relic[] = [
     src: "/12.png",
     width: 255,
     height: 288,
-    figmaX: 1188,
-    figmaY: 110,
-    figmaW: 253.99,
-    figmaH: 284.65,
+    designX: 1188,
+    designY: 110,
+    designW: 253.99,
+    designH: 284.65,
     objectFit: "bottom",
     zIndex: 5,
     bubbleAlign: "center",
@@ -404,10 +404,10 @@ const relics: Relic[] = [
     src: "/13.png",
     width: 271,
     height: 314,     
-    figmaX: 1064,
-    figmaY: 635,
-    figmaW: 241.39,
-    figmaH: 313.4,
+    designX: 1064,
+    designY: 635,
+    designW: 241.39,
+    designH: 313.4,
     objectFit: "bottom",
     zIndex: 3,
     caption: "diy lightning in a bottle",
@@ -415,10 +415,10 @@ const relics: Relic[] = [
 ];
 
 function getRelicLayoutRect(relic: Relic) {
-  const scaledW = relic.figmaW * RELIC_SCALE;
-  const offsetX = (relic.figmaW - scaledW) / 2;
+  const scaledW = relic.designW * RELIC_SCALE;
+  const offsetX = (relic.designW - scaledW) / 2;
   return {
-    left: relic.figmaX + offsetX,
+    left: relic.designX + offsetX,
     width: scaledW,
   };
 }
@@ -436,8 +436,8 @@ function computeTabletSpread() {
     const { left, width } = getRelicLayoutRect(relic);
     minLeft = Math.min(minLeft, left);
     maxRight = Math.max(maxRight, left + width);
-    minTop = Math.min(minTop, relic.figmaY);
-    maxBottom = Math.max(maxBottom, relic.figmaY + relic.figmaH);
+    minTop = Math.min(minTop, relic.designY);
+    maxBottom = Math.max(maxBottom, relic.designY + relic.designH);
   }
 
   const targetLeft = layout.textLeft;
@@ -467,16 +467,16 @@ function spreadRelicForTablet(relic: Relic): Relic {
     TABLET_SPREAD;
   const { left } = getRelicLayoutRect(relic);
   const newLeft = targetLeft + (left - minLeft) * scaleX;
-  const newFigmaY = targetTop + (relic.figmaY - minTop) * scaleY;
-  const newFigmaW = relic.figmaW * scaleX;
-  const newScaledW = newFigmaW * RELIC_SCALE;
-  const newOffsetX = (newFigmaW - newScaledW) / 2;
+  const newDesignY = targetTop + (relic.designY - minTop) * scaleY;
+  const newDesignW = relic.designW * scaleX;
+  const newScaledW = newDesignW * RELIC_SCALE;
+  const newOffsetX = (newDesignW - newScaledW) / 2;
 
   return {
     ...relic,
-    figmaX: newLeft - newOffsetX,
-    figmaY: newFigmaY,
-    figmaW: newFigmaW,
+    designX: newLeft - newOffsetX,
+    designY: newDesignY,
+    designW: newDesignW,
   };
 }
 
@@ -489,17 +489,17 @@ function getRelicSceneRect(
   layout: LayoutConfig,
   sceneWidth: number,
   sceneHeight: number,
-  paddingFigmaPx = 0,
+  paddingDesignPx = 0,
 ) {
   const { mapX, mapY, mapW, mapH } = getLayoutMappers(layout);
-  const scaledW = relic.figmaW * RELIC_SCALE;
-  const scaledH = relic.figmaH * RELIC_SCALE;
-  const offsetX = (relic.figmaW - scaledW) / 2;
-  const offsetY = (relic.figmaH - scaledH) / 2;
-  const padX = (paddingFigmaPx / layout.width) * sceneWidth;
-  const padY = (paddingFigmaPx / layout.height) * sceneHeight;
-  const left = mapX(relic.figmaX + offsetX);
-  const top = mapY(relic.figmaY + offsetY);
+  const scaledW = relic.designW * RELIC_SCALE;
+  const scaledH = relic.designH * RELIC_SCALE;
+  const offsetX = (relic.designW - scaledW) / 2;
+  const offsetY = (relic.designH - scaledH) / 2;
+  const padX = (paddingDesignPx / layout.width) * sceneWidth;
+  const padY = (paddingDesignPx / layout.height) * sceneHeight;
+  const left = mapX(relic.designX + offsetX);
+  const top = mapY(relic.designY + offsetY);
   const width = mapW(scaledW);
   const height = mapH(scaledH);
 
@@ -517,7 +517,7 @@ function hitTestRelics(
   sceneWidth: number,
   sceneHeight: number,
   tier: ViewportTier,
-  paddingFigmaPx = 0,
+  paddingDesignPx = 0,
 ) {
   const layout = getLayout(tier);
   for (const relic of relics) {
@@ -528,7 +528,7 @@ function hitTestRelics(
       layout,
       sceneWidth,
       sceneHeight,
-      paddingFigmaPx,
+      paddingDesignPx,
     );
     if (
       localX >= rect.left &&
@@ -546,9 +546,9 @@ function getBubbleAlign(
   relic: Relic,
   layout: LayoutConfig,
 ): "left" | "center" | "right" {
-  const nearLeft = relic.figmaX < layout.textLeft;
+  const nearLeft = relic.designX < layout.textLeft;
   const nearRight =
-    relic.figmaX + relic.figmaW > layout.width - layout.textLeft;
+    relic.designX + relic.designW > layout.width - layout.textLeft;
   if (nearRight && !nearLeft) return "right";
   if (nearLeft && !nearRight) return "left";
   return "center";
@@ -563,9 +563,9 @@ function RelicSpeechBubble({
   layout: LayoutConfig;
   lensOnly?: boolean;
 }) {
-  const { figmaFont, figmaSpaceY, figmaPx } = createPctHelpers(layout);
+  const { designFont, designSpaceY, designPx } = createPctHelpers(layout);
   const bubbleRef = useRef<HTMLDivElement>(null);
-  const isTopRelic = relic.figmaY < TOP_RELIC_Y;
+  const isTopRelic = relic.designY < TOP_RELIC_Y;
   const fixedAlign = relic.bubbleAlign;
   const [align, setAlign] = useState(
     () => fixedAlign ?? getBubbleAlign(relic, layout),
@@ -606,7 +606,7 @@ function RelicSpeechBubble({
 
   if (!relic.caption) return null;
 
-  const overlap = figmaSpaceY(BUBBLE_OVERLAP);
+  const overlap = designSpaceY(BUBBLE_OVERLAP);
   const translateX =
     align === "center" ? "-50%" : align === "right" ? "-100%" : "0";
   const translateY = isTopRelic
@@ -616,7 +616,7 @@ function RelicSpeechBubble({
   const style: CSSProperties = {
     position: "absolute",
     width: "max-content",
-    maxWidth: `min(${figmaPx(227.504)}, calc(100vw - ${figmaPx(layout.textLeft * 2)}))`,
+    maxWidth: `min(${designPx(227.504)}, calc(100vw - ${designPx(layout.textLeft * 2)}))`,
     top: isTopRelic ? "100%" : `${BUBBLE_ANCHOR_Y * 100}%`,
     ...(align === "right"
       ? { right: 0, left: "auto" }
@@ -638,10 +638,10 @@ function RelicSpeechBubble({
       <div
         className="border border-black bg-white text-center text-black"
         style={{
-          padding: `${figmaSpaceY(10)} ${figmaPx(11)}`,
+          padding: `${designSpaceY(10)} ${designPx(11)}`,
           fontFamily: FONT_ARIAL_NARROW,
-          fontSize: figmaFont(16, 11, 16),
-          letterSpacing: figmaPx(-0.32),
+          fontSize: designFont(16, 11, 16),
+          letterSpacing: designPx(-0.32),
           lineHeight: 1.15,
         }}
       >
@@ -665,15 +665,27 @@ function HeroTextBlock({
   measureFit?: boolean;
 }) {
   const blockRef = useRef<HTMLDivElement>(null);
-  const { pctX, pctY, pctBottom, pctW, figmaFont, figmaSpaceY, figmaPx } =
+  const { pctX, pctBottom, pctW, designFont, designSpaceY, designPx } =
     createPctHelpers(layout);
 
   useLayoutEffect(() => {
-    if (!measureFit || !onFitScaleChange) return;
+    let raf = 0;
+
+    const finishLayout = () => {
+      markAppReady("hero-layout");
+    };
+
+    if (!measureFit || !onFitScaleChange) {
+      raf = requestAnimationFrame(finishLayout);
+      return () => cancelAnimationFrame(raf);
+    }
 
     const block = blockRef.current;
     const scene = block?.closest("[data-hero-scene]") as HTMLElement | null;
-    if (!block || !scene) return;
+    if (!block || !scene) {
+      raf = requestAnimationFrame(finishLayout);
+      return () => cancelAnimationFrame(raf);
+    }
 
     const measure = () => {
       block.style.transform = "";
@@ -694,12 +706,15 @@ function HeroTextBlock({
     };
 
     measure();
-    requestAnimationFrame(() => {
+    raf = requestAnimationFrame(() => {
       measure();
-      markAppReady("hero-layout");
+      finishLayout();
     });
     window.addEventListener("resize", measure);
-    return () => window.removeEventListener("resize", measure);
+    return () => {
+      cancelAnimationFrame(raf);
+      window.removeEventListener("resize", measure);
+    };
   }, [layout.width, layout.height, measureFit, onFitScaleChange]);
 
   return (
@@ -712,7 +727,7 @@ function HeroTextBlock({
         bottom: `calc(${pctBottom(layout.textBottom)} + env(safe-area-inset-bottom, 0px))`,
         width: pctW(layout.textWidth),
         maxWidth: `calc(100% - ${pctX(layout.textLeft * 2)})`,
-        gap: figmaSpaceY(layout.blockGap),
+        gap: designSpaceY(layout.blockGap),
         transform: fitScale < 1 ? `scale(${fitScale})` : undefined,
         transformOrigin: "bottom left",
       }}
@@ -721,12 +736,12 @@ function HeroTextBlock({
         className="m-0 max-w-full text-balance text-black"
         style={{
           fontFamily: FONT_ARIAL_NARROW,
-          fontSize: figmaFont(
-            layout.headline.figma,
+          fontSize: designFont(
+            layout.headline.design,
             layout.headline.min,
             layout.headline.max,
           ),
-          letterSpacing: figmaPx(-2.88),
+          letterSpacing: designPx(-2.88),
           lineHeight: HEADLINE_LINE_HEIGHT,
         }}
       >
@@ -735,12 +750,12 @@ function HeroTextBlock({
       <div
         className="max-w-full font-arial-narrow text-black"
         style={{
-          fontSize: figmaFont(
-            layout.body.figma,
+          fontSize: designFont(
+            layout.body.design,
             layout.body.min,
             layout.body.max,
           ),
-          letterSpacing: figmaPx(-0.48),
+          letterSpacing: designPx(-0.48),
           lineHeight: BODY_LINE_HEIGHT,
         }}
       >
@@ -753,13 +768,13 @@ function HeroTextBlock({
         <span
           className="inline-flex shrink-0 items-center justify-center rounded-full border border-black bg-white font-arial-narrow text-black"
           style={{
-            padding: `${figmaSpaceY(4)} ${figmaPx(16)}`,
-            fontSize: figmaFont(
-              layout.body.figma,
+            padding: `${designSpaceY(4)} ${designPx(16)}`,
+            fontSize: designFont(
+              layout.body.design,
               layout.body.min,
               layout.body.max,
             ),
-            letterSpacing: figmaPx(-0.48),
+            letterSpacing: designPx(-0.48),
             lineHeight: 1,
           }}
         >
@@ -768,12 +783,12 @@ function HeroTextBlock({
         <span
           className="font-arial-narrow text-black"
           style={{
-            fontSize: figmaFont(
-              layout.body.figma,
+            fontSize: designFont(
+              layout.body.design,
               layout.body.min,
               layout.body.max,
             ),
-            letterSpacing: figmaPx(-0.48),
+            letterSpacing: designPx(-0.48),
             lineHeight: 1,
           }}
         >
@@ -786,7 +801,6 @@ function HeroTextBlock({
 
 function renderRelicImage(
   relic: Relic & RelicOverride,
-  layout: LayoutConfig,
   interactive: boolean,
   halftoneActive: boolean,
   enableHalftoneLayer: boolean,
@@ -805,7 +819,7 @@ function renderRelicImage(
         alt={interactive ? `relic ${relic.id}` : ""}
         width={relic.width}
         height={relic.height}
-        sizes={relicImageSizes(relic, layout)}
+        sizes={relicImageSizes(relic)}
         objectFit={objectFit}
         priority={interactive && relic.id <= 4}
         halftoneActive={halftoneActive}
@@ -821,14 +835,8 @@ function renderRelicImage(
       width={relic.width}
       height={relic.height}
       draggable={false}
-      sizes={relicImageSizes(relic, layout)}
-      className={
-        relic.objectFit === "cover"
-          ? "h-full w-full select-none object-cover"
-          : relic.objectFit === "bottom"
-            ? "h-full w-full select-none object-contain object-bottom"
-            : "h-full w-full select-none object-contain"
-      }
+      sizes={relicImageSizes(relic)}
+      className={relicObjectFitClass(relic.objectFit)}
       priority={interactive && relic.id <= 4}
       aria-hidden={!interactive}
     />
@@ -876,13 +884,13 @@ function HeroScene({
   const enableHalftoneLayer = !forceFullColor && interactive;
 
   const relicStyle = (relic: Relic & RelicOverride) => {
-    const scaledW = relic.figmaW * RELIC_SCALE;
-    const scaledH = relic.figmaH * RELIC_SCALE;
-    const offsetX = (relic.figmaW - scaledW) / 2;
-    const offsetY = (relic.figmaH - scaledH) / 2;
+    const scaledW = relic.designW * RELIC_SCALE;
+    const scaledH = relic.designH * RELIC_SCALE;
+    const offsetX = (relic.designW - scaledW) / 2;
+    const offsetY = (relic.designH - scaledH) / 2;
     return {
-      top: pctY(relic.figmaY + offsetY),
-      left: pctX(relic.figmaX + offsetX),
+      top: pctY(relic.designY + offsetY),
+      left: pctX(relic.designX + offsetX),
       width: pctW(scaledW),
       height: pctH(scaledH),
       ...(relic.rotation != null
@@ -964,7 +972,6 @@ function HeroScene({
           >
             {renderRelicImage(
               resolved,
-              layout,
               interactive,
               halftoneRelics,
               enableHalftoneLayer,

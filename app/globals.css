@@ -6,6 +6,8 @@
   color-scheme: light;
   /** Visible viewport height — svh baseline, refined by ViewportHeightSync on mobile. */
   --app-height: 100svh;
+  /** Dark sections background — single source for both CSS and TS (SECTION_BG). */
+  --section-bg: #0e0e0e;
 }
 
 @supports not (height: 100svh) {
@@ -17,6 +19,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-section-bg: var(--section-bg);
   --font-arial-narrow:
     "Arial Narrow", var(--font-arial-narrow-web), Arial, sans-serif;
   --font-arial: Arial, Helvetica, sans-serif;
@@ -92,7 +95,7 @@ body {
   contain: layout style;
   user-select: none;
   -webkit-user-select: none;
-  /* Figma Drop shadow on Ellipse 1 */
+  /* Drop shadow under the lens */
   box-shadow:
     0 10px 40px rgb(0 0 0 / 0.16),
     0 4px 14px rgb(0 0 0 / 0.1);
@@ -109,7 +112,7 @@ body {
   will-change: transform, left, top;
 }
 
-/* Dark glass vignette at the very rim (Figma: dark bezel around lens) */
+/* Dark glass vignette at the very rim (dark bezel around lens) */
 .magnifier-glass-edge {
   z-index: 3;
   pointer-events: none;
@@ -123,7 +126,7 @@ body {
   );
 }
 
-/* Specular rim + inner bevel (Figma Ellipse highlight) */
+/* Specular rim + inner bevel (lens highlight) */
 .magnifier-glass-specular {
   z-index: 4;
   pointer-events: none;
@@ -251,10 +254,6 @@ html.loading-screen-active body {
   overflow: hidden;
 }
 
-html.loading-screen-active #app-content {
-  visibility: hidden;
-}
-
 .loading-screen {
   position: fixed;
   inset: 0;
@@ -264,10 +263,7 @@ html.loading-screen-active #app-content {
   justify-content: center;
   background: #ffffff;
   color: #000000;
-  opacity: 1;
-  will-change: opacity;
-  contain: strict;
-  transition: opacity 480ms ease-out;
+  transition: opacity 420ms ease-out;
 }
 
 .loading-screen--exit {
@@ -306,11 +302,18 @@ html.loading-screen-active #app-content {
   background: #000000;
   opacity: 0.14;
   image-rendering: pixelated;
-  transition: opacity 70ms steps(1, end);
+  animation: loading-slot-step 720ms steps(1, end) infinite;
 }
 
-.loading-screen__slot--on {
-  opacity: 1;
+@keyframes loading-slot-step {
+  0% {
+    opacity: 1;
+  }
+
+  12.5%,
+  100% {
+    opacity: 0.14;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -319,6 +322,7 @@ html.loading-screen-active #app-content {
   }
 
   .loading-screen__slot {
-    transition: none;
+    animation: none;
+    opacity: 0.45;
   }
 }

@@ -4,30 +4,49 @@ export const APP_READY_GATES = ["viewport", "hero-layout"] as const;
 
 export type AppReadyGate = (typeof APP_READY_GATES)[number];
 
+const GATE_FALLBACK_MS = 1200;
+
 const gateState = new Map<AppReadyGate, boolean>();
 const gateListeners = new Set<() => void>();
+let gateFallbacksScheduled = false;
+
+function notifyGateListeners() {
+  if (!APP_READY_GATES.every((name) => gateState.get(name))) return;
+  for (const listener of gateListeners) {
+    listener();
+  }
+}
 
 export function markAppReady(gate: AppReadyGate) {
   if (gateState.get(gate)) return;
   gateState.set(gate, true);
+  notifyGateListeners();
+}
 
-  if (APP_READY_GATES.every((name) => gateState.get(name))) {
-    for (const listener of gateListeners) {
-      listener();
-    }
+function scheduleGateFallbacks() {
+  if (gateFallbacksScheduled) return;
+  gateFallbacksScheduled = true;
+
+  for (const gate of APP_READY_GATES) {
+    window.setTimeout(() => markAppReady(gate), GATE_FALLBACK_MS);
   }
 }
 
-function allGatesReady() {
-  return APP_READY_GATES.every((name) => gateState.get(name));
+function withTimeout<T>(promise: Promise<T>, ms: number): Promise<T | void> {
+  return Promise.race([
+    promise.catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, ms)),
+  ]);
 }
 
 function waitForGates(): Promise<void> {
-  if (allGatesReady()) return Promise.resolve();
+  if (APP_READY_GATES.every((name) => gateState.get(name))) {
+    return Promise.resolve();
+  }
 
   return new Promise((resolve) => {
     const listener = () => {
-      if (!allGatesReady()) return;
+      if (!APP_READY_GATES.every((name) => gateState.get(name))) return;
       gateListeners.delete(listener);
       resolve();
     };
@@ -35,11 +54,11 @@ function waitForGates(): Promise<void> {
   });
 }
 
-function waitForWindowLoad(): Promise<void> {
-  if (document.readyState === "complete") return Promise.resolve();
+function waitForDocumentInteractive(): Promise<void> {
+  if (document.readyState !== "loading") return Promise.resolve();
 
   return new Promise((resolve) => {
-    window.addEventListener("load", () => resolve(), { once: true });
+    document.addEventListener("DOMContentLoaded", () => resolve(), { once: true });
   });
 }
 
@@ -51,8 +70,8 @@ function doubleRaf(): Promise<void> {
   });
 }
 
-/** Wait until hero scene dimensions stop changing (layout + fit scale settled). */
-function waitForStableHeroScene(timeoutMs = 4000): Promise<void> {
+/** Brief settle — tolerant of mobile URL-bar resize jitter. */
+function waitForStableHeroScene(maxMs = 1200): Promise<void> {
   return new Promise((resolve) => {
     const started = performance.now();
     let lastWidth = 0;
@@ -60,7 +79,7 @@ function waitForStableHeroScene(timeoutMs = 4000): Promise<void> {
     let stableFrames = 0;
 
     const tick = () => {
-      if (performance.now() - started > timeoutMs) {
+      if (performance.now() - started > maxMs) {
         resolve();
         return;
       }
@@ -72,23 +91,22 @@ function waitForStableHeroScene(timeoutMs = 4000): Promise<void> {
       const width = rect?.width ?? 0;
       const height = rect?.height ?? 0;
 
-      if (
-        width > 0 &&
-        height > 0 &&
-        Math.abs(width - lastWidth) < 0.5 &&
-        Math.abs(height - lastHeight) < 0.5
-      ) {
-        stableFrames += 1;
-        if (stableFrames >= 2) {
-          resolve();
-          return;
+      if (width > 0 && height > 0) {
+        const dw = Math.abs(width - lastWidth);
+        const dh = Math.abs(height - lastHeight);
+        if (dw < 2 && dh < 2) {
+          stableFrames += 1;
+          if (stableFrames >= 2) {
+            resolve();
+            return;
+          }
+        } else {
+          stableFrames = 0;
         }
-      } else {
-        stableFrames = 0;
+        lastWidth = width;
+        lastHeight = height;
       }
 
-      lastWidth = width;
-      lastHeight = height;
       requestAnimationFrame(tick);
     };
 
@@ -96,21 +114,28 @@ function waitForStableHeroScene(timeoutMs = 4000): Promise<void> {
   });
 }
 
-/** Resolves when fonts, layout gates, images, and paint are ready. */
-export async function whenAppReady(timeoutMs = 10000): Promise<void> {
-  const ready = Promise.all([
-    document.fonts?.ready ?? Promise.resolve(),
-    waitForGates(),
-    waitForWindowLoad(),
-  ]).then(async () => {
-    await waitForStableHeroScene();
-    await doubleRaf();
-  });
+function isMobileViewport() {
+  return window.matchMedia("(max-width: 1023px)").matches;
+}
+
+/** Resolves when fonts, layout gates, and paint are ready — never hangs. */
+export async function whenAppReady(): Promise<void> {
+  const hardCapMs = isMobileViewport() ? 4500 : 7000;
+
+  scheduleGateFallbacks();
+
+  const ready = (async () => {
+    await Promise.all([
+      withTimeout(document.fonts?.ready ?? Promise.resolve(), 2000),
+      waitForGates(),
+      waitForDocumentInteractive(),
+    ]);
+    await withTimeout(waitForStableHeroScene(), 1200);
+    await withTimeout(doubleRaf(), 500);
+  })();
 
   await Promise.race([
-    ready,
-    new Promise<void>((resolve) => {
-      window.setTimeout(resolve, timeoutMs);
-    }),
+    ready.catch(() => undefined),
+    new Promise<void>((resolve) => window.setTimeout(resolve, hardCapMs)),
   ]);
 }

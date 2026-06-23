@@ -1,7 +1,7 @@
 import Image from "next/image";
 import FramedPhotoArc from "./framed-photo-arc";
 import OutlineCtaButton from "./outline-cta-button";
-import { getArcConfig } from "./stamp-arc-config";
+import { getArcConfig } from "./stamp-config";
 import {
   SECTION_BG,
   SECTION_BODY_MAX_PX,
@@ -10,12 +10,6 @@ import {
   sectionFont,
   sectionPx,
 } from "./section-layout";
-
-/** Figma combined bottom panel (146:37) — events + sponsor us. */
-const FIGMA_WIDTH = 1512;
-
-const figmaFont = (px: number, minPx: number, maxPx: number = px) =>
-  `clamp(${minPx}px, ${(px / FIGMA_WIDTH) * 100}vw, ${maxPx}px)`;
 
 type EventItem = {
   city: string;
@@ -35,8 +29,8 @@ export const EVENT_YEARS: EventYear[] = [
     events: [
       {
         city: "ottawa",
-        date: "2026-09-12",
-        href: "https://stupideas-ottawa-f26.devpost.com/",
+        date: "TBD",
+        href: "",
       },
       { city: "san franscisco", date: "TBD", href: "" },
       {
@@ -70,6 +64,11 @@ export const EVENT_YEARS: EventYear[] = [
         href: "https://toronto-stupid-ideas-hackathon.devpost.com/",
       },
       {
+        city: "san franscisco",
+        date: "2026-09-20",
+        href: "https://stupideas-ottawa-f26.devpost.com/",
+      },
+      {
         city: "antananarivo",
         date: "2025-07-26",
         href: "https://stupid-hackathon-antananarivo.devpost.com/",
@@ -92,7 +91,7 @@ const ARC_CORNER = "top-right" as const;
 const arcCfg = getArcConfig(ARC_CORNER);
 
 const listStyle = {
-  fontSize: figmaFont(20, 15, 20),
+  fontSize: sectionFont(20, 15, 20),
   letterSpacing: sectionPx(-0.4),
   lineHeight: 1.35,
 } as const;
@@ -105,7 +104,7 @@ function EventColumns() {
           <p
             className="font-arial-narrow m-0 lowercase text-white"
             style={{
-              fontSize: figmaFont(36, 24, 36),
+              fontSize: sectionFont(36, 24, 36),
               letterSpacing: sectionPx(-1.44),
             }}
           >
@@ -181,7 +180,7 @@ export default function EventsSection() {
             id="sponsor-us"
             className="pointer-events-auto flex w-fit max-w-[451px] flex-col items-end gap-4"
           >
-            <div className="relative aspect-[451/301] w-full overflow-hidden rounded-[4px] border-[16px] border-[#0e0e0e]">
+            <div className="relative aspect-[451/301] w-full overflow-hidden rounded-[4px] border-[16px] border-section-bg">
               <Image
                 src="/sections/sponsor-photo.png"
                 alt="participants cheering with drinks at a hackathon table"
