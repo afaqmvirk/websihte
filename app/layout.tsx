@@ -1,5 +1,5 @@
 import type { Metadata, Viewport } from "next";
-import { arialNarrowWeb, pressStart2P } from "./fonts";
+import { arialNarrowWeb, caveat, pressStart2P } from "./fonts";
 import LoadingScreen from "@/components/shared/loading-screen";
 import ViewportHeightSync from "@/components/shared/viewport-height-sync";
 import "./globals.css";
@@ -24,7 +24,7 @@ export default function RootLayout({
   return (
     <html
       lang="en"
-      className={`${arialNarrowWeb.variable} ${pressStart2P.variable} antialiased`}
+      className={`${arialNarrowWeb.variable} ${pressStart2P.variable} ${caveat.variable} antialiased`}
     >
       <body>
         <LoadingScreen />

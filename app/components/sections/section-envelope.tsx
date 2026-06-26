@@ -5,13 +5,19 @@ import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react
 import {
   EnvelopeSvgContent,
   ENVELOPE_BODY_WIDTH_RATIO,
+  ENVELOPE_VIEWBOX,
   useEnvelopeFlap,
   useFlapPolygonSync,
 } from "@/components/stamp/envelope-svg";
-import { ENVELOPE_CONFIG, STAMP_FRAME, stampPhotoTransform } from "@/components/stamp/stamp-config";
+import { ENVELOPE_CONFIG, STAMP_FRAME, STAMP_PHOTO_RATIOS, stampPhotoTransform } from "@/components/stamp/stamp-config";
 import { useEnvelope, type FlyRequest } from "@/components/stamp/envelope-context";
 import { BREAKPOINT } from "@/components/shared/breakpoints";
+import { STAMP_PHOTOS } from "@/components/shared/section-layout";
 import StampSheen from "@/components/stamp/stamp-sheen";
+
+/** Same destination as the "host a sih" CTA in the events section. */
+const HOST_SIH_MAIL =
+  "mailto:stupidideashackathon@gmail.com?subject=i%20want%20to%make%20more%memories";
 
 const PHOTO_INSET = STAMP_FRAME.photoInset;
 const PHOTO_W = STAMP_FRAME.photoWidth;
@@ -25,9 +31,17 @@ const FLY_MS = 1080;
 const FADE_MS = 140;
 const FLY_EXIT_WIDTH_FRACTION = 1 / 3;
 const POP_PEAK_SCALE = 1.16;
+/** Cursor-follow tilt on the revealed letter — gentler than the stamps' 52°. */
+const REVEAL_TILT_DEG = 16;
+/** Time the docked envelope ducks off-screen before the centred letter pops up. */
+const REVEAL_DUCK_MS = 460;
 
 function easeInOutSine(t: number) {
   return -(Math.cos(Math.PI * t) - 1) / 2;
+}
+
+function easeOutCubic(t: number) {
+  return 1 - Math.pow(1 - t, 3);
 }
 
 function cubicAt(t: number, p0: number, p1: number, p2: number, p3: number) {
@@ -148,6 +162,14 @@ function FlyingStamp({
   const startX = from.left + from.width / 2;
   const startY = from.top + from.height / 2;
 
+  // Launching another stamp re-renders this layer with a fresh onDone arrow.
+  // Keep it in a ref so the animation effect below runs once and isn't
+  // restarted (which would snap already-flying stamps back to their origin).
+  const onDoneRef = useRef(onDone);
+  useEffect(() => {
+    onDoneRef.current = onDone;
+  }, [onDone]);
+
   useLayoutEffect(() => {
     const el = ref.current;
     if (!el) return;
@@ -157,6 +179,9 @@ function FlyingStamp({
     const endX = entryX;
     const endY = flyExitY(window.innerHeight, stampSize);
     const exitScale = flyExitScale(envelopeWidth, stampSize);
+    // Pop grows from the stamp's current (expanded) size up to the peak and
+    // holds there; the shrink toward exitScale happens during the flight.
+    const popPeakScale = startScale * POP_PEAK_SCALE;
     const rotationDelta = shortestAngleDelta(startRotation, entryRotation);
 
     el.style.left = `${startX}px`;
@@ -189,8 +214,9 @@ function FlyingStamp({
 
       if (elapsed < POP_MS) {
         const t = elapsed / POP_MS;
-        const popMul = 1 + (POP_PEAK_SCALE - 1) * Math.sin(t * Math.PI);
-        applyTransform(startX, startY, startScale * popMul, startRotation);
+        // Monotonic grow to the peak — no shrink-back while stationary.
+        const scale = startScale + (popPeakScale - startScale) * easeOutCubic(t);
+        applyTransform(startX, startY, scale, startRotation);
         raf = requestAnimationFrame(tick);
         return;
       }
@@ -208,7 +234,7 @@ function FlyingStamp({
           endY,
         );
         const scale =
-          startScale + (exitScale - startScale) * easeInOutSine(t);
+          popPeakScale + (exitScale - popPeakScale) * easeInOutSine(t);
         const alignT = Math.min(1, t / (ENTRY_PATH_T * 1.15));
         const rotate =
           startRotation + rotationDelta * easeInOutSine(alignT);
@@ -221,7 +247,7 @@ function FlyingStamp({
 
       done = true;
       el.style.opacity = "0";
-      fadeTimer = window.setTimeout(onDone, FADE_MS);
+      fadeTimer = window.setTimeout(() => onDoneRef.current(), FADE_MS);
     };
 
     applyTransform(startX, startY, startScale, startRotation);
@@ -234,7 +260,6 @@ function FlyingStamp({
     };
   }, [
     flight,
-    onDone,
     envelopeWidth,
     entryRotation,
     photoRotateDeg,
@@ -281,9 +306,10 @@ function FlyingStamp({
         <Image
           src={flight.photo.src}
           alt=""
-          width={Math.round(PHOTO_W)}
-          height={Math.round(PHOTO_H)}
+          width={Math.round(stampSize * STAMP_PHOTO_RATIOS.width)}
+          height={Math.round(stampSize * STAMP_PHOTO_RATIOS.height)}
           className="h-full w-full object-cover"
+          sizes={`${Math.round(stampSize)}px`}
           draggable={false}
           style={{
             objectPosition: flight.photo.objectPosition ?? "center",
@@ -321,6 +347,168 @@ function FlyingPhotoLayer({
   );
 }
 
+/** Back face of the envelope — cream paper, seams, and the handwritten invite. */
+function EnvelopeBack() {
+  return (
+    <div className="relative h-full w-full overflow-hidden rounded-[6px]">
+      <svg
+        viewBox={`0 0 ${ENVELOPE_VIEWBOX.width} ${ENVELOPE_VIEWBOX.height}`}
+        className="absolute inset-0 h-full w-full"
+        aria-hidden
+      >
+        <defs>
+          <linearGradient id="envelope-back-paper" x1="0" y1="0" x2="0" y2="1">
+            <stop offset="0%" stopColor="#f7f7f2" />
+            <stop offset="100%" stopColor="#e7e7df" />
+          </linearGradient>
+        </defs>
+        <rect
+          x={2}
+          y={2}
+          width={ENVELOPE_VIEWBOX.width - 4}
+          height={ENVELOPE_VIEWBOX.height - 4}
+          rx={6}
+          fill="url(#envelope-back-paper)"
+          stroke="#d6d6cc"
+          strokeWidth={2}
+        />
+        {/* Single closed top flap folding down to its tip. */}
+        <polygon
+          points={`2,2 ${ENVELOPE_VIEWBOX.width - 2},2 ${ENVELOPE_VIEWBOX.width / 2},148`}
+          fill="#efefe7"
+          stroke="#d8d6c9"
+          strokeWidth={1.5}
+          strokeLinejoin="round"
+        />
+      </svg>
+      <div className="absolute inset-0 flex flex-col items-center justify-center gap-[6%] px-[12%] text-center">
+        <p
+          className="font-handwriting m-0 leading-[1.05] text-[#2a2a26]"
+          style={{ fontSize: "clamp(20px, 6.2vw, 36px)" }}
+        >
+          join us to collect more memory stamps
+        </p>
+        <span
+          className="font-handwriting m-0 text-[#7a786d]"
+          style={{ fontSize: "clamp(12px, 3vw, 17px)" }}
+        >
+          click to say hi →
+        </span>
+      </div>
+    </div>
+  );
+}
+
+/**
+ * Full-screen reveal shown once every stamp is collected: the envelope flies to
+ * the centre, enlarges, and flips about the vertical axis to show the invite.
+ */
+function EnvelopeReveal({
+  active,
+  onDismiss,
+  onOpenMail,
+}: {
+  active: boolean;
+  onDismiss: () => void;
+  onOpenMail: () => void;
+}) {
+  const [tilt, setTilt] = useState({ x: 0, y: 0 });
+
+  const handleMove = useCallback((e: React.PointerEvent<HTMLDivElement>) => {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const px = (e.clientX - rect.left) / rect.width - 0.5;
+    const py = (e.clientY - rect.top) / rect.height - 0.5;
+    setTilt({ x: px, y: py });
+  }, []);
+
+  const resetTilt = useCallback(() => setTilt({ x: 0, y: 0 }), []);
+
+  return (
+    <div
+      className="fixed inset-0 z-[10000] flex items-center justify-center"
+      style={{ pointerEvents: active ? "auto" : "none" }}
+      onClick={onDismiss}
+      role="presentation"
+    >
+      <div
+        className="absolute inset-0 bg-black transition-opacity duration-[500ms] ease-out"
+        style={{ opacity: active ? 0.74 : 0 }}
+        aria-hidden
+      />
+      <div
+        role="button"
+        tabIndex={0}
+        aria-label="join us — email us to collect more memory stamps"
+        onClick={(e) => {
+          e.stopPropagation();
+          onOpenMail();
+        }}
+        onKeyDown={(e) => {
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onOpenMail();
+          }
+        }}
+        onPointerMove={handleMove}
+        onPointerLeave={resetTilt}
+        className="relative cursor-pointer transition-[transform,opacity] duration-[600ms] ease-[cubic-bezier(0.22,1,0.36,1)]"
+        style={{
+          width: "min(86vw, 460px)",
+          aspectRatio: `${ENVELOPE_VIEWBOX.width} / ${ENVELOPE_VIEWBOX.height}`,
+          perspective: "1200px",
+          transform: active
+            ? "translateY(0) scale(1)"
+            : "translateY(46vh) scale(0.42)",
+          opacity: active ? 1 : 0,
+        }}
+      >
+        {/* Cursor-follow tilt — same idea as the stamps, on its own fast
+            transition so it stays responsive independent of the flip. */}
+        <div
+          className="relative h-full w-full transition-transform duration-[200ms] ease-out"
+          style={{
+            transformStyle: "preserve-3d",
+            transform: `rotateX(${-tilt.y * REVEAL_TILT_DEG}deg) rotateY(${tilt.x * REVEAL_TILT_DEG}deg)`,
+          }}
+        >
+          <div
+            className="relative h-full w-full transition-transform duration-[780ms] ease-[cubic-bezier(0.45,0,0.2,1)]"
+            style={{
+              transformStyle: "preserve-3d",
+              transform: active ? "rotateY(180deg)" : "rotateY(0deg)",
+              transitionDelay: active ? "240ms" : "0ms",
+            }}
+          >
+            <div
+              className="absolute inset-0"
+              style={{
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+              }}
+            >
+              <EnvelopeSvgContent
+                layer="full"
+                active
+                className="h-full w-full"
+              />
+            </div>
+            <div
+              className="absolute inset-0"
+              style={{
+                backfaceVisibility: "hidden",
+                WebkitBackfaceVisibility: "hidden",
+                transform: "rotateY(180deg)",
+              }}
+            >
+              <EnvelopeBack />
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 /** SVG envelope — pops up in the black sections, draggable on desktop. */
 export function SectionEnvelope() {
   const {
@@ -333,7 +521,7 @@ export function SectionEnvelope() {
     releaseAllStamps,
     collectedStamps,
     flights,
-    flyingStamp,
+    flyingStamps,
     completeFlight,
   } = useEnvelope();
   const cfg = ENVELOPE_CONFIG;
@@ -363,10 +551,32 @@ export function SectionEnvelope() {
   const rotateDeg = isMobile ? cfg.rotateDegMobile : cfg.rotateDeg;
   const entryRotation = rotateDeg;
 
+  // Once every stamp is collected, take over the screen with the flip reveal.
+  const isFull = collectedStamps.size >= STAMP_PHOTOS.length;
+  const [revealActive, setRevealActive] = useState(false);
+
+  useEffect(() => {
+    if (!isFull) return;
+    // Let the docked envelope duck off-screen first, then pop the letter up so
+    // it reads as the same envelope returning rather than a second one.
+    const t = window.setTimeout(() => setRevealActive(true), REVEAL_DUCK_MS);
+    return () => window.clearTimeout(t);
+  }, [isFull]);
+
+  const dismissReveal = useCallback(() => {
+    setRevealActive(false);
+    // Let the fly-back / un-flip play, then clear the stamps so it unmounts.
+    window.setTimeout(() => releaseAllStamps(), 620);
+  }, [releaseAllStamps]);
+
+  const openMail = useCallback(() => {
+    window.location.href = HOST_SIH_MAIL;
+  }, []);
+
   const isEngaged =
     isOpen ||
     flights.length > 0 ||
-    flyingStamp !== null ||
+    flyingStamps.size > 0 ||
     isHovered ||
     isPressed ||
     isDragging;
@@ -381,27 +591,16 @@ export function SectionEnvelope() {
   const innerOpacity = isEngaged ? 1 : 0.72;
   const innerVisualClass =
     "origin-bottom overflow-visible transition-[transform,opacity] duration-[450ms] ease-[cubic-bezier(0.22,1,0.36,1)]";
+  // Idle: sink the envelope down (and slightly smaller) so it tucks out of the
+  // way; it rises and scales up as soon as it's engaged.
+  const restSink = isEngaged ? 0 : cfg.restSinkPercent;
   const innerVisualStyle = {
-    transform: `scale(${innerScale})`,
+    transform: `translateY(${restSink}%) scale(${innerScale})`,
     opacity: innerOpacity,
   } as const;
-  const [flightBodyEngaged, setFlightBodyEngaged] = useState(false);
-
-  useLayoutEffect(() => {
-    if (!hasFlights) {
-      setFlightBodyEngaged(false);
-      return;
-    }
-
-    setFlightBodyEngaged(false);
-    const raf = requestAnimationFrame(() => setFlightBodyEngaged(true));
-    return () => cancelAnimationFrame(raf);
-  }, [hasFlights]);
-
-  const flightBodyStyle = {
-    transform: `scale(${flightBodyEngaged ? innerScale : 1})`,
-    opacity: flightBodyEngaged ? innerOpacity : 0.72,
-  } as const;
+  // The detached body layer (rendered only while stamps fly) reuses the engaged
+  // style — the envelope is always engaged during flights, so mounting it at the
+  // engaged scale keeps it aligned with the button body and avoids a scale flicker.
   const shellTransform = `translateX(calc(-50% + ${dragX}px)) translateY(${cfg.translateYPercent}%) rotate(${rotateDeg}deg)`;
   const shellWidth = `min(${cfg.widthVw}vw, ${cfg.maxWidthPx}px)`;
 
@@ -498,10 +697,12 @@ export function SectionEnvelope() {
       <div
         className="pointer-events-none fixed inset-x-0 bottom-0 z-[9998] transition-[opacity,bottom] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
         style={{
-          bottom: isVisible ? 0 : "-42vh",
-          opacity: isVisible ? 1 : 0,
+          // When full, duck the dock off-screen so the centred letter looks
+          // like the same envelope returning.
+          bottom: !isVisible || isFull ? "-42vh" : 0,
+          opacity: !isVisible || isFull ? 0 : 1,
         }}
-        aria-hidden={!isVisible}
+        aria-hidden={!isVisible || isFull}
       >
         <div className="relative mx-auto w-full">
           {/* Interior + flap — stamp flies in front of these */}
@@ -597,7 +798,7 @@ export function SectionEnvelope() {
               }}
               aria-hidden
             >
-              <div className={innerVisualClass} style={flightBodyStyle}>
+              <div className={innerVisualClass} style={innerVisualStyle}>
                 <EnvelopeSvgContent
                   layer="body"
                   active={isEngaged}
@@ -609,6 +810,14 @@ export function SectionEnvelope() {
           ) : null}
         </div>
       </div>
+
+      {isFull ? (
+        <EnvelopeReveal
+          active={revealActive}
+          onDismiss={dismissReveal}
+          onOpenMail={openMail}
+        />
+      ) : null}
     </>
   );
 }

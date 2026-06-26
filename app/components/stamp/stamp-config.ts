@@ -57,6 +57,8 @@ export type EnvelopeConfig = {
   hoverScale: number;
   /** Scale when engaged (hover, collect, drag, click). */
   engagedScale: number;
+  /** Extra downward offset (% of envelope height) when idle — sinks it out of the way. */
+  restSinkPercent: number;
   pocketLeft: string;
   pocketTop: string;
   pocketWidth: string;
@@ -100,13 +102,14 @@ export const STAMP_ARC_CONFIG: Record<
 };
 
 export const ENVELOPE_CONFIG: EnvelopeConfig = {
-  maxWidthPx: 360,
-  widthVw: 30,
+  maxWidthPx: 430,
+  widthVw: 36,
   translateYPercent: 52,
   rotateDeg: -8,
   rotateDegMobile: 0,
   hoverScale: 1.03,
   engagedScale: 1.14,
+  restSinkPercent: 20,
   pocketLeft: "38%",
   pocketTop: "58%",
   pocketWidth: "24%",

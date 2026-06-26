@@ -23,6 +23,8 @@
   --font-arial-narrow:
     "Arial Narrow", var(--font-arial-narrow-web), Arial, sans-serif;
   --font-arial: Arial, Helvetica, sans-serif;
+  --font-handwriting:
+    var(--font-caveat), "Segoe Script", "Comic Sans MS", cursive;
 }
 
 html {

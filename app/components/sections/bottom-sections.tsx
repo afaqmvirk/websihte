@@ -12,7 +12,7 @@ import { SECTION_BG, STAMP_PHOTOS } from "@/components/shared/section-layout";
 export default function BottomSections() {
   return (
     <EnvelopeProvider>
-      <div id="dark-sections" className="relative overflow-x-clip overflow-y-visible">
+      <div id="dark-sections" className="relative -mt-px overflow-x-clip overflow-y-visible">
         <WhoWeAreScrollOverlay />
         <WhoWeAreSection />
 

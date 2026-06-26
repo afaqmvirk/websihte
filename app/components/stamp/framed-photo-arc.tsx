@@ -16,8 +16,13 @@ import type { StampPhoto } from "@/components/shared/section-layout";
 import { BREAKPOINT } from "@/components/shared/breakpoints";
 import StampSheen from "@/components/stamp/stamp-sheen";
 
-const STAMP_SIZE = STAMP_FRAME.size;
-const MOBILE_STAMP_SIZE = 72;
+/** Intrinsic stamp-frame artwork px — the <Image> source dimensions. */
+const STAMP_ARTWORK_SIZE = STAMP_FRAME.size;
+/** Rendered desktop stamp size — a touch larger than the artwork for presence. */
+const STAMP_SIZE = 198;
+const MOBILE_STAMP_SIZE = 88;
+/** Per-frame easing for stamps gliding to even spacing as others are collected. */
+const REDISTRIBUTE_EASE = 0.12;
 const MOBILE_LINE_GAP = 36;
 const MOBILE_BREAKPOINT = BREAKPOINT.desktopMin;
 const PHOTO_INSET_RATIO = STAMP_PHOTO_RATIOS.inset;
@@ -217,8 +222,8 @@ function FramedStamp({
         <Image
           src="/sections/stamp-frame.png"
           alt=""
-          width={STAMP_SIZE}
-          height={STAMP_SIZE}
+          width={STAMP_ARTWORK_SIZE}
+          height={STAMP_ARTWORK_SIZE}
           className="pointer-events-none absolute inset-0 z-0 h-full w-full select-none"
           draggable={false}
         />
@@ -256,7 +261,8 @@ export default function FramedPhotoArc({
   corner,
   className,
 }: FramedPhotoArcProps) {
-  const { requestFly, isStampHidden, flyingStamp } = useEnvelope();
+  const { requestFly, isStampHidden, flyingStamps } = useEnvelope();
+  const isFlying = flyingStamps.size > 0;
   const arcConfig = getArcConfig(corner);
   const trackRef = useRef<HTMLDivElement>(null);
   const stampRefs = useRef<(HTMLDivElement | null)[]>([]);
@@ -277,9 +283,12 @@ export default function FramedPhotoArc({
     bottom: arcConfig.clipMarginBottom,
   });
   const totalRef = useRef(photos.length);
+  // Eased fractional slot per stamp (0..1 around the track) and which stamps
+  // are currently collected/flying — read each frame to redistribute spacing.
+  const fracRef = useRef<number[]>([]);
+  const hiddenRef = useRef<boolean[]>([]);
 
   const [hoveredKey, setHoveredKey] = useState<string | null>(null);
-  const [flyingKey, setFlyingKey] = useState<string | null>(null);
   const [isMobileLine, setIsMobileLine] = useState(false);
   const [layoutSize, setLayoutSize] = useState({
     width: layoutRef.current.width,
@@ -330,12 +339,34 @@ export default function FramedPhotoArc({
     const layout = layoutRef.current;
     const total = totalRef.current;
     const isPaused = pausedRef.current;
+    const hidden = hiddenRef.current;
+    const fracs = fracRef.current;
 
+    if (fracs.length !== total) {
+      fracs.length = total;
+      for (let i = 0; i < total; i++) fracs[i] = i / total;
+    }
+
+    let visibleCount = 0;
+    for (let i = 0; i < total; i++) if (!hidden[i]) visibleCount++;
+    if (visibleCount === 0) visibleCount = total;
+
+    let visibleIndex = 0;
     for (let index = 0; index < total; index++) {
+      // Visible stamps ease toward an even spread across the track; a collected
+      // stamp holds its slot so it glides back into place when released.
+      const target = hidden[index] ? fracs[index] : visibleIndex / visibleCount;
+      if (!hidden[index]) visibleIndex++;
+
+      let delta = (((target - fracs[index]) % 1) + 1) % 1;
+      if (delta > 0.5) delta -= 1;
+      fracs[index] =
+        (((fracs[index] + delta * REDISTRIBUTE_EASE) % 1) + 1) % 1;
+
       const el = stampRefs.current[index];
       if (!el) continue;
 
-      const slotT = (index / total + phaseRef.current) % 1;
+      const slotT = (fracs[index] + phaseRef.current) % 1;
       const point = isMobileLineRef.current
         ? getLinePointAt(slotT, layout)
         : getArcPointAt(slotT, cornerRef.current, layout);
@@ -343,14 +374,20 @@ export default function FramedPhotoArc({
     }
   }, []);
 
+  useEffect(() => {
+    // Mirror collected/flying state into a ref so the rAF paint loop can
+    // redistribute the remaining stamps without reading React state.
+    hiddenRef.current = photos.map((photo) => isStampHidden(photo.src));
+    paintStamps();
+  }, [photos, isStampHidden, paintStamps]);
+
   useLayoutEffect(() => {
-    if (!flyingStamp) {
-      setFlyingKey(null);
+    if (!isFlying) {
       setHoveredKey(null);
       phaseEpochRef.current = performance.now();
       pausedRef.current = false;
     }
-  }, [flyingStamp]);
+  }, [isFlying]);
 
   useLayoutEffect(() => {
     syncLayout();
@@ -373,14 +410,16 @@ export default function FramedPhotoArc({
     phaseEpochRef.current = performance.now();
 
     const animate = (now: number) => {
+      // Advance the orbit only when not paused, but always paint so the
+      // remaining stamps keep gliding into place while a stamp flies away.
       if (!pausedRef.current) {
         phaseRef.current =
           (phaseBaseRef.current +
             (now - phaseEpochRef.current) /
               (lapDurationRef.current * 1000)) %
           1;
-        paintStamps();
       }
+      paintStamps();
 
       raf = requestAnimationFrame(animate);
     };
@@ -401,27 +440,32 @@ export default function FramedPhotoArc({
   );
 
   const handleHoverEnd = useCallback(() => {
-    if (flyingKey) return;
+    setHoveredKey(null);
+    // Keep the orbit frozen while stamps are still flying in.
+    if (isFlying) return;
     phaseEpochRef.current = performance.now();
     pausedRef.current = false;
-    setHoveredKey(null);
     paintStamps();
-  }, [flyingKey, paintStamps]);
+  }, [isFlying, paintStamps]);
 
   const handleClick = useCallback(
     (photo: StampPhoto, index: number) => {
       const el = stampRefs.current[index];
-      if (!el || flyingKey || isStampHidden(photo.src)) return;
+      // No global flying lock — only this stamp being collected/in-flight blocks it,
+      // so a second stamp can be launched while the first is still on its way in.
+      if (!el || isStampHidden(photo.src)) return;
 
       phaseBaseRef.current = phaseRef.current;
       phaseEpochRef.current = performance.now();
       pausedRef.current = true;
-      setFlyingKey(photo.src);
       setHoveredKey(photo.src);
       paintStamps();
 
       const layout = layoutRef.current;
-      const slotT = (index / photos.length + phaseRef.current) % 1;
+      const slotT =
+        ((fracRef.current[index] ?? index / photos.length) +
+          phaseRef.current) %
+        1;
       const point = isMobileLineRef.current
         ? getLinePointAt(slotT, layout)
         : getArcPointAt(slotT, cornerRef.current, layout);
@@ -435,7 +479,7 @@ export default function FramedPhotoArc({
         photoRotateDeg: isMobileLineRef.current ? 0 : arcConfig.photoRotateDeg,
       });
     },
-    [flyingKey, hoveredKey, isStampHidden, paintStamps, photos.length, arcConfig.photoRotateDeg, requestFly],
+    [hoveredKey, isStampHidden, paintStamps, photos.length, arcConfig.photoRotateDeg, requestFly],
   );
 
   return (
@@ -474,7 +518,10 @@ export default function FramedPhotoArc({
               stampRefs.current[index] = el;
               if (!el) return;
               const layout = layoutRef.current;
-              const slotT = (index / photos.length + phaseRef.current) % 1;
+              const slotT =
+                ((fracRef.current[index] ?? index / photos.length) +
+                  phaseRef.current) %
+                1;
               const point = isMobileLineRef.current
                 ? getLinePointAt(slotT, layout)
                 : getArcPointAt(slotT, corner, layout);

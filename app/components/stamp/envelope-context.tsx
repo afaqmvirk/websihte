@@ -42,7 +42,7 @@ type EnvelopeContextValue = {
   isVisible: boolean;
   setVisible: (visible: boolean) => void;
   collectedStamps: ReadonlySet<string>;
-  flyingStamp: string | null;
+  flyingStamps: ReadonlySet<string>;
   isStampHidden: (src: string) => boolean;
   releaseAllStamps: () => void;
 };
@@ -59,7 +59,9 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
   const [collectedStamps, setCollectedStamps] = useState<Set<string>>(
     () => new Set(),
   );
-  const [flyingStamp, setFlyingStamp] = useState<string | null>(null);
+  const [flyingStamps, setFlyingStamps] = useState<Set<string>>(
+    () => new Set(),
+  );
   const closeTimerRef = useRef<number | null>(null);
 
   const registerEnvelope = useCallback((el: HTMLButtonElement | null) => {
@@ -87,7 +89,7 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
   const requestFly = useCallback((photo: StampPhoto, meta: FlyLaunchMeta) => {
     const entry = entryRef.current;
     if (!entry) return;
-    if (collectedStamps.has(photo.src) || flyingStamp === photo.src) return;
+    if (collectedStamps.has(photo.src) || flyingStamps.has(photo.src)) return;
 
     if (closeTimerRef.current) {
       window.clearTimeout(closeTimerRef.current);
@@ -95,7 +97,7 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
     }
 
     setIsOpen(true);
-    setFlyingStamp(photo.src);
+    setFlyingStamps((prev) => new Set(prev).add(photo.src));
 
     const from = meta.fromEl.getBoundingClientRect();
     const to = entry.getBoundingClientRect();
@@ -120,7 +122,7 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
         envelopeWidth,
       },
     ]);
-  }, [collectedStamps, flyingStamp]);
+  }, [collectedStamps, flyingStamps]);
 
   const completeFlight = useCallback(
     (id: string) => {
@@ -128,7 +130,11 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
         const flight = prev.find((f) => f.id === id);
         if (flight) {
           setCollectedStamps((stamps) => new Set(stamps).add(flight.photo.src));
-          setFlyingStamp(null);
+          setFlyingStamps((stamps) => {
+            const next = new Set(stamps);
+            next.delete(flight.photo.src);
+            return next;
+          });
         }
         const next = prev.filter((f) => f.id !== id);
         if (next.length === 0) {
@@ -154,8 +160,8 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
   }, [collectedStamps.size, scheduleClose]);
 
   const isStampHidden = useCallback(
-    (src: string) => collectedStamps.has(src) || flyingStamp === src,
-    [collectedStamps, flyingStamp],
+    (src: string) => collectedStamps.has(src) || flyingStamps.has(src),
+    [collectedStamps, flyingStamps],
   );
 
   const setVisible = useCallback((visible: boolean) => {
@@ -182,7 +188,7 @@ export function EnvelopeProvider({ children }: { children: ReactNode }) {
         isVisible,
         setVisible,
         collectedStamps,
-        flyingStamp,
+        flyingStamps,
         isStampHidden,
         releaseAllStamps,
       }}

@@ -23,7 +23,7 @@ export default function WhoWeAreSection() {
       <div
         className={`${SECTION_SHELL_CLASS} relative flex w-full flex-col gap-10 py-[max(2rem,6vw)] pb-0 min-[1024px]:flex-row min-[1024px]:items-start min-[1024px]:justify-between min-[1024px]:gap-8 min-[1024px]:py-[100px]`}
       >
-          <div className="pointer-events-none relative z-10 flex w-full min-w-0 flex-col gap-4 min-[1024px]:max-w-[57%] min-[1024px]:gap-4">
+          <div className="pointer-events-none relative z-10 flex w-full min-w-0 flex-col gap-4 pt-2 pr-1 min-[1024px]:max-w-[57%] min-[1024px]:gap-4 min-[1024px]:pt-4 min-[1024px]:pr-10">
             <h2
               className="font-arial-narrow m-0 lowercase leading-none text-white"
               style={{

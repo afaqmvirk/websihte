@@ -1,4 +1,4 @@
-import { Archivo_Narrow, Press_Start_2P } from "next/font/google";
+import { Archivo_Narrow, Caveat, Press_Start_2P } from "next/font/google";
 
 /** Web fallback when "Arial Narrow" is not installed (most mobile/Linux devices). */
 export const arialNarrowWeb = Archivo_Narrow({
@@ -13,4 +13,11 @@ export const pressStart2P = Press_Start_2P({
   subsets: ["latin"],
   weight: "400",
   variable: "--font-press-start-2p",
+});
+
+/** Handwriting font — used for the "join us" note on the back of the envelope. */
+export const caveat = Caveat({
+  subsets: ["latin"],
+  weight: ["500", "700"],
+  variable: "--font-caveat",
 });
