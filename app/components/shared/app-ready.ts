@@ -1,10 +1,22 @@
 "use client";
 
-export const APP_READY_GATES = ["viewport", "hero-layout"] as const;
+export const APP_READY_GATES = [
+  "viewport",
+  "hero-layout",
+  "dark-texture",
+  "who-photo",
+  "sponsor-photo",
+] as const;
 
 export type AppReadyGate = (typeof APP_READY_GATES)[number];
 
-const GATE_FALLBACK_MS = 1200;
+const GATE_FALLBACK_MS: Record<AppReadyGate, number> = {
+  viewport: 1200,
+  "hero-layout": 1200,
+  "dark-texture": 5500,
+  "who-photo": 5500,
+  "sponsor-photo": 5500,
+};
 
 const gateState = new Map<AppReadyGate, boolean>();
 const gateListeners = new Set<() => void>();
@@ -28,7 +40,7 @@ function scheduleGateFallbacks() {
   gateFallbacksScheduled = true;
 
   for (const gate of APP_READY_GATES) {
-    window.setTimeout(() => markAppReady(gate), GATE_FALLBACK_MS);
+    window.setTimeout(() => markAppReady(gate), GATE_FALLBACK_MS[gate]);
   }
 }
 

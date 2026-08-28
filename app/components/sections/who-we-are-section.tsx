@@ -1,7 +1,7 @@
-import Image from "next/image";
 import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
 import { getArcConfig } from "@/components/stamp/stamp-config";
-import { SECTION_BG, SECTION_SHELL_CLASS, STAMP_PHOTOS, sectionFont, sectionPx } from "@/components/shared/section-layout";
+import EdgeTransparentImage from "@/components/shared/edge-transparent-image";
+import { SECTION_SHELL_CLASS, STAMP_PHOTOS, sectionFont, sectionPx } from "@/components/shared/section-layout";
 
 const bodyStyle = {
   fontSize: sectionFont(20, 15, 20),
@@ -17,7 +17,6 @@ export default function WhoWeAreSection() {
     <section
       id="who-we-are"
       className="relative w-full shrink-0 overflow-hidden text-white"
-      style={{ backgroundColor: SECTION_BG }}
       aria-label="who we are"
     >
       <div
@@ -65,13 +64,13 @@ export default function WhoWeAreSection() {
               build something extremely impractical, and fail spectacularly.
             </p>
 
-            <div className="relative mt-2 aspect-[4096/2731] w-full max-w-full overflow-hidden rounded-[4px] border-[16px] border-section-bg min-[1024px]:border-[12px]">
-              <Image
+            <div className="relative mt-2 aspect-[4096/2731] w-full max-w-full overflow-hidden rounded-[4px] border-[16px] border-transparent min-[1024px]:border-[12px]">
+              <EdgeTransparentImage
                 src="/sections/who-we-are-photo.png"
                 alt="hackathon participants working together at a long table"
-                fill
                 className="object-cover"
                 sizes="(max-width: 1023px) 100vw, 50vw"
+                readyGate="who-photo"
               />
             </div>
             </div>

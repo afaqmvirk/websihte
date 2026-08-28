@@ -26,10 +26,17 @@ const STAMP_SIZE = STAMP_FRAME.size;
 const DRAG_THRESHOLD_PX = 8;
 const MOBILE_MAX_WIDTH = BREAKPOINT.desktopMin - 1;
 
+/** Desktop drag physics, expressed in CSS pixels and seconds. */
+const ENVELOPE_GRAVITY = 1900;
+const ENVELOPE_ANGULAR_DRAG = 2.35;
+const ENVELOPE_MAX_ANGULAR_SPEED = 6.5;
+const ENVELOPE_RETURN_MAX_MS = 4200;
+
 const POP_MS = 200;
 const FLY_MS = 1080;
 const FADE_MS = 140;
-const FLY_EXIT_WIDTH_FRACTION = 1 / 3;
+/** Stamp width at the bottom of its fall, relative to the visible envelope body. */
+const FLY_EXIT_WIDTH_FRACTION = 1 / 6;
 const POP_PEAK_SCALE = 1.16;
 /** Cursor-follow tilt on the revealed letter — gentler than the stamps' 52°. */
 const REVEAL_TILT_DEG = 16;
@@ -122,7 +129,7 @@ function flyExitY(viewportHeight: number, stampHeight: number) {
   return viewportHeight + stampHeight * 0.65 + 32;
 }
 
-/** Transform scale so rendered width = ⅓ of the visible envelope body. */
+/** Transform scale so rendered width = ⅙ of the visible envelope body. */
 function flyExitScale(envelopeWidth: number, stampSize: number) {
   const bodyWidth = envelopeWidth * ENVELOPE_BODY_WIDTH_RATIO;
   const targetWidth = bodyWidth * FLY_EXIT_WIDTH_FRACTION;
@@ -130,8 +137,49 @@ function flyExitScale(envelopeWidth: number, stampSize: number) {
 }
 
 function shortestAngleDelta(fromDeg: number, toDeg: number) {
-  return ((toDeg - fromDeg + 180) % 360) - 180;
+  const delta = toDeg - fromDeg;
+  return (((delta + 180) % 360) + 360) % 360 - 180;
 }
+
+function rotateVector(x: number, y: number, angleRad: number) {
+  const cos = Math.cos(angleRad);
+  const sin = Math.sin(angleRad);
+  return {
+    x: x * cos - y * sin,
+    y: x * sin + y * cos,
+  };
+}
+
+type EnvelopePose = {
+  /** World-space offset from the envelope's original docked centre. */
+  x: number;
+  y: number;
+  /** Absolute clockwise rotation, matching CSS rotate(). */
+  angleDeg: number;
+};
+
+type EnvelopeDrag = {
+  active: boolean;
+  pointerId: number;
+  startX: number;
+  startY: number;
+  pointerX: number;
+  pointerY: number;
+  pointerAt: number;
+  pointerVx: number;
+  pointerVy: number;
+  pointerAx: number;
+  pointerAy: number;
+  dragging: boolean;
+  /** Grab point in the envelope's unrotated, centre-relative coordinates. */
+  grabLocalX: number;
+  grabLocalY: number;
+  restCenterX: number;
+  restCenterY: number;
+  width: number;
+  height: number;
+  angularVelocity: number;
+};
 
 function useIsMobileEnvelope() {
   const [isMobile, setIsMobile] = useState(false);
@@ -216,6 +264,7 @@ function FlyingStamp({
         const t = elapsed / POP_MS;
         // Monotonic grow to the peak — no shrink-back while stationary.
         const scale = startScale + (popPeakScale - startScale) * easeOutCubic(t);
+        el.style.zIndex = "4";
         applyTransform(startX, startY, scale, startRotation);
         raf = requestAnimationFrame(tick);
         return;
@@ -239,6 +288,9 @@ function FlyingStamp({
         const rotate =
           startRotation + rotationDelta * easeInOutSine(alignT);
         const fadeT = Math.max(0, (t - 0.68) / 0.32);
+        // Stay above every envelope outline on approach. Only move behind the
+        // white body frame once the stamp actually crosses into the slot.
+        el.style.zIndex = t < ENTRY_PATH_T ? "4" : "2";
         el.style.opacity = String(1 - fadeT * 0.9);
         applyTransform(x, y, scale, rotate);
         raf = requestAnimationFrame(tick);
@@ -274,7 +326,7 @@ function FlyingStamp({
   return (
     <div
       ref={ref}
-      className="pointer-events-none fixed z-[2] overflow-hidden"
+      className="pointer-events-none fixed overflow-hidden"
       style={{
         left: startX,
         top: startY,
@@ -283,6 +335,7 @@ function FlyingStamp({
         transform: `translate(-50%, -50%) rotate(${startRotation}deg) scale(${startScale})`,
         transformOrigin: "center center",
         opacity: 1,
+        zIndex: 4,
         isolation: "isolate",
       }}
     >
@@ -534,17 +587,38 @@ export function SectionEnvelope() {
     },
     [registerEnvelope],
   );
-  const [dragX, setDragX] = useState(0);
+  const [pose, setPose] = useState<EnvelopePose>(() => ({
+    x: 0,
+    y: 0,
+    angleDeg: cfg.rotateDeg,
+  }));
   const [isDragging, setIsDragging] = useState(false);
+  const [isSettling, setIsSettling] = useState(false);
   const [isHovered, setIsHovered] = useState(false);
   const [isPressed, setIsPressed] = useState(false);
+  const poseRef = useRef(pose);
+  const animationFrameRef = useRef<number | null>(null);
   const suppressClickRef = useRef(false);
-  const dragRef = useRef({
+  const dragRef = useRef<EnvelopeDrag>({
     active: false,
     pointerId: -1,
     startX: 0,
-    startDragX: 0,
+    startY: 0,
+    pointerX: 0,
+    pointerY: 0,
+    pointerAt: 0,
+    pointerVx: 0,
+    pointerVy: 0,
+    pointerAx: 0,
+    pointerAy: 0,
     dragging: false,
+    grabLocalX: 0,
+    grabLocalY: 0,
+    restCenterX: 0,
+    restCenterY: 0,
+    width: 1,
+    height: 1,
+    angularVelocity: 0,
   });
 
   const dragEnabled = !isMobile;
@@ -579,7 +653,8 @@ export function SectionEnvelope() {
     flyingStamps.size > 0 ||
     isHovered ||
     isPressed ||
-    isDragging;
+    isDragging ||
+    isSettling;
 
   const hasFlights = flights.length > 0;
   const flapLitRef = useRef<SVGPolygonElement>(null);
@@ -601,8 +676,22 @@ export function SectionEnvelope() {
   // The detached body layer (rendered only while stamps fly) reuses the engaged
   // style — the envelope is always engaged during flights, so mounting it at the
   // engaged scale keeps it aligned with the button body and avoids a scale flicker.
-  const shellTransform = `translateX(calc(-50% + ${dragX}px)) translateY(${cfg.translateYPercent}%) rotate(${rotateDeg}deg)`;
+  const shellTransform = `translateX(calc(-50% + ${pose.x}px)) translateY(calc(${cfg.translateYPercent}% + ${pose.y}px)) rotate(${pose.angleDeg}deg)`;
   const shellWidth = `min(${cfg.widthVw}vw, ${cfg.maxWidthPx}px)`;
+
+  const commitPose = useCallback((nextPose: EnvelopePose) => {
+    poseRef.current = nextPose;
+    setPose(nextPose);
+  }, []);
+
+  const cancelPhysicsFrame = useCallback(() => {
+    if (animationFrameRef.current !== null) {
+      window.cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
+    }
+  }, []);
+
+  useEffect(() => cancelPhysicsFrame, [cancelPhysicsFrame]);
 
   useEffect(() => {
     const target = document.getElementById("dark-sections");
@@ -618,34 +707,224 @@ export function SectionEnvelope() {
   }, [setVisible]);
 
   useEffect(() => {
-    if (!dragEnabled) {
-      setDragX(0);
+    cancelPhysicsFrame();
+    dragRef.current.active = false;
+    dragRef.current.dragging = false;
+    const resetFrame = window.requestAnimationFrame(() => {
       setIsDragging(false);
-    }
-  }, [dragEnabled]);
+      setIsSettling(false);
+      commitPose({ x: 0, y: 0, angleDeg: rotateDeg });
+    });
+    return () => window.cancelAnimationFrame(resetFrame);
+  }, [cancelPhysicsFrame, commitPose, dragEnabled, rotateDeg]);
 
-  const clampDragX = useCallback((x: number) => {
-    const el = envelopeRef.current;
-    if (!el) return x;
-    const margin = 12;
-    const max = Math.max(0, (window.innerWidth - el.offsetWidth) / 2 - margin);
-    return Math.max(-max, Math.min(max, x));
-  }, []);
+  const startDragPhysics = useCallback(() => {
+    cancelPhysicsFrame();
+    let previousTime = performance.now();
+
+    const tick = (now: number) => {
+      const drag = dragRef.current;
+      if (!drag.active || !drag.dragging) {
+        animationFrameRef.current = null;
+        return;
+      }
+
+      const dt = Math.min(0.034, Math.max(0.001, (now - previousTime) / 1000));
+      previousTime = now;
+
+      let angleRad = (poseRef.current.angleDeg * Math.PI) / 180;
+      const grabWorld = rotateVector(drag.grabLocalX, drag.grabLocalY, angleRad);
+      const radiusSquared =
+        drag.grabLocalX * drag.grabLocalX + drag.grabLocalY * drag.grabLocalY;
+      // Parallel-axis theorem: body inertia plus the grab-point offset.
+      const inertia =
+        (drag.width * drag.width + drag.height * drag.height) / 12 + radiusSquared;
+      // In the cursor's accelerating frame, rapid mouse movement acts like an
+      // opposing force on the body. This is what makes a quick pull or flick
+      // start the envelope swinging instead of merely translating it.
+      const centerFromPivotX = -grabWorld.x;
+      const centerFromPivotY = -grabWorld.y;
+      const effectiveForceX = -drag.pointerAx;
+      const effectiveForceY = ENVELOPE_GRAVITY - drag.pointerAy;
+      const angularAcceleration =
+        (centerFromPivotX * effectiveForceY -
+          centerFromPivotY * effectiveForceX) /
+        Math.max(1, inertia);
+      drag.pointerAx *= Math.exp(-9 * dt);
+      drag.pointerAy *= Math.exp(-9 * dt);
+
+      drag.angularVelocity += angularAcceleration * dt;
+      drag.angularVelocity *= Math.exp(-ENVELOPE_ANGULAR_DRAG * dt);
+      drag.angularVelocity = Math.max(
+        -ENVELOPE_MAX_ANGULAR_SPEED,
+        Math.min(ENVELOPE_MAX_ANGULAR_SPEED, drag.angularVelocity),
+      );
+      angleRad += drag.angularVelocity * dt;
+
+      const rotatedGrab = rotateVector(drag.grabLocalX, drag.grabLocalY, angleRad);
+      const centerX = drag.pointerX - rotatedGrab.x;
+      const centerY = drag.pointerY - rotatedGrab.y;
+      commitPose({
+        x: centerX - drag.restCenterX,
+        y: centerY - drag.restCenterY,
+        angleDeg: (angleRad * 180) / Math.PI,
+      });
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    };
+
+    animationFrameRef.current = window.requestAnimationFrame(tick);
+  }, [cancelPhysicsFrame, commitPose]);
+
+  const startReturnPhysics = useCallback(
+    (initialVx: number, initialVy: number, initialAngularVelocity: number) => {
+      cancelPhysicsFrame();
+      setIsSettling(true);
+
+      let { x, y } = poseRef.current;
+      let angleRad = (poseRef.current.angleDeg * Math.PI) / 180;
+      let vx = Math.max(-2600, Math.min(2600, initialVx));
+      let vy = Math.max(-2600, Math.min(2600, initialVy));
+      let angularVelocity = Math.max(
+        -ENVELOPE_MAX_ANGULAR_SPEED,
+        Math.min(ENVELOPE_MAX_ANGULAR_SPEED, initialAngularVelocity),
+      );
+      let previousTime = performance.now();
+      const startedAt = previousTime;
+      const returningFromBelow = y > 0;
+      let hasLanded = y >= 0;
+
+      const prepareLandingRotation = () => {
+        const currentAngleDeg = (angleRad * 180) / Math.PI;
+        // Equivalent angles can differ by any number of full turns. Collapse
+        // that invisible history so the spring always sees the nearest visual
+        // orientation instead of trying to unwind every accumulated revolution.
+        const equivalentAngleDeg =
+          rotateDeg - shortestAngleDelta(currentAngleDeg, rotateDeg);
+        angleRad = (equivalentAngleDeg * Math.PI) / 180;
+        angularVelocity =
+          Math.max(-2.2, Math.min(2.2, angularVelocity)) * 0.45;
+      };
+
+      if (hasLanded) prepareLandingRotation();
+
+      const tick = (now: number) => {
+        const dt = Math.min(0.034, Math.max(0.001, (now - previousTime) / 1000));
+        previousTime = now;
+
+        if (hasLanded) {
+          // Once it touches the dock, damped floor friction and a horizontal
+          // spring restore the envelope's exact original position.
+          vx += (-18 * x - 7.2 * vx) * dt;
+        } else {
+          // Airborne motion is ballistic: preserve the mouse's horizontal throw
+          // with only a very light amount of air resistance.
+          vx *= Math.exp(-0.12 * dt);
+        }
+        if (returningFromBelow) {
+          // Below the dock there is no floor collision to snap against. A
+          // near-critically-damped spring lifts the envelope smoothly home.
+          vy += (-24 * y - 10 * vy) * dt;
+        } else {
+          vy += ENVELOPE_GRAVITY * dt;
+        }
+        x += vx * dt;
+        y += vy * dt;
+
+        if (hasLanded) {
+          const angleDeg = (angleRad * 180) / Math.PI;
+          const angleErrorRad =
+            (shortestAngleDelta(angleDeg, rotateDeg) * Math.PI) / 180;
+          angularVelocity += (20 * angleErrorRad - 5.6 * angularVelocity) * dt;
+        } else {
+          // A free body keeps the angular momentum imparted by the cursor.
+          angularVelocity *= Math.exp(-0.1 * dt);
+        }
+        angleRad += angularVelocity * dt;
+
+        // The original dock is the floor. A small, rapidly damped bounce keeps
+        // the landing physical without delaying the return to the resting pose.
+        if (!returningFromBelow && y >= 0) {
+          const landedNow = !hasLanded;
+          hasLanded = true;
+          if (landedNow) prepareLandingRotation();
+          y = 0;
+          if (vy > 46) {
+            vy *= -0.2;
+            vx *= 0.76;
+            angularVelocity *= 0.66;
+          } else {
+            vy = 0;
+          }
+        }
+
+        const currentAngleDeg = (angleRad * 180) / Math.PI;
+        const settled =
+          Math.abs(x) < 0.55 &&
+          Math.abs(y) < 0.1 &&
+          Math.abs(vx) < 5 &&
+          Math.abs(vy) < 5 &&
+          Math.abs(shortestAngleDelta(currentAngleDeg, rotateDeg)) < 0.35 &&
+          Math.abs(angularVelocity) < 0.025;
+        const timedOut = now - startedAt >= ENVELOPE_RETURN_MAX_MS;
+
+        if (settled || timedOut) {
+          commitPose({ x: 0, y: 0, angleDeg: rotateDeg });
+          setIsSettling(false);
+          animationFrameRef.current = null;
+          return;
+        }
+
+        commitPose({ x, y, angleDeg: currentAngleDeg });
+        animationFrameRef.current = window.requestAnimationFrame(tick);
+      };
+
+      animationFrameRef.current = window.requestAnimationFrame(tick);
+    },
+    [cancelPhysicsFrame, commitPose, rotateDeg],
+  );
 
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLButtonElement>) => {
       setIsPressed(true);
       if (!dragEnabled || e.button !== 0) return;
       suppressClickRef.current = false;
+
+      const rect = e.currentTarget.getBoundingClientRect();
+      const currentPose = poseRef.current;
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const angleRad = (currentPose.angleDeg * Math.PI) / 180;
+      const grabLocal = rotateVector(
+        e.clientX - centerX,
+        e.clientY - centerY,
+        -angleRad,
+      );
+
       dragRef.current = {
         active: true,
         pointerId: e.pointerId,
         startX: e.clientX,
-        startDragX: dragX,
+        startY: e.clientY,
+        pointerX: e.clientX,
+        pointerY: e.clientY,
+        pointerAt: e.timeStamp,
+        pointerVx: 0,
+        pointerVy: 0,
+        pointerAx: 0,
+        pointerAy: 0,
         dragging: false,
+        grabLocalX: grabLocal.x,
+        grabLocalY: grabLocal.y,
+        restCenterX: centerX - currentPose.x,
+        restCenterY: centerY - currentPose.y,
+        width: e.currentTarget.offsetWidth,
+        height: e.currentTarget.offsetHeight,
+        angularVelocity: 0,
       };
+      e.currentTarget.setPointerCapture(e.pointerId);
     },
-    [dragEnabled, dragX],
+    [dragEnabled],
   );
 
   const handlePointerMove = useCallback(
@@ -654,18 +933,61 @@ export function SectionEnvelope() {
         return;
       }
 
-      const dx = e.clientX - dragRef.current.startX;
-      if (!dragRef.current.dragging) {
-        if (Math.abs(dx) <= DRAG_THRESHOLD_PX) return;
-        dragRef.current.dragging = true;
-        suppressClickRef.current = true;
-        setIsDragging(true);
-        e.currentTarget.setPointerCapture(e.pointerId);
-      }
+      const drag = dragRef.current;
+      const dx = e.clientX - drag.startX;
+      const dy = e.clientY - drag.startY;
+      const elapsed = Math.max(0.001, (e.timeStamp - drag.pointerAt) / 1000);
+      const instantVx = (e.clientX - drag.pointerX) / elapsed;
+      const instantVy = (e.clientY - drag.pointerY) / elapsed;
+      const previousVx = drag.pointerVx;
+      const previousVy = drag.pointerVy;
+      drag.pointerVx = previousVx * 0.58 + instantVx * 0.42;
+      drag.pointerVy = previousVy * 0.58 + instantVy * 0.42;
+      const instantAx = (drag.pointerVx - previousVx) / elapsed;
+      const instantAy = (drag.pointerVy - previousVy) / elapsed;
+      drag.pointerAx = Math.max(
+        -12000,
+        Math.min(12000, drag.pointerAx * 0.45 + instantAx * 0.55),
+      );
+      drag.pointerAy = Math.max(
+        -12000,
+        Math.min(12000, drag.pointerAy * 0.45 + instantAy * 0.55),
+      );
+      drag.pointerX = e.clientX;
+      drag.pointerY = e.clientY;
+      drag.pointerAt = e.timeStamp;
 
-      setDragX(clampDragX(dragRef.current.startDragX + dx));
+      if (!drag.dragging) {
+        if (Math.hypot(dx, dy) <= DRAG_THRESHOLD_PX) return;
+
+        // The envelope may still be falling between pointer-down and the drag
+        // threshold. Establish the joint from its current pose so a plain click
+        // never pauses the return animation and a real re-grab never jumps.
+        const rect = e.currentTarget.getBoundingClientRect();
+        const currentPose = poseRef.current;
+        const centerX = rect.left + rect.width / 2;
+        const centerY = rect.top + rect.height / 2;
+        const angleRad = (currentPose.angleDeg * Math.PI) / 180;
+        const grabLocal = rotateVector(
+          e.clientX - centerX,
+          e.clientY - centerY,
+          -angleRad,
+        );
+        drag.grabLocalX = grabLocal.x;
+        drag.grabLocalY = grabLocal.y;
+        drag.restCenterX = centerX - currentPose.x;
+        drag.restCenterY = centerY - currentPose.y;
+        drag.width = e.currentTarget.offsetWidth;
+        drag.height = e.currentTarget.offsetHeight;
+        drag.angularVelocity = 0;
+        drag.dragging = true;
+        suppressClickRef.current = true;
+        setIsSettling(false);
+        setIsDragging(true);
+        startDragPhysics();
+      }
     },
-    [clampDragX, dragEnabled],
+    [dragEnabled, startDragPhysics],
   );
 
   const handlePointerEnd = useCallback(
@@ -673,15 +995,62 @@ export function SectionEnvelope() {
       setIsPressed(false);
       if (!dragRef.current.active || e.pointerId !== dragRef.current.pointerId) return;
 
-      if (dragRef.current.dragging && e.currentTarget.hasPointerCapture(e.pointerId)) {
+      const drag = dragRef.current;
+      const wasDragging = drag.dragging;
+      drag.active = false;
+      drag.dragging = false;
+      if (e.currentTarget.hasPointerCapture(e.pointerId)) {
         e.currentTarget.releasePointerCapture(e.pointerId);
       }
 
-      dragRef.current.active = false;
-      dragRef.current.dragging = false;
       setIsDragging(false);
+
+      if (wasDragging) {
+        cancelPhysicsFrame();
+        const wasCancelled = e.type === "pointercancel";
+        const secondsSincePointerMove = Math.max(
+          0,
+          (e.timeStamp - drag.pointerAt) / 1000,
+        );
+        const releaseDx = e.clientX - drag.pointerX;
+        const releaseDy = e.clientY - drag.pointerY;
+        if (!wasCancelled && Math.hypot(releaseDx, releaseDy) > 0.25) {
+          const sampleTime = Math.max(0.001, secondsSincePointerMove);
+          drag.pointerVx =
+            drag.pointerVx * 0.58 + (releaseDx / sampleTime) * 0.42;
+          drag.pointerVy =
+            drag.pointerVy * 0.58 + (releaseDy / sampleTime) * 0.42;
+          drag.pointerX = e.clientX;
+          drag.pointerY = e.clientY;
+        } else {
+          // Pausing before release should drop the envelope straight down;
+          // momentum only survives while the mouse is genuinely still moving.
+          const pointerStoppedDecay = Math.exp(-10 * secondsSincePointerMove);
+          drag.pointerVx *= pointerStoppedDecay;
+          drag.pointerVy *= pointerStoppedDecay;
+        }
+
+        if (wasCancelled) {
+          drag.pointerVx = 0;
+          drag.pointerVy = 0;
+        }
+
+        const angleRad = (poseRef.current.angleDeg * Math.PI) / 180;
+        const grabWorld = rotateVector(drag.grabLocalX, drag.grabLocalY, angleRad);
+        const releaseCenterX = drag.pointerX - grabWorld.x;
+        const releaseCenterY = drag.pointerY - grabWorld.y;
+        commitPose({
+          x: releaseCenterX - drag.restCenterX,
+          y: releaseCenterY - drag.restCenterY,
+          angleDeg: poseRef.current.angleDeg,
+        });
+        // centre = pointer - rotatedGrab, so rotation contributes -omega x grab.
+        const centerVx = drag.pointerVx + drag.angularVelocity * grabWorld.y;
+        const centerVy = drag.pointerVy - drag.angularVelocity * grabWorld.x;
+        startReturnPhysics(centerVx, centerVy, drag.angularVelocity);
+      }
     },
-    [],
+    [cancelPhysicsFrame, commitPose, startReturnPhysics],
   );
 
   const handleClick = useCallback(() => {
@@ -718,6 +1087,7 @@ export function SectionEnvelope() {
             onPointerMove={handlePointerMove}
             onPointerUp={handlePointerEnd}
             onPointerCancel={handlePointerEnd}
+            onLostPointerCapture={handlePointerEnd}
             onPointerEnter={() => setIsHovered(true)}
             onPointerLeave={() => {
               setIsHovered(false);
@@ -726,8 +1096,8 @@ export function SectionEnvelope() {
             onClick={handleClick}
             aria-label={
               collectedStamps.size > 0
-                ? `release ${collectedStamps.size} stamps from envelope${dragEnabled ? " — drag to reposition" : ""}`
-                : `envelope${dragEnabled ? " — drag to reposition" : ""}`
+                ? `release ${collectedStamps.size} stamps from envelope${dragEnabled ? " — drag to lift and throw" : ""}`
+                : `envelope${dragEnabled ? " — drag to lift and throw" : ""}`
             }
           >
             <div className={innerVisualClass} style={innerVisualStyle}>

@@ -1,9 +1,8 @@
-import Image from "next/image";
 import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
 import OutlineCtaButton from "@/components/shared/outline-cta-button";
+import EdgeTransparentImage from "@/components/shared/edge-transparent-image";
 import { getArcConfig } from "@/components/stamp/stamp-config";
 import {
-  SECTION_BG,
   SECTION_BODY_MAX_PX,
   SECTION_SHELL_CLASS,
   STAMP_PHOTOS,
@@ -32,7 +31,6 @@ export const EVENT_YEARS: EventYear[] = [
         date: "TBD",
         href: "",
       },
-      { city: "san franscisco", date: "TBD", href: "" },
       {
         city: "singapore",
         date: "2026-05-02",
@@ -64,9 +62,9 @@ export const EVENT_YEARS: EventYear[] = [
         href: "https://toronto-stupid-ideas-hackathon.devpost.com/",
       },
       {
-        city: "san franscisco",
+        city: "san francisco",
         date: "2026-09-20",
-        href: "https://stupideas-ottawa-f26.devpost.com/",
+        href: "https://stupid-hackathon-roan.vercel.app/",
       },
       {
         city: "antananarivo",
@@ -142,7 +140,6 @@ export default function EventsSection() {
     <section
       id="our-events"
       className="relative w-full shrink-0 overflow-hidden text-white"
-      style={{ backgroundColor: SECTION_BG }}
       aria-label="our events and sponsor us"
     >
       <div
@@ -180,13 +177,13 @@ export default function EventsSection() {
             id="sponsor-us"
             className="pointer-events-auto flex w-fit max-w-[451px] flex-col items-end gap-4"
           >
-            <div className="relative aspect-[451/301] w-full overflow-hidden rounded-[4px] border-[16px] border-section-bg">
-              <Image
+            <div className="relative aspect-[451/301] w-full overflow-hidden rounded-[4px] border-[16px] border-transparent">
+              <EdgeTransparentImage
                 src="/sections/sponsor-photo.png"
                 alt="participants cheering with drinks at a hackathon table"
-                fill
                 className="object-cover"
                 sizes="(max-width: 768px) 100vw, 451px"
+                readyGate="sponsor-photo"
               />
             </div>
 

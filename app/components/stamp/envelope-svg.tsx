@@ -207,6 +207,16 @@ function EnvelopeDefs({
         <mask id={`${uid}-body-frame-mask`}>
           <rect x={0} y={0} width={400} height={260} fill="white" />
           <polygon points={interiorPointsStatic} fill="black" />
+          {/* The body rect's top stroke is centred on hingeY, so half of it
+              sits above the triangular cutout. Mask that overscan as well or
+              its anti-aliased edge paints a line across an entering stamp. */}
+          <rect
+            x={bodyLeft - 2}
+            y={hingeY - 3}
+            width={bodyRight - bodyLeft + 4}
+            height={4}
+            fill="black"
+          />
         </mask>
       ) : null}
       <linearGradient id={`${uid}-body-lit`} x1="0" y1="0" x2="0" y2="1">

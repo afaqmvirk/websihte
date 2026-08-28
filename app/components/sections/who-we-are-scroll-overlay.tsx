@@ -21,6 +21,8 @@ const CURL_REGION_FRACTION = 1;
 /** Number of vertical strips the curl is wrapped from (more = smoother cylinder,
  *  fewer = visible facet bands). */
 const N_STRIPS = 30;
+/** Covers subpixel cracks between independently composited 3D strips. */
+const STRIP_OVERLAP_PX = 2;
 /** Per-strip rotation at full progress; N_STRIPS * this is the total wrap angle.
  *  Negative so the page rolls under/away rather than toward the viewer. */
 const DT_MAX_DEG = -6;
@@ -103,10 +105,10 @@ function CurlStrip({ i }: { i: number }) {
       className="absolute top-0 h-full"
       style={
         {
-          // Right edge sits 0.6px inside the parent so neighbours overlap and
+          // Right edge sits inside the parent so neighbours overlap and
           // there are no subpixel gaps; the leftward step stays exactly --seg.
-          right: "calc(100% - 0.6px)",
-          width: "calc(var(--seg) + 0.6px)",
+          right: `calc(100% - ${STRIP_OVERLAP_PX}px)`,
+          width: `calc(var(--seg) + ${STRIP_OVERLAP_PX}px)`,
           transformOrigin: "right center",
           transform: "rotateY(calc(var(--dt) * 1deg))",
           transformStyle: "preserve-3d",
@@ -227,6 +229,26 @@ export default function WhoWeAreScrollOverlay() {
 
   return (
     <>
+      {/* Unmasked overlap behind the stub prevents the dark section from
+          bleeding through when its top edge lands between device pixels. */}
+      <div
+        className="pointer-events-none absolute -top-2 right-0 left-0 z-[23] h-4 overflow-hidden bg-white"
+        aria-hidden
+      >
+        <div
+          className="absolute right-0 bottom-[7px] left-0"
+          style={{
+            height: "var(--app-height)",
+            backgroundColor: PAPER_WHITE,
+            backgroundImage: PAPER_TEXTURE,
+            backgroundBlendMode: "multiply",
+            backgroundRepeat: "no-repeat",
+            backgroundPosition: "center",
+            backgroundSize: "cover",
+          }}
+        />
+      </div>
+
       {/* Fixed white piece that closes the gap to the hero; its torn bottom edge
           matches the curl's torn top, so a clean tear remains as the curl peels. */}
       <div
