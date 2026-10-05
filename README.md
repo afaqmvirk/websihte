@@ -1,5 +1,11 @@
 This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
 
+## Site metadata
+
+`app/site.ts` holds the production URL, existing title and description, and shared image settings used by `app/layout.tsx`. The static 1200×630 `public/social-preview.png` reuses the homepage's paper texture and SIH phone sticker (`public/4.png`); no image-generation service is needed at runtime.
+
+`app/sitemap.ts` lists the homepage, since events, hosting and sponsorship are sections of that page. Add entries and page-specific canonical/Open Graph URLs when adding public routes. `app/robots.ts` allows crawling and points to the production sitemap.
+
 ## Getting Started
 
 First, run the development server:

@@ -3,11 +3,29 @@ import { arialNarrowWeb, caveat, pressStart2P } from "./fonts";
 import LoadingScreen from "@/components/shared/loading-screen";
 import ViewportHeightSync from "@/components/shared/viewport-height-sync";
 import "./globals.css";
+import { shareImage, siteDescription, siteTitle, siteUrl } from "./site";
 
 export const metadata: Metadata = {
-  title: "the stupid ideas hackathon community",
-  description:
-    "a decentralized community reclaiming the joy of building, one stupid idea at a time.",
+  metadataBase: new URL(siteUrl),
+  title: siteTitle,
+  description: siteDescription,
+  alternates: {
+    canonical: "/",
+  },
+  openGraph: {
+    type: "website",
+    url: "/",
+    siteName: siteTitle,
+    title: siteTitle,
+    description: siteDescription,
+    images: [shareImage],
+  },
+  twitter: {
+    card: "summary_large_image",
+    title: siteTitle,
+    description: siteDescription,
+    images: [shareImage],
+  },
 };
 
 export const viewport: Viewport = {
