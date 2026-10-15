@@ -590,6 +590,9 @@ export default function OttawaPage() {
                 <a href="https://ccss.carleton.ca/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Carleton Computer Science Society">
                   <Image src="/sponsors/ccss.png" alt="Carleton Computer Science Society" width={1000} height={204} className={styles.ccssLogo} />
                 </a>
+                <a href="https://www.investottawa.ca/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Invest Ottawa">
+                  <Image src="/sponsors/invest-ottawa.svg" alt="Invest Ottawa" width={982} height={351} className={styles.investOttawaLogo} />
+                </a>
                 <a href="https://cuthere.app/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="CU There">
                   <Image src="/sponsors/cu-there.png" alt="CU There" width={1010} height={496} className={styles.cuThereLogo} />
                 </a>
