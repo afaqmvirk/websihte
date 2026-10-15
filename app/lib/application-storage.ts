@@ -1,8 +1,8 @@
-import { createHash } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
 
 const RESUME_BUCKET = "application-resumes";
-const PRIVACY_POLICY_VERSION = "2026-10-14";
-const RECEIPT_COLUMNS = "id,intake_status,confirmation_email_status";
+const PRIVACY_POLICY_VERSION = "2026-10-15";
+const RECEIPT_COLUMNS = "id,created_at,intake_status,confirmation_email_status,discord_notification_status";
 
 export function getApplicationStorageConfig() {
   const key = process.env.SUPABASE_SECRET_KEY?.trim();
@@ -19,8 +19,10 @@ export function getApplicationStorageConfig() {
 type StorageConfig = NonNullable<ReturnType<typeof getApplicationStorageConfig>>;
 type StoredApplication = {
   id: string;
+  created_at: string;
   intake_status: "pending_resume" | "complete";
   confirmation_email_status: "pending" | "sent" | "failed";
+  discord_notification_status: "pending" | "sending" | "sent" | "failed";
 };
 
 function field(form: FormData, name: string) {
@@ -135,4 +137,40 @@ export async function recordApplicationEmail(config: StorageConfig, applicationI
     // Collection has succeeded; a receipt tracking failure must not ask for a duplicate application.
     console.error("Could not update application email status", { applicationId });
   }
+}
+
+export async function claimApplicationDiscordNotification(config: StorageConfig, applicationId: string) {
+  const claimId = randomUUID();
+  const now = new Date().toISOString();
+  const expired = new Date(Date.now() - 2 * 60_000).toISOString();
+  const query = new URLSearchParams({
+    id: `eq.${applicationId}`, intake_status: "eq.complete", select: "id",
+    or: `(discord_notification_status.in.(pending,failed),and(discord_notification_status.eq.sending,discord_notification_attempted_at.lt.${expired}),and(discord_notification_status.eq.sending,discord_notification_claim_id.eq.${claimId}))`,
+  });
+  const response = await storageRequest(config, `/rest/v1/applications?${query}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json", Prefer: "return=representation" },
+    body: JSON.stringify({
+      discord_notification_status: "sending", discord_notification_claim_id: claimId,
+      discord_notification_attempted_at: now, updated_at: now,
+    }),
+  });
+  return (await response.json() as { id: string }[]).length ? claimId : null;
+}
+
+export async function recordApplicationDiscordNotification(
+  config: StorageConfig, applicationId: string, claimId: string, messageId: string | null,
+) {
+  const query = new URLSearchParams({
+    id: `eq.${applicationId}`, discord_notification_status: "eq.sending",
+    discord_notification_claim_id: `eq.${claimId}`,
+  });
+  const now = new Date().toISOString();
+  await storageRequest(config, `/rest/v1/applications?${query}`, {
+    method: "PATCH", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({
+      discord_notification_status: messageId ? "sent" : "failed",
+      discord_notification_claim_id: null, discord_notification_id: messageId,
+      discord_notification_sent_at: messageId ? now : null, updated_at: now,
+    }),
+  });
 }

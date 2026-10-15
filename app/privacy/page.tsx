@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
-          <time dateTime="2026-10-14">October 14, 2026</time>
+          <time dateTime="2026-10-15">October 15, 2026</time>
         </p>
       </header>
 
@@ -47,6 +47,7 @@ export default function PrivacyPolicyPage() {
               When you submit an event form, its fields and uploaded files are
               transmitted to the application processor identified on that form.
               Ottawa applications are stored with Supabase and emailed to you and SIH organizers through Resend.
+              A copy is also sent to a private SIH organizer channel on Discord.
             </li>
             <li>
               When you join an event mailing list, we use your email only for
@@ -118,6 +119,8 @@ export default function PrivacyPolicyPage() {
               answers and any uploaded résumé to the address you provide, with
               a private copy to the SIH organizer inbox. These application emails
               are for event administration and do not subscribe you to a mailing list.
+              We also send the application details and any uploaded résumé to a
+              private organizer channel on Discord to notify the team of new applications.
             </p>
 
             <h3>when you email us</h3>
@@ -209,7 +212,8 @@ export default function PrivacyPolicyPage() {
                 application management, mailing-list delivery, file storage,
                 communications, and security, including Vercel as our website
                 host, Supabase for application and file storage, and Resend for
-                application emails and mailing-list delivery;
+                application emails and mailing-list delivery, and Discord for private
+                organizer application notifications;
               </li>
               <li>
                 sponsors identified for the relevant event, only for the optional
@@ -256,16 +260,19 @@ export default function PrivacyPolicyPage() {
               outside Ontario may be subject to the laws and lawful access rules
               of those places. Our Ottawa application database and résumé storage
               are hosted in Supabase&apos;s Canada Central region. Email delivery,
-              hosting, and provider support may involve processing elsewhere. See our
+              hosting, Discord notifications, and provider support may involve processing elsewhere. See our
               providers&apos; notices for more detail: {" "}
               <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">
                 Vercel Privacy Notice
               </a>,{" "}
               <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">
                 Supabase Privacy Policy
-              </a>, and{" "}
+              </a>,{" "}
               <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">
                 Resend Privacy Policy
+              </a>, and{" "}
+              <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">
+                Discord Privacy Policy
               </a>.
             </p>
           </section>

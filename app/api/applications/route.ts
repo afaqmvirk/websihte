@@ -1,5 +1,6 @@
 import { getApplicationEmailConfig, isValidEmail, sendApplicationEmail } from "@/lib/application-email";
 import { getApplicationStorageConfig, recordApplicationEmail, storeApplication } from "@/lib/application-storage";
+import { notifyApplicationDiscord } from "@/lib/application-discord";
 
 const MAX_UPLOAD_BYTES = 4 * 1024 * 1024;
 
@@ -84,9 +85,11 @@ export async function POST(request: Request) {
 
   const receiptFailureMessage = `Application received, but we couldn't email your copy. You don't need to apply again. Contact ${emailConfig.replyTo} if you need a copy.`;
   let applicationStored = false;
+  let notification: Promise<void> | undefined;
   try {
     const application = await storeApplication(formData, storageConfig);
     applicationStored = true;
+    notification = notifyApplicationDiscord(formData, application, storageConfig);
     if (application.confirmation_email_status === "sent") {
       return Response.json({
         confirmationEmailSent: true,
@@ -120,5 +123,8 @@ export async function POST(request: Request) {
       },
       { status: 502 },
     );
+  } finally {
+    // Keep serverless work alive, including duplicate submissions and email failures.
+    await notification;
   }
 }

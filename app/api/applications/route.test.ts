@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { POST } from "./route";
 
 const DATABASE_URL = "https://test.supabase.co";
-const envNames = ["APPLICATION_EMAIL_API_KEY", "RESEND_API_KEY", "APPLICATION_EMAIL_FROM", "APPLICATION_EMAIL_TO", "APPLICATION_EMAIL_REPLY_TO", "SUPABASE_URL", "SUPABASE_SECRET_KEY"];
+const WEBHOOK_URL = `https://discord.com/api/webhooks/123456789012345678/${"test-token-".repeat(6)}`;
+const envNames = ["APPLICATION_EMAIL_API_KEY", "RESEND_API_KEY", "APPLICATION_EMAIL_FROM", "APPLICATION_EMAIL_TO", "APPLICATION_EMAIL_REPLY_TO", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "DISCORD_APPLICATION_WEBHOOK_URL"];
 const originalFetch = globalThis.fetch;
 const originalEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 type RecordData = { id: string; [key: string]: unknown };
@@ -29,12 +30,14 @@ function submit(form = application()) {
 }
 
 const emailCalls = () => calls.filter(({ url }) => url === "https://api.resend.com/emails");
+const discordCalls = () => calls.filter(({ url }) => url.startsWith(WEBHOOK_URL));
 
 beforeEach(() => {
   envNames.forEach((name) => delete process.env[name]);
   process.env.RESEND_API_KEY = "test-only-email-key";
   process.env.SUPABASE_URL = DATABASE_URL;
   process.env.SUPABASE_SECRET_KEY = "sb_secret_test-only-server-key";
+  process.env.DISCORD_APPLICATION_WEBHOOK_URL = WEBHOOK_URL;
   calls = [];
   records = new Map();
   uploads = new Map();
@@ -45,6 +48,7 @@ beforeEach(() => {
     const intercepted = intercept?.(url, init);
     if (intercepted) return intercepted;
     if (url === "https://api.resend.com/emails") return Response.json({ id: "test-email-id" });
+    if (url.startsWith(WEBHOOK_URL)) return Response.json({ id: "test-discord-message-id" });
     assert.ok(url.startsWith(DATABASE_URL));
     const endpoint = new URL(url);
     if (endpoint.pathname.startsWith("/storage/v1/object/")) {
@@ -55,15 +59,35 @@ beforeEach(() => {
     if (init?.method === "POST") {
       const data = JSON.parse(String(init.body));
       if (records.has(data.submission_hash)) return Response.json([]);
-      const record = { confirmation_email_status: "pending", ...data, id: `application-${records.size + 1}` };
+      const record = {
+        confirmation_email_status: "pending", discord_notification_status: "pending",
+        created_at: "2026-10-15T12:00:00.000Z", ...data, id: `application-${records.size + 1}`,
+      };
       records.set(data.submission_hash, record);
       return Response.json([record]);
     }
     if (init?.method === "PATCH") {
       const record = [...records.values()].find((record) => `eq.${record.id}` === endpoint.searchParams.get("id"));
       assert.ok(record);
+      const patch = JSON.parse(String(init.body));
+      const claim = endpoint.searchParams.get("or");
+      if (claim) {
+        const matches = record.intake_status === "complete" && (
+          ["pending", "failed"].includes(String(record.discord_notification_status))
+          || record.discord_notification_claim_id === patch.discord_notification_claim_id
+          || (record.discord_notification_status === "sending"
+            && new Date(String(record.discord_notification_attempted_at)).getTime() < Date.now() - 120_000)
+        );
+        if (!matches) return Response.json([]);
+        Object.assign(record, patch);
+        return Response.json([{ id: record.id }]);
+      }
+      if (endpoint.searchParams.has("discord_notification_claim_id")
+        && `eq.${record.discord_notification_claim_id}` !== endpoint.searchParams.get("discord_notification_claim_id")) {
+        return new Response(null, { status: 204 });
+      }
       if (endpoint.searchParams.get("confirmation_email_status") !== "neq.sent" || record.confirmation_email_status !== "sent") {
-        Object.assign(record, JSON.parse(String(init.body)));
+        Object.assign(record, patch);
       }
       return new Response(null, { status: 204 });
     }
@@ -91,7 +115,7 @@ describe("Ottawa application collection and receipts", () => {
     assert.equal(record.coolest_build, "An unnecessary button.");
     assert.equal(record.attending, true);
     assert.equal(record.sponsor_opt_in, false);
-    assert.equal(record.privacy_policy_version, "2026-10-14");
+    assert.equal(record.privacy_policy_version, "2026-10-15");
     assert.equal(record.intake_status, "complete");
     assert.equal(record.confirmation_email_status, "sent");
     assert.equal(record.confirmation_email_id, "test-email-id");
@@ -160,6 +184,7 @@ describe("Ottawa application collection and receipts", () => {
     const response = await submit();
     assert.equal(records.size, 1);
     assert.equal(emailCalls().length, 1);
+    assert.equal(discordCalls().length, 1);
     assert.match((await response.json()).message, /already received/);
   });
 
@@ -254,5 +279,96 @@ describe("Ottawa application collection and receipts", () => {
     form.set("website", "spam.example.com");
     assert.equal((await submit(form)).status, 200);
     assert.equal(calls.length, 0);
+  });
+
+  it("posts all application details and the optional résumé to Discord after storage completes", async () => {
+    const form = application();
+    form.set("fullName", "Test @everyone **Applicant**");
+    form.set("dietaryRestrictions", "other");
+    form.set("dietaryRestrictionsOther", "No peanuts");
+    form.set("sponsorOptIn", "on");
+    form.set("resume", new File(["Synthetic résumé"], "test-resume.pdf", { type: "application/pdf" }));
+    form.set("unknownField", "MUST NOT SEND");
+    const response = await submit(form);
+    assert.equal((await response.json()).confirmationEmailSent, true);
+    assert.equal(discordCalls().length, 1);
+    const call = discordCalls()[0];
+    assert.equal(new URL(call.url).searchParams.get("wait"), "true");
+    const body = call.init?.body as FormData;
+    const payload = JSON.parse(String(body.get("payload_json")));
+    assert.deepEqual(payload.allowed_mentions, { parse: [] });
+    assert.match(payload.embeds[0].fields[0].value, /\\\*\\\*Applicant\\\*\\\*/);
+    assert.ok(payload.embeds[0].fields.some((field: { value: string }) => field.value === "No peanuts"));
+    assert.equal(await (body.get("files[1]") as File).text(), "Synthetic résumé");
+    const fullApplication = await (body.get("files[0]") as File).text();
+    assert.match(fullApplication, /Test @everyone \*\*Applicant\*\*/);
+    assert.match(fullApplication, /applicant@example.com/);
+    assert.match(fullApplication, /event sponsors\nYes/);
+    assert.doesNotMatch(fullApplication, /MUST NOT SEND/);
+    const discordIndex = calls.findIndex(({ url }) => url.startsWith(WEBHOOK_URL));
+    assert.ok(calls.findIndex(({ url }) => url.includes("/storage/v1/object/")) < discordIndex);
+    assert.equal([...records.values()][0].discord_notification_status, "sent");
+    assert.equal([...records.values()][0].discord_notification_id, "test-discord-message-id");
+  });
+
+  it("respects Discord rate limits and records successful delivery", async () => {
+    intercept = (url) => url.startsWith(WEBHOOK_URL) && discordCalls().length === 1
+      ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
+    assert.equal((await submit()).status, 200);
+    assert.equal(discordCalls().length, 2);
+    assert.equal([...records.values()][0].discord_notification_status, "sent");
+  });
+
+  it("preserves signup and email success on webhook failure, then retries only the notification", async () => {
+    intercept = (url) => url.startsWith(WEBHOOK_URL) ? Response.json({}, { status: 403 }) : null;
+    assert.equal((await (await submit()).json()).confirmationEmailSent, true);
+    assert.equal([...records.values()][0].discord_notification_status, "failed");
+    intercept = undefined;
+    await submit();
+    assert.equal(records.size, 1);
+    assert.equal(emailCalls().length, 1);
+    assert.equal(discordCalls().length, 2);
+    assert.equal([...records.values()][0].discord_notification_status, "sent");
+  });
+
+  it("sends the Discord notification even when receipt email fails", async () => {
+    intercept = (url) => url.includes("api.resend.com") ? Response.json({}, { status: 403 }) : null;
+    assert.equal((await (await submit()).json()).confirmationEmailSent, false);
+    assert.equal([...records.values()][0].discord_notification_status, "sent");
+  });
+
+  it("claims a concurrent duplicate only once", async () => {
+    const responses = await Promise.all([submit(), submit()]);
+    assert.ok(responses.every((response) => response.status === 200));
+    assert.equal(records.size, 1);
+    assert.equal(discordCalls().length, 1);
+  });
+
+  it("keeps Discord embed limits and attaches complete long answers", async () => {
+    const form = application();
+    form.set("affiliation", "*".repeat(500));
+    const longLink = `https://example.com/${"_".repeat(2028)}`;
+    form.set("linkedin", longLink);
+    form.set("otherLink", longLink);
+    await submit(form);
+    const body = discordCalls()[0].init?.body as FormData;
+    const embed = JSON.parse(String(body.get("payload_json"))).embeds[0];
+    let length = embed.title.length + embed.description.length + embed.footer.text.length;
+    for (const field of embed.fields) {
+      assert.ok(field.value.length > 0 && field.value.length <= 1024);
+      length += field.name.length + field.value.length;
+    }
+    assert.ok(length <= 6000);
+    assert.ok((await (body.get("files[0]") as File).text()).includes(longLink));
+  });
+
+  it("ignores absent or unsafe webhook URLs without sending data elsewhere", async () => {
+    for (const url of ["", "https://example.com/api/webhooks/123/token", `${WEBHOOK_URL}?redirect=elsewhere`]) {
+      process.env.DISCORD_APPLICATION_WEBHOOK_URL = url;
+      const form = application();
+      form.set("coolestBuild", `Configuration check ${url.length}`);
+      assert.equal((await submit(form)).status, 200);
+    }
+    assert.equal(discordCalls().length, 0);
   });
 });
