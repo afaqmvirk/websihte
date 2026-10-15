@@ -1,0 +1,220 @@
+.page {
+  position: relative;
+  isolation: isolate;
+  min-height: 100svh;
+  overflow: hidden;
+  background: #efe9db;
+  color: #111;
+  font-family: var(--font-arial-narrow), "Arial Narrow", Arial, sans-serif;
+}
+
+.paperTexture {
+  position: fixed;
+  z-index: -1;
+  inset: 0;
+  background-image:
+    linear-gradient(rgb(239 233 219 / 0.82), rgb(239 233 219 / 0.82)),
+    url("/Texturelabs_Paper_312XL 1.png");
+  background-position: center;
+  background-size: cover;
+  pointer-events: none;
+}
+
+.header,
+.content,
+.footer {
+  width: min(1120px, calc(100% - 48px));
+  margin-inline: auto;
+}
+
+.header {
+  padding: clamp(28px, 5vw, 72px) 0 clamp(34px, 5vw, 64px);
+  border-bottom: 2px solid #111;
+}
+
+.backLink,
+.policy a,
+.footer a {
+  color: inherit;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 0.18em;
+}
+
+.backLink {
+  display: inline-block;
+  margin-bottom: clamp(48px, 8vw, 104px);
+  font-size: 18px;
+  text-decoration: none;
+}
+
+.backLink:hover,
+.policy a:hover,
+.footer a:hover {
+  opacity: 0.62;
+}
+
+.eyebrow,
+.date {
+  margin: 0;
+  font-size: clamp(15px, 1.4vw, 19px);
+  letter-spacing: 0.02em;
+  text-transform: lowercase;
+}
+
+.header h1 {
+  max-width: 900px;
+  margin: 8px 0 18px;
+  font-size: clamp(64px, 11vw, 146px);
+  font-weight: 400;
+  letter-spacing: -0.065em;
+  line-height: 0.82;
+  text-transform: lowercase;
+}
+
+.intro {
+  max-width: 720px;
+  margin: 0 0 28px;
+  font-size: clamp(22px, 2.8vw, 36px);
+  letter-spacing: -0.035em;
+  line-height: 1.02;
+}
+
+.date {
+  color: rgb(17 17 17 / 0.62);
+}
+
+.content {
+  display: grid;
+  grid-template-columns: minmax(240px, 0.72fr) minmax(0, 1.7fr);
+  gap: clamp(44px, 8vw, 110px);
+  padding: clamp(44px, 7vw, 92px) 0;
+}
+
+.summary {
+  align-self: start;
+  border: 1px solid #111;
+  background: rgb(255 255 255 / 0.55);
+  box-shadow: 7px 7px 0 #111;
+  padding: 26px;
+  transform: rotate(-0.5deg);
+}
+
+.noteNumber {
+  margin: 0 0 30px;
+  font-size: 34px;
+}
+
+.summary h2,
+.policy h2 {
+  margin: 0;
+  font-size: clamp(28px, 3vw, 42px);
+  font-weight: 400;
+  letter-spacing: -0.04em;
+  line-height: 0.95;
+  text-transform: lowercase;
+}
+
+.summary ul,
+.policy ul {
+  padding-left: 1.1em;
+}
+
+.summary ul {
+  margin: 22px 0 0;
+  font-size: 18px;
+  line-height: 1.25;
+}
+
+.summary li + li,
+.policy li + li {
+  margin-top: 0.55em;
+}
+
+.policy {
+  min-width: 0;
+}
+
+.policy section {
+  padding-bottom: clamp(38px, 5vw, 64px);
+  border-bottom: 1px solid rgb(17 17 17 / 0.28);
+}
+
+.policy section + section {
+  padding-top: clamp(38px, 5vw, 64px);
+}
+
+.policy h2 {
+  margin-bottom: 24px;
+}
+
+.policy h3 {
+  margin: 30px 0 8px;
+  font-size: 21px;
+  font-weight: 700;
+  letter-spacing: -0.02em;
+  line-height: 1.1;
+  text-transform: lowercase;
+}
+
+.policy p,
+.policy li {
+  font-family: Arial, Helvetica, sans-serif;
+  font-size: 17px;
+  line-height: 1.48;
+}
+
+.policy p {
+  margin: 0;
+}
+
+.policy p + p,
+.policy ul + p,
+.policy p + ul {
+  margin-top: 16px;
+}
+
+.policy ul {
+  margin-bottom: 0;
+}
+
+.footer {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 28px 0 max(34px, env(safe-area-inset-bottom));
+  border-top: 2px solid #111;
+  font-size: 15px;
+  text-transform: lowercase;
+}
+
+.backLink:focus-visible,
+.policy a:focus-visible,
+.footer a:focus-visible {
+  outline: 2px solid currentcolor;
+  outline-offset: 4px;
+}
+
+@media (max-width: 760px) {
+  .header,
+  .content,
+  .footer {
+    width: min(100% - 32px, 1120px);
+  }
+
+  .header h1 {
+    font-size: clamp(58px, 20vw, 94px);
+  }
+
+  .content {
+    grid-template-columns: 1fr;
+    gap: 52px;
+  }
+
+  .summary {
+    margin-right: 7px;
+  }
+
+  .footer {
+    flex-direction: column;
+  }
+}
