@@ -60,6 +60,16 @@ const GENERAL_PRIZES: Prize[] = [
 const GOOGLE_CALENDAR_URL =
   "https://calendar.google.com/calendar/render?action=TEMPLATE&text=The%20Stupid%20Ideas%20Hackathon%20Ottawa&dates=20261115T140000Z%2F20261116T000000Z&details=One%20day%20to%20follow%20your%20idea%20all%20the%20way%20through.&location=Bayview%20Yards%2C%207%20Bayview%20Station%20Rd%2C%20Ottawa%2C%20ON%20K1Y%202C5";
 
+const OUTLOOK_CALENDAR_URL = "https://outlook.live.com/calendar/0/deeplink/compose?" + new URLSearchParams({
+  path: "/calendar/action/compose",
+  rru: "addevent",
+  subject: "The Stupid Ideas Hackathon Ottawa",
+  startdt: "2026-11-15T14:00:00Z",
+  enddt: "2026-11-16T00:00:00Z",
+  body: "One day to follow your idea all the way through.",
+  location: "Bayview Yards, 7 Bayview Station Rd, Ottawa, ON K1Y 2C5",
+});
+
 type SubmissionState = "idle" | "submitting" | "success" | "error";
 type ApplicationStep = 1 | 2;
 type ApplicationControl = HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement;
@@ -472,6 +482,13 @@ export default function OttawaPage() {
                 rel="noopener noreferrer"
               >
                 + google calendar
+              </a>
+              <a
+                href={OUTLOOK_CALENDAR_URL}
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                + outlook calendar
               </a>
               <a href="/ottawa-2026.ics" download>
                 + apple calendar
