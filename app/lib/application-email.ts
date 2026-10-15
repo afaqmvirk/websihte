@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { discordInviteUrl } from "@/site";
 
 const RESEND_API_URL = "https://api.resend.com/emails";
 const APPLICATION_ADDRESS = "applications@stupideas.com";
@@ -65,10 +66,11 @@ export async function createApplicationEmail(form: FormData, config: EmailConfig
     reply_to: config.replyTo,
     subject: "Your Stupid Ideas Hackathon Ottawa application",
     text: [greeting, introduction, nextSteps,
+      `Join our Discord to meet the community and get event updates: ${discordInviteUrl}`,
       ...answers.map(([label, value]) => `${label}\n${value}`),
       contact, "https://stupideas.com/ottawa",
     ].join("\n\n"),
-    html: `<div style="background:#f4f0e5;padding:28px 16px;color:#242420;font-family:Arial,sans-serif;line-height:1.6"><div style="max-width:600px;margin:auto"><p>stupid ideas hackathon / ottawa</p><h1 style="font-size:30px;line-height:1.2">application received.</h1><p>${escapeHtml(greeting)}</p><p>${introduction}</p><p>${nextSteps}</p><dl>${answers.map(([label, value]) => `<dt style="margin-top:20px;font-weight:bold">${escapeHtml(label)}</dt><dd style="margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(value)}</dd>`).join("")}</dl><p style="margin-top:28px">${escapeHtml(contact)}</p><p><a href="https://stupideas.com/ottawa" style="color:#242420">stupideas.com/ottawa</a></p></div></div>`,
+    html: `<div style="background:#f4f0e5;padding:28px 16px;color:#242420;font-family:Arial,sans-serif;line-height:1.6"><div style="max-width:600px;margin:auto"><p>stupid ideas hackathon / ottawa</p><h1 style="font-size:30px;line-height:1.2">application received.</h1><p>${escapeHtml(greeting)}</p><p>${introduction}</p><p>${nextSteps}</p><p><a href="${discordInviteUrl}" style="color:#242420">Join our Discord</a> to meet the community and get event updates.</p><dl>${answers.map(([label, value]) => `<dt style="margin-top:20px;font-weight:bold">${escapeHtml(label)}</dt><dd style="margin:4px 0 0;white-space:pre-wrap;overflow-wrap:anywhere">${escapeHtml(value)}</dd>`).join("")}</dl><p style="margin-top:28px">${escapeHtml(contact)}</p><p><a href="https://stupideas.com/ottawa" style="color:#242420">stupideas.com/ottawa</a></p></div></div>`,
     ...(attachment ? { attachments: [attachment] } : {}),
     tags: [{ name: "event", value: "ottawa-2026" }, { name: "type", value: "application-receipt" }],
   };
