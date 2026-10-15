@@ -74,6 +74,32 @@ and [Google's notice](https://support.google.com/mail/answer/17101213).
 
 Run the email flow checks with `bun test app/api/applications/route.test.ts`.
 
+## Discord application notifications
+
+Create an incoming webhook in the organizer server's `#firehose` channel
+(Edit Channel → Integrations → Webhooks). Set its URL as the server-only
+`DISCORD_APPLICATION_WEBHOOK_URL` in `.env.local` and Vercel, then redeploy.
+The URL is a secret; never put it in browser code or commit it. Apply the
+Discord delivery migration in `supabase/migrations/` before deploying the code.
+
+Each completed application sends an embed with the application details, a
+text attachment containing every answer in full, and the optional résumé.
+All mentions are disabled. Keep this channel limited to organizers who should
+have access to applications and résumés.
+
+Delivery runs alongside the receipt email and finishes before the function
+returns. A short database claim prevents concurrent submissions from sending
+the same notification, and successful delivery is recorded using Discord's
+message ID. Temporary failures retry up to three times, respecting short
+Discord rate limits. Missing configuration or Discord failure does not fail
+the application or its email. A later identical submission can retry failed
+delivery without resending a successful receipt. A process crash or an
+ambiguous network failure after Discord accepts a message can still cause a
+duplicate on retry; Discord webhooks do not provide an idempotency key.
+
+Run the application and Discord checks with
+`bun test app/api/applications/route.test.ts`.
+
 ## Getting Started
 
 First, run the development server:
