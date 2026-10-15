@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
-          <time dateTime="2026-09-22">September 22, 2026</time>
+          <time dateTime="2026-10-14">October 14, 2026</time>
         </p>
       </header>
 
@@ -46,6 +46,7 @@ export default function PrivacyPolicyPage() {
             <li>
               When you submit an event form, its fields and uploaded files are
               transmitted to the application processor identified on that form.
+              Ottawa applications are stored with Supabase and emailed to you and SIH organizers through Resend.
             </li>
             <li>
               When you join an event mailing list, we use your email only for
@@ -93,6 +94,7 @@ export default function PrivacyPolicyPage() {
               <li>school, company, or other affiliation;</li>
               <li>LinkedIn and an optional additional profile or portfolio link;</li>
               <li>your answers to application questions;</li>
+              <li>T-shirt size and dietary restrictions;</li>
               <li>event preferences and confirmation that you can attend; and</li>
               <li>
                 uploaded files such as an optional résumé, along with your
@@ -107,6 +109,15 @@ export default function PrivacyPolicyPage() {
               that provider and link to the provider&apos;s privacy information. We
               will also update this policy when a new provider or materially
               different processing arrangement is introduced.
+            </p>
+            <p>
+              For Ottawa applications, we store your answers, consent choices,
+              submission time, and email delivery status in a private Supabase
+              database, with any uploaded résumé in private Supabase file storage.
+              We use Resend to email a copy of your
+              answers and any uploaded résumé to the address you provide, with
+              a private copy to the SIH organizer inbox. These application emails
+              are for event administration and do not subscribe you to a mailing list.
             </p>
 
             <h3>when you email us</h3>
@@ -126,7 +137,7 @@ export default function PrivacyPolicyPage() {
 
             <p>
               We do not ask for payment-card details, government identification,
-              health information, or precise location through this website.
+              or precise location through this website.
               Please do not include unnecessary sensitive information in an
               application or email.
             </p>
@@ -141,7 +152,7 @@ export default function PrivacyPolicyPage() {
                 communicate about application status, event logistics, safety,
                 accessibility requests that you choose to raise, and event updates;
               </li>
-              <li>plan and administer the event;</li>
+              <li>plan and administer the event, including catering and any event merch;</li>
               <li>
                 send opening announcements and related updates for an event
                 mailing list you chose to join;
@@ -197,7 +208,8 @@ export default function PrivacyPolicyPage() {
                 service providers that support website hosting, form delivery,
                 application management, mailing-list delivery, file storage,
                 communications, and security, including Vercel as our website
-                host and Resend as our mailing-list provider;
+                host, Supabase for application and file storage, and Resend for
+                application emails and mailing-list delivery;
               </li>
               <li>
                 sponsors identified for the relevant event, only for the optional
@@ -242,13 +254,16 @@ export default function PrivacyPolicyPage() {
               storage, and communications providers may process information in
               Canada, the United States, or other countries. Information handled
               outside Ontario may be subject to the laws and lawful access rules
-              of those places. We will identify the application provider in the
-              relevant form notice and this policy once selected. See our
+              of those places. Our Ottawa application database and résumé storage
+              are hosted in Supabase&apos;s Canada Central region. Email delivery,
+              hosting, and provider support may involve processing elsewhere. See our
               providers&apos; notices for more detail: {" "}
               <a href="https://vercel.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">
                 Vercel Privacy Notice
-              </a>{" "}
-              and{" "}
+              </a>,{" "}
+              <a href="https://supabase.com/privacy" target="_blank" rel="noopener noreferrer">
+                Supabase Privacy Policy
+              </a>, and{" "}
               <a href="https://resend.com/legal/privacy-policy" target="_blank" rel="noopener noreferrer">
                 Resend Privacy Policy
               </a>.

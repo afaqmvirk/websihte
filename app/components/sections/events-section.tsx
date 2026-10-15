@@ -24,12 +24,22 @@ type EventYear = {
 /** Update `href` values when event links are ready. */
 export const EVENT_YEARS: EventYear[] = [
   {
+    year: 2027,
+    events: [
+      {
+        city: "montreal",
+        date: "TBD",
+        href: "",
+      },
+    ],
+  },
+  {
     year: 2026,
     events: [
       {
         city: "ottawa",
-        date: "TBD",
-        href: "",
+        date: "2026-11-15",
+        href: "/ottawa",
       },
       {
         city: "singapore",
