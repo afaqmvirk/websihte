@@ -16,23 +16,38 @@ const AGENDA = [
   { time: "19:00", label: "prizes + goodbye" },
 ];
 
-type Prize = { title: string; icon: PrizeIconName; amount?: string; description?: string };
+type Prize = {
+  title: string;
+  icon: PrizeIconName;
+  amount?: string;
+  description?: string;
+  sponsor?: { name: string; src: string; width: number; height: number };
+};
 
-const THEMED_PRIZES: Prize[] = [
-  { title: "stupidest metric", icon: "metric", description: "track something useless" },
+const MAIN_TRACKS: Prize[] = [
+  {
+    title: "stupidest metric",
+    icon: "metric",
+    description: "track something useless",
+    sponsor: { name: "Amplitude", src: "/sponsors/amplitude.svg", width: 3840, height: 800 },
+  },
   {
     title: "stupidest button",
     icon: "button",
     description: "make something cool happen with a useless button",
+    sponsor: { name: "Shopify", src: "/sponsors/shopify.svg", width: 304, height: 87 },
   },
   {
     title: "stupidest API",
     icon: "api",
-    amount: "$67 cash",
     description: "return stupid data",
   },
-  { title: "stupidest AI", icon: "ai", description: "build a stupid AI agent" },
-  { title: "the great bob award", icon: "bob" },
+  {
+    title: "stupidest AI",
+    icon: "ai",
+    description: "build a stupid AI agent",
+    sponsor: { name: "Carleton Computer Science Society", src: "/sponsors/ccss.png", width: 1000, height: 204 },
+  },
 ];
 
 const GENERAL_PRIZES: Prize[] = [
@@ -503,18 +518,29 @@ export default function OttawaPage() {
               <p className={styles.sectionNumber} aria-hidden>②</p>
               <h2>prizes</h2>
               <div className={styles.prizeGroups}>
-                <section aria-label="themed awards">
+                <section aria-labelledby="main-tracks-title">
+                  <h3 id="main-tracks-title" className={styles.mainTracksHeading}>main tracks <span>(pick one)</span></h3>
                   <ol className={styles.themedPrizeList}>
-                    {THEMED_PRIZES.map((prize) => (
-                      <li key={prize.title}>
+                    {MAIN_TRACKS.map((prize) => (
+                      <li key={prize.title} className={prize.sponsor ? styles.sponsoredPrize : undefined}>
                         <PrizeIcon name={prize.icon} className={styles.prizeIcon} />
                         <div>
-                          <h3>{prize.title}</h3>
+                          <h4>{prize.title}</h4>
                           {prize.amount ? <p className={styles.prizeAmount}>{prize.amount}</p> : null}
                           {prize.description ? (
                             <p className={styles.prizeDescription}>{prize.description}</p>
                           ) : null}
                         </div>
+                        {prize.sponsor ? (
+                          <Image
+                            src={prize.sponsor.src}
+                            alt={prize.sponsor.name}
+                            width={prize.sponsor.width}
+                            height={prize.sponsor.height}
+                            sizes="(max-width: 720px) 28vw, 120px"
+                            className={styles.prizeSponsorLogo}
+                          />
+                        ) : null}
                       </li>
                     ))}
                   </ol>
@@ -558,11 +584,14 @@ export default function OttawaPage() {
               </div>
 
               <div className={`${styles.sponsorRow} ${styles.sponsorTierThree}`}>
-                <a href="https://cuthere.app/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="CU There">
-                  <Image src="/sponsors/cu-there.png" alt="CU There" width={1010} height={496} className={styles.cuThereLogo} />
+                <a href="https://anakin.io/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Anakin">
+                  <Image src="/sponsors/anakin.png" alt="Anakin" width={954} height={312} className={styles.anakinLogo} />
                 </a>
                 <a href="https://ccss.carleton.ca/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Carleton Computer Science Society">
                   <Image src="/sponsors/ccss.png" alt="Carleton Computer Science Society" width={1000} height={204} className={styles.ccssLogo} />
+                </a>
+                <a href="https://cuthere.app/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="CU There">
+                  <Image src="/sponsors/cu-there.png" alt="CU There" width={1010} height={496} className={styles.cuThereLogo} />
                 </a>
               </div>
             </div>
@@ -658,8 +687,8 @@ export default function OttawaPage() {
                   <input id="dietary-restrictions-other" name="dietaryRestrictionsOther" type="text" maxLength={500} required={dietaryRestriction === "other"} disabled={dietaryRestriction !== "other"} {...validationProps("dietary-restrictions-other")} />
                   <FieldError id="dietary-restrictions-other" validation={fieldValidation["dietary-restrictions-other"]} />
                 </label>
-                <label className={`${styles.field} ${styles.fullField}`} htmlFor="linkedin"><span>linkedin *</span><input id="linkedin" name="linkedin" type="url" inputMode="url" placeholder="https://linkedin.com/in/" required {...validationProps("linkedin")} /><FieldError id="linkedin" validation={fieldValidation.linkedin} /></label>
-                <label className={`${styles.field} ${styles.fullField}`} htmlFor="other-link"><span>another link <span className={styles.optional}>(optional)</span></span><input id="other-link" name="otherLink" type="url" inputMode="url" placeholder="(portfolio, github, instagram, anything)" {...validationProps("other-link")} /><FieldError id="other-link" validation={fieldValidation["other-link"]} /></label>
+                <label className={`${styles.field} ${styles.fullField} ${styles.profileLinkField}`} htmlFor="linkedin"><span>linkedin *</span><input id="linkedin" name="linkedin" type="url" inputMode="url" placeholder="https://linkedin.com/in/" required {...validationProps("linkedin")} /><FieldError id="linkedin" validation={fieldValidation.linkedin} /></label>
+                <label className={`${styles.field} ${styles.fullField} ${styles.profileLinkField}`} htmlFor="other-link"><span>another link <span className={styles.optional}>(optional)</span></span><input id="other-link" name="otherLink" type="url" inputMode="url" placeholder="(portfolio, github, instagram, anything)" {...validationProps("other-link")} /><FieldError id="other-link" validation={fieldValidation["other-link"]} /></label>
               </fieldset>
 
               <fieldset className={styles.stepPanel} data-application-step="2" hidden={applicationStep !== 2} aria-label="your ideas and consent">
