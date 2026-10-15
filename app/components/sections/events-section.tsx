@@ -2,6 +2,7 @@ import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
 import OutlineCtaButton from "@/components/shared/outline-cta-button";
 import EdgeTransparentImage from "@/components/shared/edge-transparent-image";
 import { getArcConfig } from "@/components/stamp/stamp-config";
+import { discordInviteUrl } from "@/site";
 import {
   SECTION_BODY_MAX_PX,
   SECTION_SHELL_CLASS,
@@ -150,7 +151,7 @@ export default function EventsSection() {
     <section
       id="our-events"
       className="relative w-full shrink-0 overflow-hidden text-white"
-      aria-label="our events and sponsor us"
+      aria-label="our events, community and sponsor us"
     >
       <div
         className={`${SECTION_SHELL_CLASS} relative flex w-full flex-col gap-12 pt-0 py-[max(2rem,6vw)] pb-[max(5rem,10vw)] min-[1024px]:flex-row min-[1024px]:items-start min-[1024px]:justify-end min-[1024px]:gap-6 min-[1024px]:pt-[100px] min-[1024px]:pb-[clamp(5rem,10vw,8rem)]`}
@@ -180,6 +181,21 @@ export default function EventsSection() {
 
             <OutlineCtaButton className="pointer-events-auto" href={HOST_SIH_MAIL}>
               host a sih in your city
+            </OutlineCtaButton>
+          </div>
+
+          <div
+            id="join-discord"
+            className="pointer-events-auto flex max-w-[451px] flex-col items-end gap-4"
+          >
+            <p
+              className="m-0 text-right font-arial lowercase text-white"
+              style={listStyle}
+            >
+              meet the community and get event updates.
+            </p>
+            <OutlineCtaButton href={discordInviteUrl}>
+              join our discord
             </OutlineCtaButton>
           </div>
 

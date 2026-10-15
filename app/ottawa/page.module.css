@@ -684,6 +684,23 @@
   line-height: 1.12;
 }
 
+.applicationDeadline {
+  display: block;
+  margin-top: 0.65em;
+  font-weight: 700;
+}
+
+.applicationContact {
+  display: block;
+  margin-top: 0.5em;
+}
+
+.applicationContact a {
+  color: inherit;
+  text-underline-offset: 3px;
+  overflow-wrap: anywhere;
+}
+
 .applicationForm {
   position: relative;
   display: flex;
@@ -946,6 +963,24 @@
 
 .applicationSuccess .receiptNotice {
   font-size: 16px;
+}
+
+.discordCta {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  border: 1px solid currentcolor;
+  padding: 12px 20px;
+  color: #fff;
+  background: #000;
+  font-size: 21px;
+  text-decoration: none;
+}
+
+.discordCta:hover {
+  color: #000;
+  background: #fff;
 }
 
 .formGrid {
@@ -1223,6 +1258,8 @@
 .heroVenueLink:focus-visible,
 .calendarActions a:focus-visible,
 .sponsorCard:focus-visible,
+.applicationContact a:focus-visible,
+.discordCta:focus-visible,
 .submitRow button:focus-visible,
 .confirmation a:focus-visible,
 .footer a:focus-visible {

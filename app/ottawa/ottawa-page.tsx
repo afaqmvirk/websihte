@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FocusEvent, type FormEvent } from "react";
 import { APP_READY_GATES, markAppReady } from "@/components/shared/app-ready";
+import { discordInviteUrl } from "@/site";
 import { PrizeIcon, type PrizeIconName } from "./prize-icon";
 import styles from "./page.module.css";
 
@@ -432,8 +433,8 @@ export default function OttawaPage() {
 
       <header className={styles.hero} inert={isApplicationExpanded}>
         <Image
-          src="/ottawa-skyline.png"
-          alt="the Ottawa skyline and Parliament Hill viewed across the Ottawa River"
+          src="/ottawa-illustration.png"
+          alt="SpongeBob and Patrick in Carleton gear in front of Ottawa’s Parliament Hill"
           fill
           sizes="100vw"
           className={styles.heroImage}
@@ -619,6 +620,10 @@ export default function OttawaPage() {
               <span className={styles.successMark} aria-hidden>✓</span>
               <h2 id="application-title" ref={confirmationHeadingRef} tabIndex={-1}>application received.</h2>
               <p>thanks for applying. we’ll be in touch with an update.</p>
+              <p>join our discord to meet the community and get event updates.</p>
+              <a className={styles.discordCta} href={discordInviteUrl} target="_blank" rel="noopener noreferrer">
+                join our discord <span aria-hidden>↗</span>
+              </a>
               {submissionMessage && <p className={styles.receiptNotice}>{submissionMessage}</p>}
             </div>
           ) : (
@@ -626,7 +631,15 @@ export default function OttawaPage() {
           <div className={styles.applicationIntro}>
             <p className={styles.sectionNumber} aria-hidden>④</p>
             <h2 id="application-title">apply to build.</h2>
-            <p>tell us who you are and what gloriously unnecessary thing you want to make. rough ideas are very welcome.</p>
+            <p>
+              tell us who you are and what gloriously unnecessary thing you want to make. rough ideas are very welcome.
+              <span className={styles.applicationDeadline}>
+                applications close <time dateTime="2026-11-02">02 november at midnight</time> EDT.
+              </span>
+              <span className={styles.applicationContact}>
+                questions? email <a href="mailto:stupidideashackathon@gmail.com">stupidideashackathon@gmail.com</a>
+              </span>
+            </p>
           </div>
 
           <form id="application-form" className={styles.applicationForm} onClickCapture={autoExpandApplication} onSubmit={handleSubmit} onBlurCapture={handleFieldBlur} onChange={handleFieldChange} noValidate>
