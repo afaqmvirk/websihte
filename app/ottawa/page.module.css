@@ -554,7 +554,7 @@
 }
 
 .sponsorTierThree {
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: repeat(4, minmax(0, 1fr));
 }
 
 .sponsorCard {
@@ -635,6 +635,11 @@
 }
 
 .anakinLogo {
+  width: min(98%, 200px);
+  height: auto;
+}
+
+.investOttawaLogo {
   width: min(98%, 200px);
   height: auto;
 }
