@@ -124,7 +124,7 @@ GET to the cron route; later listeners are started by Vercel automatically.
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
-tokens. Defaults allow 100 requests per UTC day, 1,000 per UTC month, and one
+tokens. Defaults allow 10,000 requests per UTC day, 310,000 per UTC month, and one
 per person every two seconds. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
 claim keeps overlapping listeners from answering the same person out of order;

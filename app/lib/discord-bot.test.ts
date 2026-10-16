@@ -73,12 +73,14 @@ describe("sih-inator mention bot", () => {
     assert.equal(isDiscordCronAuthorized(new Request(url, { headers: { authorization: "Bearer wrong" } })), false);
     assert.equal(isDiscordCronAuthorized(new Request(url, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })), true);
     assert.equal(config().cooldownSeconds, 2);
+    assert.equal(config().dailyLimit, 10_000);
+    assert.equal(config().monthlyLimit, 310_000);
     process.env.DISCORD_BOT_ENABLED = "false"; assert.equal(getDiscordBotConfig(), null);
     process.env.DISCORD_BOT_ENABLED = "true";
-    process.env.DISCORD_BOT_DAILY_LIMIT = "1000000"; assert.equal(getDiscordBotConfig(), null);
-    process.env.DISCORD_BOT_DAILY_LIMIT = "100";
-    process.env.DISCORD_BOT_MONTHLY_LIMIT = "1001"; assert.equal(getDiscordBotConfig(), null);
-    process.env.DISCORD_BOT_MONTHLY_LIMIT = "1000";
+    process.env.DISCORD_BOT_DAILY_LIMIT = "10001"; assert.equal(getDiscordBotConfig(), null);
+    process.env.DISCORD_BOT_DAILY_LIMIT = "10000"; assert.equal(config().dailyLimit, 10_000);
+    process.env.DISCORD_BOT_MONTHLY_LIMIT = "310001"; assert.equal(getDiscordBotConfig(), null);
+    process.env.DISCORD_BOT_MONTHLY_LIMIT = "310000"; assert.equal(config().monthlyLimit, 310_000);
     delete process.env.OPENAI_API_KEY; assert.equal(getDiscordBotConfig(), null);
   });
   it("ignores bots, unmentioned messages, global pings, and other servers", async () => {
@@ -98,7 +100,8 @@ describe("sih-inator mention bot", () => {
     assert.match(request.messages[0].content, /use no punctuation at all/);
     assert.match(request.messages[0].content, /why would you even bother/);
     assert.equal(new Headers(modelCalls()[0].init?.headers).get("Authorization"), "Bearer synthetic-openai-api-key");
-    assert.equal(JSON.parse(String(calls[0].init?.body)).p_monthly_limit, 1000);
+    assert.equal(JSON.parse(String(calls[0].init?.body)).p_daily_limit, 10_000);
+    assert.equal(JSON.parse(String(calls[0].init?.body)).p_monthly_limit, 310_000);
     assert.equal(JSON.parse(String(calls[0].init?.body)).p_cooldown_seconds, 2);
     const reply = JSON.parse(String(replies()[0].init?.body));
     assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
