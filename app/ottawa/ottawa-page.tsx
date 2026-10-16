@@ -729,7 +729,7 @@ export default function OttawaPage() {
 
               <fieldset className={styles.stepPanel} data-application-step="2" hidden={applicationStep !== 2} aria-label="your ideas and consent">
                 <div className={styles.formGrid}>
-                  <label className={`${styles.field} ${styles.fullField}`} htmlFor="stupidest-thing"><span>what’s the stupidest thing you’ve ever done that completely worked out well? * (400 characters max)</span><textarea id="stupidest-thing" name="stupidestThing" rows={3} maxLength={400} required {...validationProps("stupidest-thing")} /><FieldError id="stupidest-thing" validation={fieldValidation["stupidest-thing"]} /></label>
+                  <label className={`${styles.field} ${styles.fullField}`} htmlFor="stupidest-thing"><span>what’s the stupidest thing you’ve ever done that completely worked out well? (doesn’t have to be technical) * (400 characters max)</span><textarea id="stupidest-thing" name="stupidestThing" rows={3} maxLength={400} required {...validationProps("stupidest-thing")} /><FieldError id="stupidest-thing" validation={fieldValidation["stupidest-thing"]} /></label>
                   <label className={`${styles.field} ${styles.fullField}`} htmlFor="coolest-build"><span>coolest thing you’ve ever built (link or short description) * (100 characters max)</span><input id="coolest-build" name="coolestBuild" type="text" maxLength={100} required {...validationProps("coolest-build")} /><FieldError id="coolest-build" validation={fieldValidation["coolest-build"]} /></label>
                 </div>
 
