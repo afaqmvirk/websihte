@@ -11,7 +11,7 @@ let calls: { url: string; init?: RequestInit }[];
 let seen: Set<string>;
 let intercept: ((url: string, init?: RequestInit) => Response | null) | undefined;
 const modelCalls = () => calls.filter(({ url }) => url === modelUrl);
-const replies = () => calls.filter(({ url }) => url.startsWith("https://discord.com/api/v10/channels/"));
+const replies = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "POST");
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -33,7 +33,9 @@ beforeEach(() => {
       if (seen.has(id)) return Response.json("duplicate");
       seen.add(id); return Response.json("accepted");
     }
-    if (url.startsWith("https://discord.com/api/v10/channels/")) return Response.json({ id: "1560000000000000005" });
+    if (url.startsWith("https://discord.com/api/v10/channels/")) return init?.method === "POST"
+      ? Response.json({ id: "1560000000000000005" }) : Response.json([]);
+    if (url.startsWith("https://discord.com/api/v10/guilds/")) return Response.json({messages:[]});
     assert.ok(url.startsWith("https://test.supabase.co/rest/v1/discord_bot_requests?message_id=eq."));
     assert.equal(init?.method, "PATCH"); return new Response(null, { status: 204 });
   };
@@ -61,12 +63,16 @@ describe("sih-inator mention bot", () => {
     for (const entry of [message({ authorIsBot: true }), message({ mentionedUserIds: [] }), message({ content: "@everyone hello", mentionedUserIds: [] }), message({ guildId: "1560000000000000099" })]) assert.equal(await handleDiscordMention(entry, config()), "ignored");
     assert.equal(calls.length, 0);
   });
-  it("sends only the explicit question to the small model and replies without pings", async () => {
+  it("sends the overlord bob persona and current question, and replies without pings", async () => {
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     assert.equal(request.model, "gpt-6-luna"); assert.equal(request.reasoning_effort, "none");
     assert.equal(request.max_completion_tokens, 512); assert.equal(request.store, false);
     assert.equal(request.messages.length, 2); assert.equal(request.messages[1].content, "Give me a silly project idea");
+    assert.equal(request.messages[1].name, "current_user");
+    assert.match(request.messages[0].content, /you are overlord bob/);
+    assert.match(request.messages[0].content, /uhhhh iunno/);
+    assert.match(request.messages[0].content, /november 15, 2026/);
     assert.equal(new Headers(modelCalls()[0].init?.headers).get("Authorization"), "Bearer synthetic-openai-api-key");
     assert.equal(JSON.parse(String(calls[0].init?.body)).p_monthly_limit, 1000);
     const reply = JSON.parse(String(replies()[0].init?.body));
@@ -89,11 +95,14 @@ describe("sih-inator mention bot", () => {
     intercept = (url) => url.includes("/rpc/") ? Response.json("monthly_limit") : null;
     assert.equal(await handleDiscordMention(message(), config()), "monthly_limit");
     assert.match(JSON.parse(String(replies()[1].init?.body)).content, /monthly brain budget/); assert.equal(modelCalls().length, 0);
+    assert.equal(calls.filter(({url}) => url.includes("/messages?before=")).length, 0);
   });
   it("does not spend model tokens on empty or oversized questions", async () => {
     await handleDiscordMention(message({ content: `<@!${botId}>` }), config());
     await handleDiscordMention(message({ id: "1560000000000000006", content: `<@${botId}> ${"x".repeat(2001)}` }), config());
     assert.equal(modelCalls().length, 0); assert.equal(replies().length, 2);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "uhhhh iunno");
+    assert.equal(calls.filter(({url}) => url.includes("/messages?before=")).length, 0);
   });
   it("fails closed when shared quota storage is unavailable or returns an unknown result", async () => {
     intercept = (url) => url.includes("/rpc/") ? Response.json({}, { status: 503 }) : null;
@@ -106,11 +115,11 @@ describe("sih-inator mention bot", () => {
     intercept = (url) => url === modelUrl ? Response.json({}, { status: 503 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "failed");
     const reply = JSON.parse(String(replies()[0].init?.body));
-    assert.match(reply.content, /tiny brain is taking a break/); assert.doesNotMatch(reply.content, /synthetic|token|503/);
+    assert.match(reply.content, /uhhhh iunno.*brain not working/); assert.doesNotMatch(reply.content, /synthetic|token|503/);
     assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "failed");
   });
   it("respects Discord rate limits and reuses the nonce when retrying", async () => {
-    intercept = (url) => url.startsWith("https://discord.com/api/v10/channels/") && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
+    intercept = (url, init) => url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "POST" && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 2); assert.equal(replies()[0].init?.body, replies()[1].init?.body);
   });
@@ -120,5 +129,60 @@ describe("sih-inator mention bot", () => {
     intercept = (url) => url.includes("/discord_bot_requests?") ? Response.json({}, { status: 403 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 1);
+  });
+  it("includes earlier messages from the current user and bob in the same conversation", async () => {
+    const current = message({id:"1560000000000000100", content:`<@${botId}> what am i building?`});
+    intercept = (url) => url.includes("/messages?before=") ? Response.json([
+      {id:"1560000000000000092", channel_id:current.channelId, timestamp:new Date().toISOString(), type:0, author:{id:botId,bot:true},content:"sounds delightfully pointless"},
+      {id:"1560000000000000091", channel_id:current.channelId, timestamp:new Date().toISOString(), type:0, author:{id:current.authorId},content:"i am building a coffee-powered toaster"},
+    ]) : null;
+    assert.equal(await handleDiscordMention(current,config()),"answered");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.equal(request.messages.length,4);
+    assert.deepEqual(request.messages.slice(1).map((entry: {role:string;name:string;content:string})=>[entry.role,entry.name,entry.content]),[
+      ["user","current_user","i am building a coffee-powered toaster"],
+      ["assistant","overlord_bob","sounds delightfully pointless"],
+      ["user","current_user","what am i building?"],
+    ]);
+    const history = calls.find(({url})=>url.includes("/messages?before="))!;
+    assert.match(history.url,new RegExp(`/channels/${current.channelId}/messages\\?before=${current.id}&limit=25$`));
+    assert.equal(new Headers(history.init?.headers).get("Authorization"),`Bot ${config().token}`);
+    assert.equal(history.init?.cache,"no-store");
+    const search = calls.find(({url})=>url.includes("/messages/search?"))!;
+    const searchUrl = new URL(search.url);
+    assert.equal(searchUrl.pathname,`/api/v10/guilds/${config().guildId}/messages/search`);
+    assert.equal(searchUrl.searchParams.get("author_id"),current.authorId);
+    assert.equal(searchUrl.searchParams.get("max_id"),current.id);
+    assert.equal(searchUrl.searchParams.get("limit"),"10");
+    assert.equal(searchUrl.searchParams.has("channel_id"),false);
+  });
+  it("answers the current question when optional history cannot be fetched",async()=>{
+    intercept = (url)=>url.includes("/messages?before=")?Response.json({}, {status:403}):null;
+    assert.equal(await handleDiscordMention(message(),config()),"answered");
+    assert.equal(JSON.parse(String(modelCalls()[0].init?.body)).messages.length,2);
+    assert.equal(modelCalls().length,1);
+  });
+  it("enforces lowercase speech while preserving links and code",async()=>{
+    intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I AM OVERLORD BOB. JOIN https://discord.gg/335SMmyteY OR TRY `someFunction()`"}}]}):null;
+    assert.equal(await handleDiscordMention(message(),config()),"answered");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"i am overlord bob. join https://discord.gg/335SMmyteY or try `someFunction()`");
+  });
+  it("keeps cross-channel user context when current-channel history fails",async()=>{
+    const current = message({id:"1560000000000000100"});
+    intercept = (url)=>url.includes("/messages?before=")?Response.json({}, {status:403})
+      :url.includes("/messages/search?")?Response.json({messages:[[{id:"1560000000000000090",channel_id:"1560000000000000099",timestamp:new Date().toISOString(),type:0,author:{id:current.authorId},content:"my project is a banana-powered doorbell"}]]}):null;
+    assert.equal(await handleDiscordMention(current,config()),"answered");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.equal(request.messages.length,3);
+    assert.equal(request.messages[1].name,"current_user");
+    assert.match(request.messages[1].content,/another server channel.*\nmy project is a banana-powered doorbell/);
+    assert.equal(request.messages.at(-1).content,"Give me a silly project idea");
+  });
+  it("retries a short search-index warmup without delaying current-channel history",async()=>{
+    let searches = 0;
+    intercept = (url)=>url.includes("/messages/search?")&&searches++===0?Response.json({retry_after:0},{status:202}):null;
+    assert.equal(await handleDiscordMention(message(),config()),"answered");
+    assert.equal(searches,2);
+    assert.equal(modelCalls().length,1);
   });
 });
