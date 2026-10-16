@@ -114,7 +114,8 @@ accepted mention, rather than cached from every incoming message.
 
 Create a Discord application named `sih-inator`, copy its application ID, generate
 its bot token, and install it with View Channels, Add Reactions, Send Messages, Send Messages in
-Threads, and Read Message History permissions. Set `DISCORD_BOT_TOKEN`,
+Threads, and Read Message History permissions. To enable moderation, grant Manage
+Messages in the channels where Bob should be able to delete messages. Set `DISCORD_BOT_TOKEN`,
 `DISCORD_APPLICATION_ID`, `OPENAI_API_KEY`, and a random `CRON_SECRET` of at least
 32 characters in Vercel. Apply the bot migrations, then set
 `DISCORD_BOT_ENABLED=true` and redeploy.
@@ -142,10 +143,20 @@ The persona is overlord bob: short lowercase replies without punctuation in spee
 often just "uhhhh iunno", and brief in-character safety refusals that question the idea.
 Broad or oversized requests get a lazy, adversarial brush-off instead of a full plan.
 Serious topics outside hackathon context get a noncommittal "yeah i guess bro"
-style brush-off; genuine distress or immediate danger still gets a compassionate response.
+style brush-off; ordinary venting gets a brief acknowledgment, with compassionate
+support reserved for apparent immediate personal danger.
+Obvious trolling, theatrical threats, exaggerated claims, and roleplay get the
+same unimpressed response, based on the conversation rather than specific keywords.
 For messages that directly mention it, Bob can choose one emoji reaction, a text
 reply, or both. Reaction-only answers count as answered requests. If Discord rejects
 a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
+The server rules are "be respectful of one another" and "treat others the way you
+want to be treated". With Manage Messages permission, Bob can quietly delete the
+current message mentioning him for clear disrespect, targeted harassment, or repeated
+spam. He cannot target another message or moderate unmentioned chat. The delete tool
+is unavailable without the channel permission; failed deletions get a short text
+response. Bob rechecks the message before deleting and leaves it alone if it was
+edited. Deletions carry a Discord audit-log reason and use the same queue and quotas.
 Its public hackathon facts are in `app/lib/discord-bot-knowledge.ts`. Keep that
 snapshot up to date when the website's event details change. Speech formatting
 preserves literal code, email addresses, and case-sensitive links.

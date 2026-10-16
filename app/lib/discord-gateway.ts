@@ -1,4 +1,4 @@
-import { Client, Events, GatewayIntentBits, Options } from "discord.js";
+import { Client, Events, GatewayIntentBits, Options, PermissionFlagsBits } from "discord.js";
 import { handleDiscordMention, type DiscordBotConfig } from "@/lib/discord-bot";
 
 export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 600_000) {
@@ -15,12 +15,13 @@ export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 6
   });
   client.on(Events.Error, () => console.error("Discord Gateway connection error"));
   client.on(Events.MessageCreate, (message) => {
-    if (message.author.bot || message.guildId !== config.guildId
+    if (!message.inGuild() || message.author.bot || message.guildId !== config.guildId
       || !message.mentions.users.has(config.applicationId)) return;
     const work = handleDiscordMention({
       id: message.id, guildId: message.guildId, channelId: message.channelId,
       authorId: message.author.id, content: message.content, authorIsBot: message.author.bot,
       mentionedUserIds: [...message.mentions.users.keys()],
+      canDelete: message.channel.permissionsFor(message.client.user)?.has(PermissionFlagsBits.ManageMessages) ?? false,
     }, config);
     pending.add(work);
     void work.finally(() => pending.delete(work));
