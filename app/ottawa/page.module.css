@@ -957,7 +957,14 @@
   font-size: 16px;
 }
 
-.discordCta {
+.socialActions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: center;
+  gap: 12px;
+}
+
+.socialCta {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -970,7 +977,7 @@
   text-decoration: none;
 }
 
-.discordCta:hover {
+.socialCta:hover {
   color: #000;
   background: #fff;
 }
@@ -1251,7 +1258,7 @@
 .calendarActions a:focus-visible,
 .sponsorCard:focus-visible,
 .applicationContact a:focus-visible,
-.discordCta:focus-visible,
+.socialCta:focus-visible,
 .submitRow button:focus-visible,
 .confirmation a:focus-visible,
 .footer a:focus-visible {
