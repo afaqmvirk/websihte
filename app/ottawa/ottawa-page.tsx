@@ -41,12 +41,12 @@ const MAIN_TRACKS: Prize[] = [
     title: "stupidest API",
     icon: "api",
     description: "return stupid data",
+    sponsor: { name: "Carleton Computer Science Society", src: "/sponsors/ccss.png", width: 1000, height: 204 },
   },
   {
     title: "stupidest AI",
     icon: "ai",
     description: "build a stupid AI agent",
-    sponsor: { name: "Carleton Computer Science Society", src: "/sponsors/ccss.png", width: 1000, height: 204 },
   },
 ];
 
@@ -535,14 +535,13 @@ export default function OttawaPage() {
               <p className={styles.sectionNumber} aria-hidden>②</p>
               <h2>prizes</h2>
               <div className={styles.prizeGroups}>
-                <section aria-labelledby="main-tracks-title">
-                  <h3 id="main-tracks-title" className={styles.mainTracksHeading}>main tracks <span>(pick one)</span></h3>
+                <section aria-label="themed prizes">
                   <ol className={styles.themedPrizeList}>
                     {MAIN_TRACKS.map((prize) => (
                       <li key={prize.title} className={prize.sponsor ? styles.sponsoredPrize : undefined}>
                         <PrizeIcon name={prize.icon} className={styles.prizeIcon} />
                         <div>
-                          <h4>{prize.title}</h4>
+                          <h3>{prize.title}</h3>
                           {prize.amount ? <p className={styles.prizeAmount}>{prize.amount}</p> : null}
                           {prize.description ? (
                             <p className={styles.prizeDescription}>{prize.description}</p>
