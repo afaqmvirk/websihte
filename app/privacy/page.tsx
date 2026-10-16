@@ -27,7 +27,7 @@ export default function PrivacyPolicyPage() {
           This policy explains how the Stupid Ideas Hackathon Community
           (&ldquo;SIH,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) handles
           personal information through this website, our event applications,
-          mailing lists, and direct emails.
+          mailing lists, Discord bot interactions, and direct emails.
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
@@ -123,6 +123,18 @@ export default function PrivacyPolicyPage() {
               private organizer channel on Discord to notify the team of new applications.
             </p>
 
+            <h3>when you mention our Discord bot</h3>
+            <p>
+              If you mention sih-inator, we send your question to OpenAI
+              to generate a reply in Discord. We do not send
+              channel history, application records, or attachments to the model.
+              We keep message, server, and user IDs, timestamps, reply IDs, and
+              delivery status in our private database for duplicate handling and
+              usage limits. Metadata older than two days is removed on the next
+              request. We also keep a server-level monthly request count until
+              the next month. We do not store question or answer text in that database.
+            </p>
+
             <h3>when you email us</h3>
             <p>
               Our host-an-event, sponsor, and community links also open your email
@@ -213,7 +225,7 @@ export default function PrivacyPolicyPage() {
                 communications, and security, including Vercel as our website
                 host, Supabase for application and file storage, and Resend for
                 application emails and mailing-list delivery, and Discord for private
-                organizer application notifications;
+                organizer application notifications, and OpenAI for Discord bot replies;
               </li>
               <li>
                 sponsors identified for the relevant event, only for the optional
@@ -273,6 +285,9 @@ export default function PrivacyPolicyPage() {
               </a>, and{" "}
               <a href="https://discord.com/privacy" target="_blank" rel="noopener noreferrer">
                 Discord Privacy Policy
+              </a>, and{" "}
+              <a href="https://openai.com/policies/privacy-policy/" target="_blank" rel="noopener noreferrer">
+                OpenAI Privacy Policy
               </a>.
             </p>
           </section>

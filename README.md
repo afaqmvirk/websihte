@@ -100,6 +100,46 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
+## sih-inator Discord bot
+
+The mention bot runs on this site's Vercel Pro project. The protected cron route
+`/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
+minutes. Connections overlap during handover; private Supabase request claims
+suppress duplicate model calls and replies across instances. The bot responds
+only to direct user mentions in `DISCORD_GUILD_ID`, ignoring bots and global pings.
+It requests only Guilds and GuildMessages intents; the privileged Message Content
+and Server Members intents can stay disabled.
+
+Create a Discord application named `sih-inator`, copy its application ID, generate
+its bot token, and install it with View Channels, Send Messages, Send Messages in
+Threads, and Read Message History permissions. Set `DISCORD_BOT_TOKEN`,
+`DISCORD_APPLICATION_ID`, `OPENAI_API_KEY`, and a random `CRON_SECRET` of at least
+32 characters in Vercel. Apply the bot migrations, then set
+`DISCORD_BOT_ENABLED=true` and redeploy.
+No interactions endpoint is needed. Start the first listener with an authenticated
+GET to the cron route; later listeners are started by Vercel automatically.
+
+The default model is `gpt-6-luna`, called directly through the OpenAI API with
+the server-only key. Questions are limited to 2,000 characters and 512 output
+tokens. Defaults allow 100 requests per UTC day, 1,000 per UTC month, and one
+per person every 15 seconds. The monthly count is atomic across instances and
+counts failed attempts conservatively. At the [current Luna price](https://developers.openai.com/api/docs/models/gpt-6-luna) this keeps
+this bot's model usage under an estimated $2 per month; it is a request quota,
+not a provider billing cap. Other uses of the same API key are billed separately,
+and changing models requires reviewing the cost estimate. Model spending and
+Vercel compute are also billed separately: a continuously connected listener
+consumes provisioned memory even while idle. The quota does not cap hosting usage.
+
+Only the explicit question is sent to the model. No channel history, application
+records, or attachments are included. The private quota table stores message,
+server, and user IDs, timestamps, delivery status, and reply IDs. Metadata older
+than two days is pruned on the next request; prompt and answer text are not stored
+in the site database. A server-level monthly request count is retained separately
+until the following month. Never commit bot tokens, cron secrets, or API keys.
+
+Run `bun test app/lib/discord-bot.test.ts` for bot checks and
+`bun test app/api/applications/route.test.ts` for the application flow.
+
 ## Getting Started
 
 First, run the development server:
