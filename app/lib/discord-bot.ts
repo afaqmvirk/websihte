@@ -22,15 +22,15 @@ export function getDiscordBotConfig() {
   const applicationId = process.env.DISCORD_APPLICATION_ID?.trim() || "";
   const guildId = process.env.DISCORD_GUILD_ID?.trim() || "1483863305360511016";
   const model = process.env.DISCORD_BOT_MODEL?.trim() || "gpt-6-luna";
-  const dailyLimit = Number(process.env.DISCORD_BOT_DAILY_LIMIT || 100);
-  const monthlyLimit = Number(process.env.DISCORD_BOT_MONTHLY_LIMIT || 1_000);
+  const dailyLimit = Number(process.env.DISCORD_BOT_DAILY_LIMIT || 10_000);
+  const monthlyLimit = Number(process.env.DISCORD_BOT_MONTHLY_LIMIT || 310_000);
   const cooldownSeconds = Number(process.env.DISCORD_BOT_COOLDOWN_SECONDS || 2);
   const storage = getApplicationStorageConfig();
   if (process.env.DISCORD_BOT_ENABLED !== "true" || !token || token.length < 40 || /\s/.test(token)
     || !SNOWFLAKE.test(applicationId) || !SNOWFLAKE.test(guildId)
     || !process.env.OPENAI_API_KEY?.trim() || !/^[\w.-]+$/.test(model)
-    || !Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 1_000
-    || !Number.isInteger(monthlyLimit) || monthlyLimit < 1 || monthlyLimit > 1_000
+    || !Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 10_000
+    || !Number.isInteger(monthlyLimit) || monthlyLimit < 1 || monthlyLimit > 310_000
     || !Number.isInteger(cooldownSeconds) || cooldownSeconds < 1 || cooldownSeconds > 3_600
     || !storage) return null;
   return { token, applicationId, guildId, model, dailyLimit, monthlyLimit, cooldownSeconds, storage };
