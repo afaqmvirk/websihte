@@ -8,6 +8,8 @@ const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
 const userQueues = new Map<string, Promise<unknown>>();
+const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
+type DiscordBotReply = { text: string; reaction?: string };
 
 export function getDiscordBotConfig() {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
@@ -65,11 +67,11 @@ async function claimMention(message: DiscordMention, config: DiscordBotConfig) {
   return await response.json() as "accepted" | "duplicate" | "cooldown" | "daily_limit" | "monthly_limit";
 }
 
-async function recordReply(messageId: string, replyId: string | null, config: DiscordBotConfig) {
+async function recordReply(messageId: string, replyId: string | null, config: DiscordBotConfig, answered = !!replyId) {
   try {
     const response = await fetch(`${config.storage.url}/rest/v1/discord_bot_requests?message_id=eq.${messageId}`, {
       method: "PATCH", headers: { apikey: config.storage.key, "Content-Type": "application/json" },
-      body: JSON.stringify({ status: replyId ? "answered" : "failed", reply_message_id: replyId }),
+      body: JSON.stringify({ status: answered ? "answered" : "failed", reply_message_id: replyId }),
       cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000),
     });
     if (!response.ok) console.error("Could not track Discord bot reply", { status: response.status });
@@ -86,13 +88,29 @@ function formatReply(text: string) {
     .join("").trim();
 }
 
-export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = []) {
+export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = []): Promise<DiscordBotReply> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new Error("OpenAI authentication is unavailable");
   const response = await fetch(OPENAI_API, {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model, reasoning_effort: "none", max_completion_tokens: 512, store: false,
+      tools: [{
+        type: "function",
+        function: {
+          name: "react_to_message", strict: true,
+          description: "React to the current user's Discord message with one emoji, optionally with a short spoken reply. For simple acknowledgment or banter, a reaction alone can be the entire answer.",
+          parameters: {
+            type: "object", additionalProperties: false,
+            properties: {
+              emoji: { type: "string", enum: REACTION_EMOJI },
+              reply: { type: ["string", "null"], description: "Optional short reply in Bob's voice, or null if the reaction is enough." },
+            },
+            required: ["emoji", "reply"],
+          },
+        },
+      }],
+      tool_choice: "auto", parallel_tool_calls: false,
       messages: [
         { role: "system", content: `${DISCORD_BOT_SYSTEM_PROMPT}\n\ntoday in ottawa: ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" })}.` },
         ...history,
@@ -102,10 +120,38 @@ export async function generateDiscordBotReply(question: string, model: string, h
     cache: "no-store", redirect: "error", signal: AbortSignal.timeout(25_000),
   });
   if (!response.ok) throw new Error(`OpenAI returned status ${response.status}`);
-  const result = await response.json() as { choices?: { message?: { content?: string } }[] };
-  const text = formatReply(result.choices?.[0]?.message?.content?.trim() || "");
-  if (!text) throw new Error("OpenAI returned no answer");
-  return text.slice(0, 1_900).trimEnd();
+  const result = await response.json() as { choices?: { message?: {
+    content?: string | null;
+    tool_calls?: { type?: string; function?: { name?: string; arguments?: string } }[];
+  } }[] };
+  const answer = result.choices?.[0]?.message;
+  let content = answer?.content || "";
+  let reaction: string | undefined;
+  const call = answer?.tool_calls?.[0];
+  if (call) {
+    if (call.type !== "function" || call.function?.name !== "react_to_message") throw new Error("Unknown bot action");
+    const args = JSON.parse(call.function.arguments || "null") as { emoji?: unknown; reply?: unknown } | null;
+    if (!args || typeof args.emoji !== "string" || !REACTION_EMOJI.includes(args.emoji)
+      || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot reaction");
+    reaction = args.emoji;
+    content = typeof args.reply === "string" ? args.reply : "";
+  }
+  const text = formatReply(content).slice(0, 1_900).trimEnd();
+  if (!text && !reaction) throw new Error("OpenAI returned no answer");
+  return { text, reaction };
+}
+
+async function postReaction(message: DiscordMention, emoji: string, config: DiscordBotConfig) {
+  try {
+    const response = await fetch(`${DISCORD_API}/channels/${message.channelId}/messages/${message.id}/reactions/${encodeURIComponent(emoji)}/@me`, {
+      method: "PUT", headers: { Authorization: `Bot ${config.token}` },
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000),
+    });
+    return response.ok;
+  } catch {
+    // Fall back to text if Discord cannot add the reaction.
+    return false;
+  }
 }
 
 async function postReply(message: DiscordMention, content: string, config: DiscordBotConfig) {
@@ -185,13 +231,16 @@ async function answerMention(message: DiscordMention, question: string, config: 
     }
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
-    let answer: string;
-    if (!question) answer = "uhhhh iunno";
-    else if (question.length > MAX_QUESTION_LENGTH) answer = "uhhhh iunno keep it under 2000 characters mortal";
+    let answer: DiscordBotReply;
+    if (!question) answer = { text: "uhhhh iunno" };
+    else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued));
-    const replyId = await postReply(message, answer, config);
-    await recordReply(message.id, replyId, config);
-    return replyId ? "answered" : "failed";
+    const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
+    const text = answer.text || (reacted ? "" : "uhhhh iunno");
+    const replyId = text ? await postReply(message, text, config) : null;
+    const answered = !!replyId || reacted;
+    await recordReply(message.id, replyId, config, answered);
+    return answered ? "answered" : "failed";
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {

@@ -113,7 +113,7 @@ Server Members and Presence can stay disabled. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
 Create a Discord application named `sih-inator`, copy its application ID, generate
-its bot token, and install it with View Channels, Send Messages, Send Messages in
+its bot token, and install it with View Channels, Add Reactions, Send Messages, Send Messages in
 Threads, and Read Message History permissions. Set `DISCORD_BOT_TOKEN`,
 `DISCORD_APPLICATION_ID`, `OPENAI_API_KEY`, and a random `CRON_SECRET` of at least
 32 characters in Vercel. Apply the bot migrations, then set
@@ -140,6 +140,10 @@ consumes provisioned memory even while idle. The quota does not cap hosting usag
 
 The persona is overlord bob: short lowercase replies without punctuation in speech,
 often just "uhhhh iunno", and brief in-character safety refusals that question the idea.
+Broad or oversized requests get a lazy, adversarial brush-off instead of a full plan.
+For messages that directly mention it, Bob can choose one emoji reaction, a text
+reply, or both. Reaction-only answers count as answered requests. If Discord rejects
+a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
 Its public hackathon facts are in `app/lib/discord-bot-knowledge.ts`. Keep that
 snapshot up to date when the website's event details change. Speech formatting
 preserves literal code, email addresses, and case-sensitive links.
