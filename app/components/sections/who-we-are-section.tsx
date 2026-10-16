@@ -77,7 +77,7 @@ export default function WhoWeAreSection() {
           </div>
 
         <div
-          className="absolute z-[20] hidden min-[1024px]:block min-[1024px]:overflow-visible"
+          className="pointer-events-none absolute z-[20] hidden min-[1024px]:block min-[1024px]:overflow-visible"
           style={{
             right: arcCfg.insetXPx,
             bottom: arcCfg.insetYPx,
