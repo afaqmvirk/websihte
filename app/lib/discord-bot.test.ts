@@ -163,9 +163,9 @@ describe("sih-inator mention bot", () => {
     assert.equal(modelCalls().length,1);
   });
   it("enforces lowercase speech while preserving links and code",async()=>{
-    intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I AM OVERLORD BOB. JOIN https://discord.gg/335SMmyteY OR TRY `someFunction()`"}}]}):null;
+    intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I AM OVERLORD BOB. JOIN https://discord.gg/D7TBJNN8Vj OR TRY `someFunction()`"}}]}):null;
     assert.equal(await handleDiscordMention(message(),config()),"answered");
-    assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"i am overlord bob. join https://discord.gg/335SMmyteY or try `someFunction()`");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"i am overlord bob. join https://discord.gg/D7TBJNN8Vj or try `someFunction()`");
   });
   it("keeps cross-channel user context when current-channel history fails",async()=>{
     const current = message({id:"1560000000000000100"});

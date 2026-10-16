@@ -1,5 +1,5 @@
 export const siteUrl = "https://stupideas.com";
-export const discordInviteUrl = "https://discord.gg/335SMmyteY";
+export const discordInviteUrl = "https://discord.gg/D7TBJNN8Vj";
 export const siteTitle = "the stupid ideas hackathon community";
 export const siteDescription =
   "a decentralized community reclaiming the joy of building, one stupid idea at a time.";
