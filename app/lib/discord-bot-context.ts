@@ -1,0 +1,112 @@
+const SNOWFLAKE = /^\d{17,20}$/;
+const MAX_CONTEXT_BYTES = 48_000;
+const MAX_MESSAGE_BYTES = 512;
+
+export type DiscordConversationMessage = {
+  role: "user" | "assistant";
+  name: string;
+  content: string;
+};
+
+type Mention = { id: string; channelId: string; authorId: string };
+type HistoryMessage = {
+  id: string; channel_id: string; timestamp: string; content: string;
+  author: { id: string; bot?: boolean }; type: number; webhook_id?: string;
+};
+
+function clipUtf8(text: string, maxBytes: number) {
+  if (Buffer.byteLength(text, "utf8") <= maxBytes) return text;
+  if (maxBytes < 4) return "";
+  let result = "", used = 0;
+  for (const character of text) {
+    const bytes = Buffer.byteLength(character, "utf8");
+    if (used + bytes > maxBytes - 3) break;
+    result += character; used += bytes;
+  }
+  return `${result}…`;
+}
+
+export function selectDiscordConversation(
+  channelData: unknown, userData: unknown, message: Mention, botId: string, now = Date.now(),
+): DiscordConversationMessage[] {
+  const eligible = (data: unknown) => (Array.isArray(data) ? data : []).filter((item): item is HistoryMessage => {
+    if (!item || typeof item !== "object") return false;
+    const entry = item as HistoryMessage;
+    const created = Date.parse(entry.timestamp);
+    return typeof entry.id === "string" && SNOWFLAKE.test(entry.id)
+      && BigInt(entry.id) < BigInt(message.id) && typeof entry.channel_id === "string" && SNOWFLAKE.test(entry.channel_id)
+      && typeof entry.content === "string" && !!entry.content.trim()
+      && !!entry.author && typeof entry.author.id === "string" && SNOWFLAKE.test(entry.author.id)
+      && (!entry.author.bot || entry.author.id === botId) && !entry.webhook_id
+      && (entry.type === 0 || entry.type === 19) && Number.isFinite(created) && created <= now;
+  }).sort((a, b) => BigInt(a.id) > BigInt(b.id) ? -1 : 1);
+  const recent = eligible(channelData).filter((item) => item.channel_id === message.channelId).slice(0, 25);
+  const previousUser = eligible(userData).filter((item) => item.author.id === message.authorId).slice(0, 10);
+  // Prefer the direct channel response over search-index copies of the same message.
+  const priority = new Map([
+    ...previousUser,
+    ...recent,
+  ].map((item) => [item.id, item]));
+  const participants = new Map<string, string>();
+  const selected: { id: string; message: DiscordConversationMessage }[] = [];
+  let remaining = MAX_CONTEXT_BYTES - 2;
+  for (const entry of priority.values()) {
+    const role = entry.author.id === botId ? "assistant" : "user";
+    let name = role === "assistant" ? "overlord_bob" : "current_user";
+    if (role === "user" && entry.author.id !== message.authorId) {
+      if (!participants.has(entry.author.id)) participants.set(entry.author.id, `participant_${participants.size + 1}`);
+      name = participants.get(entry.author.id)!;
+    }
+    const overhead = Buffer.byteLength(JSON.stringify({ role, name, content: "" }), "utf8") + 1;
+    if (remaining < overhead + 16) continue;
+    const prefix = entry.channel_id === message.channelId ? "" : "[earlier message from another server channel]\n";
+    const content = clipUtf8(prefix + entry.content
+      .replace(new RegExp(`<@!?${botId}>`, "g"), "overlord bob")
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim(),
+    // JSON escaping can at most double the content bytes after control filtering.
+    Math.min(MAX_MESSAGE_BYTES, Math.floor((remaining - overhead) / 2)));
+    if (!content) continue;
+    selected.push({ id: entry.id, message: { role, name, content } });
+    remaining -= Buffer.byteLength(JSON.stringify({ role, name, content }), "utf8") + 1;
+  }
+  return selected.sort((a, b) => BigInt(a.id) < BigInt(b.id) ? -1 : 1).map((item) => item.message);
+}
+
+export async function getDiscordConversation(
+  message: Mention, config: { token: string; applicationId: string; guildId: string },
+): Promise<DiscordConversationMessage[]> {
+  async function readHistory(url: string, allowIndexRetry = false): Promise<unknown> {
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const response = await fetch(url, {
+        headers: { Authorization: `Bot ${config.token}` },
+        cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000),
+      });
+      const data = await response.json();
+      if (response.status === 202 && allowIndexRetry && attempt === 0) {
+        const retryAfter = Number(data?.retry_after ?? 1);
+        if (Number.isFinite(retryAfter) && retryAfter >= 0 && retryAfter <= 2) {
+          await new Promise((resolve) => setTimeout(resolve, Math.max(100, retryAfter * 1_000)));
+          continue;
+        }
+      }
+      if (!response.ok || response.status === 202) throw new Error("History unavailable");
+      return data;
+    }
+    throw new Error("History unavailable");
+  }
+  const query = new URLSearchParams({
+    author_id: message.authorId, max_id: message.id, limit: "10", sort_by: "timestamp", sort_order: "desc",
+  });
+  const results = await Promise.allSettled([
+    readHistory(`https://discord.com/api/v10/channels/${message.channelId}/messages?before=${message.id}&limit=25`),
+    readHistory(`https://discord.com/api/v10/guilds/${config.guildId}/messages/search?${query}`, true),
+  ]);
+  if (results.some((result) => result.status === "rejected")) {
+    // History is optional; never log conversation text or credentials.
+    console.warn("Some Discord conversation context was unavailable");
+  }
+  const channel = results[0].status === "fulfilled" ? results[0].value : [];
+  const search = results[1].status === "fulfilled" ? results[1].value as { messages?: unknown[][] } : null;
+  const user = Array.isArray(search?.messages) ? search.messages.flat() : [];
+  return selectDiscordConversation(channel, user, message, config.applicationId);
+}

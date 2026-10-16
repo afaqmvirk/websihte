@@ -1,5 +1,7 @@
 import { timingSafeEqual } from "node:crypto";
 import { getApplicationStorageConfig } from "@/lib/application-storage";
+import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/discord-bot-context";
+import { DISCORD_BOT_SYSTEM_PROMPT } from "@/lib/discord-bot-knowledge";
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
@@ -75,7 +77,13 @@ async function recordReply(messageId: string, replyId: string | null, config: Di
   }
 }
 
-export async function generateDiscordBotReply(question: string, model: string) {
+function lowercaseReply(text: string) {
+  // Lowercase speech without breaking case-sensitive URLs or executable code.
+  return text.split(/(```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s<>()]+)/gi)
+    .map((part, index) => index % 2 ? part : part.toLowerCase()).join("");
+}
+
+export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = []) {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new Error("OpenAI authentication is unavailable");
   const response = await fetch(OPENAI_API, {
@@ -83,22 +91,23 @@ export async function generateDiscordBotReply(question: string, model: string) {
     body: JSON.stringify({
       model, reasoning_effort: "none", max_completion_tokens: 512, store: false,
       messages: [
-        { role: "system", content: "You are sih-inator, a friendly AI bot in the stupid ideas hackathon Discord. Help with questions, code, and delightfully silly project ideas. Be playful without forcing jokes. Give clear, practical answers in Canadian English, usually under 150 words. You only have the question sent to you; do not claim to have read channel history, applications, files, or searched the web. For current hackathon dates, application status, or official decisions, direct people to https://www.stupideas.com/ottawa or the organizers. Never imply you can accept applications or make organizer decisions." },
-        { role: "user", content: question },
+        { role: "system", content: `${DISCORD_BOT_SYSTEM_PROMPT}\n\ntoday in ottawa: ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" })}.` },
+        ...history,
+        { role: "user", name: "current_user", content: question },
       ],
     }),
     cache: "no-store", redirect: "error", signal: AbortSignal.timeout(25_000),
   });
   if (!response.ok) throw new Error(`OpenAI returned status ${response.status}`);
   const result = await response.json() as { choices?: { message?: { content?: string } }[] };
-  const text = result.choices?.[0]?.message?.content?.trim();
+  const text = lowercaseReply(result.choices?.[0]?.message?.content?.trim() || "");
   if (!text) throw new Error("OpenAI returned no answer");
   return text.length <= 1_900 ? text : `${text.slice(0, 1_899)}…`;
 }
 
 async function postReply(message: DiscordMention, content: string, config: DiscordBotConfig) {
   const body = JSON.stringify({
-    content, allowed_mentions: { parse: [], replied_user: false },
+    content: lowercaseReply(content), allowed_mentions: { parse: [], replied_user: false },
     message_reference: { message_id: message.id, fail_if_not_exists: false },
     nonce: message.id, enforce_nonce: true,
   });
@@ -133,26 +142,26 @@ export async function handleDiscordMention(message: DiscordMention, config: Disc
     const claim = await claimMention(message, config);
     if (claim === "duplicate" || claim === "cooldown") return claim;
     if (claim === "daily_limit") {
-      await postReply(message, "My daily brain budget is used up. Try again tomorrow (UTC).", config);
+      await postReply(message, "uhhhh iunno. bob's daily brain budget is gone. try tomorrow (utc).", config);
       return claim;
     }
     if (claim === "monthly_limit") {
-      await postReply(message, "My monthly brain budget is used up. Ask an organizer or try again next month (UTC).", config);
+      await postReply(message, "uhhhh iunno. bob's monthly brain budget is gone. ask an organizer or try next month (utc).", config);
       return claim;
     }
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
     let answer: string;
-    if (!question) answer = "Hey! Mention me with a question or a silly project idea.";
-    else if (question.length > MAX_QUESTION_LENGTH) answer = "Keep the question under 2,000 characters so my tiny brain can keep up.";
-    else answer = await generateDiscordBotReply(question, config.model);
+    if (!question) answer = "uhhhh iunno";
+    else if (question.length > MAX_QUESTION_LENGTH) answer = "uhhhh iunno. keep it under 2,000 characters, mortal.";
+    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config));
     const replyId = await postReply(message, answer, config);
     await recordReply(message.id, replyId, config);
     return replyId ? "answered" : "failed";
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      await postReply(message, "My tiny brain is taking a break. Try again in a moment.", config);
+      await postReply(message, "uhhhh iunno. brain not working. try again in a bit.", config);
       await recordReply(message.id, null, config);
     }
     return "failed";

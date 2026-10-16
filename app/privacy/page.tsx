@@ -125,14 +125,20 @@ export default function PrivacyPolicyPage() {
 
             <h3>when you mention our Discord bot</h3>
             <p>
-              If you mention sih-inator, we send your question to OpenAI
-              to generate a reply in Discord. We do not send
-              channel history, application records, or attachments to the model.
+              If you mention sih-inator (overlord bob), we send your question and
+              up to 25 recent messages from the same Discord channel or thread,
+              plus up to 10 earlier messages from you across server channels the
+              bot can access, to OpenAI to generate a reply. This can include
+              other participants&apos; messages and the bot&apos;s replies.
+              We use temporary speaker labels to distinguish participants. We do
+              not include other participants&apos; messages from other channels,
+              private application notifications, or attachments in this context.
               We keep message, server, and user IDs, timestamps, reply IDs, and
               delivery status in our private database for duplicate handling and
               usage limits. Metadata older than two days is removed on the next
               request. We also keep a server-level monthly request count until
-              the next month. We do not store question or answer text in that database.
+              the next month. Conversation context is fetched when needed; we do
+              not store message, question, or answer text in that database.
             </p>
 
             <h3>when you email us</h3>

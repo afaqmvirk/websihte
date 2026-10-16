@@ -3,7 +3,8 @@ import { handleDiscordMention, type DiscordBotConfig } from "@/lib/discord-bot";
 
 export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 600_000) {
   const client = new Client({
-    // Discord supplies message content for direct bot mentions without the privileged intent.
+    // Direct mentions need no privileged Gateway intent. History is fetched on demand
+    // over REST using the app's Message Content setting, rather than caching all messages.
     intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
     makeCache: Options.cacheWithLimits({ MessageManager: 0 }),
     allowedMentions: { parse: [], repliedUser: false },

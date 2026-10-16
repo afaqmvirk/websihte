@@ -107,8 +107,10 @@ The mention bot runs on this site's Vercel Pro project. The protected cron route
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances. The bot responds
 only to direct user mentions in `DISCORD_GUILD_ID`, ignoring bots and global pings.
-It requests only Guilds and GuildMessages intents; the privileged Message Content
-and Server Members intents can stay disabled.
+It requests only Guilds and GuildMessages Gateway intents. Enable the application's
+Message Content setting in Discord so REST history includes unmentioned messages;
+Server Members and Presence can stay disabled. History is fetched only after an
+accepted mention, rather than cached from every incoming message.
 
 Create a Discord application named `sih-inator`, copy its application ID, generate
 its bot token, and install it with View Channels, Send Messages, Send Messages in
@@ -123,15 +125,30 @@ The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
 tokens. Defaults allow 100 requests per UTC day, 1,000 per UTC month, and one
 per person every 15 seconds. The monthly count is atomic across instances and
-counts failed attempts conservatively. At the [current Luna price](https://developers.openai.com/api/docs/models/gpt-6-luna) this keeps
-this bot's model usage under an estimated $2 per month; it is a request quota,
-not a provider billing cap. Other uses of the same API key are billed separately,
+counts failed attempts conservatively. Model cost depends on the question and
+conversation context at the [current Luna price](https://developers.openai.com/api/docs/models/gpt-6-luna).
+These are request quotas, not a provider billing cap. Other uses of the same API key are billed separately,
 and changing models requires reviewing the cost estimate. Model spending and
 Vercel compute are also billed separately: a continuously connected listener
 consumes provisioned memory even while idle. The quota does not cap hosting usage.
 
-Only the explicit question is sent to the model. No channel history, application
-records, or attachments are included. The private quota table stores message,
+The persona is overlord bob: short lowercase replies, often just "uhhhh iunno",
+with public hackathon facts in `app/lib/discord-bot-knowledge.ts`. Keep that
+snapshot up to date when the website's event details change. Lowercase formatting
+preserves code and case-sensitive links.
+
+Each accepted question can include the latest 25 messages from the same channel
+or Discord thread, plus the author's last 10 messages across server channels the
+bot can access. The latter uses Discord's author-filtered guild search; overlaps
+are included once. Messages are ordered oldest to newest, the final question is
+the main request, and the prompt favours recent relevant messages over old ones.
+Other-channel messages are labelled as background. Each history message is clipped
+to 512 UTF-8 bytes; the complete context has a 48,000-byte ceiling including speaker
+labels. Other bots, webhooks, application notifications, attachments, and other
+authors' messages from other channels are excluded. If one history source fails,
+the other still works; if both fail, the bot answers the current question alone.
+Message text is not saved to the site database or logged.
+The private quota table stores message,
 server, and user IDs, timestamps, delivery status, and reply IDs. Metadata older
 than two days is pruned on the next request; prompt and answer text are not stored
 in the site database. A server-level monthly request count is retained separately
