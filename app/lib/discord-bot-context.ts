@@ -12,6 +12,7 @@ type Mention = { id: string; channelId: string; authorId: string };
 type HistoryMessage = {
   id: string; channel_id: string; timestamp: string; content: string;
   author: { id: string; bot?: boolean }; type: number; webhook_id?: string;
+  message_reference?: { message_id?: string };
 };
 
 function clipUtf8(text: string, maxBytes: number) {
@@ -33,8 +34,13 @@ export function selectDiscordConversation(
     if (!item || typeof item !== "object") return false;
     const entry = item as HistoryMessage;
     const created = Date.parse(entry.timestamp);
+    const replyTo = entry.message_reference?.message_id;
+    // A fast follow-up may arrive before Bob finishes answering the prior question.
+    const completesEarlierQuestion = entry.author?.id === botId
+      && typeof replyTo === "string" && SNOWFLAKE.test(replyTo) && BigInt(replyTo) < BigInt(message.id);
     return typeof entry.id === "string" && SNOWFLAKE.test(entry.id)
-      && BigInt(entry.id) < BigInt(message.id) && typeof entry.channel_id === "string" && SNOWFLAKE.test(entry.channel_id)
+      && (BigInt(entry.id) < BigInt(message.id) || completesEarlierQuestion)
+      && typeof entry.channel_id === "string" && SNOWFLAKE.test(entry.channel_id)
       && typeof entry.content === "string" && !!entry.content.trim()
       && !!entry.author && typeof entry.author.id === "string" && SNOWFLAKE.test(entry.author.id)
       && (!entry.author.bot || entry.author.id === botId) && !entry.webhook_id
@@ -74,6 +80,7 @@ export function selectDiscordConversation(
 
 export async function getDiscordConversation(
   message: Mention, config: { token: string; applicationId: string; guildId: string },
+  includeCompletedReplies = false,
 ): Promise<DiscordConversationMessage[]> {
   async function readHistory(url: string, allowIndexRetry = false): Promise<unknown> {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -98,7 +105,7 @@ export async function getDiscordConversation(
     author_id: message.authorId, max_id: message.id, limit: "10", sort_by: "timestamp", sort_order: "desc",
   });
   const results = await Promise.allSettled([
-    readHistory(`https://discord.com/api/v10/channels/${message.channelId}/messages?before=${message.id}&limit=25`),
+    readHistory(`https://discord.com/api/v10/channels/${message.channelId}/messages?${includeCompletedReplies ? "" : `before=${message.id}&`}limit=25`),
     readHistory(`https://discord.com/api/v10/guilds/${config.guildId}/messages/search?${query}`, true),
   ]);
   if (results.some((result) => result.status === "rejected")) {

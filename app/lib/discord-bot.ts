@@ -7,6 +7,7 @@ const SNOWFLAKE = /^\d{17,20}$/;
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
+const userQueues = new Map<string, Promise<unknown>>();
 
 export function getDiscordBotConfig() {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
@@ -15,7 +16,7 @@ export function getDiscordBotConfig() {
   const model = process.env.DISCORD_BOT_MODEL?.trim() || "gpt-6-luna";
   const dailyLimit = Number(process.env.DISCORD_BOT_DAILY_LIMIT || 100);
   const monthlyLimit = Number(process.env.DISCORD_BOT_MONTHLY_LIMIT || 1_000);
-  const cooldownSeconds = Number(process.env.DISCORD_BOT_COOLDOWN_SECONDS || 15);
+  const cooldownSeconds = Number(process.env.DISCORD_BOT_COOLDOWN_SECONDS || 2);
   const storage = getApplicationStorageConfig();
   if (process.env.DISCORD_BOT_ENABLED !== "true" || !token || token.length < 40 || /\s/.test(token)
     || !SNOWFLAKE.test(applicationId) || !SNOWFLAKE.test(guildId)
@@ -77,10 +78,12 @@ async function recordReply(messageId: string, replyId: string | null, config: Di
   }
 }
 
-function lowercaseReply(text: string) {
-  // Lowercase speech without breaking case-sensitive URLs or executable code.
-  return text.split(/(```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s<>()]+)/gi)
-    .map((part, index) => index % 2 ? part : part.toLowerCase()).join("");
+function formatReply(text: string) {
+  // Keep literal links, email addresses, and code usable while formatting speech.
+  return text.split(/(```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s<>()]+|[\w.+-]+@[\w.-]+\.[a-z]{2,})/gi)
+    .map((part, index) => index % 2 ? part : part.toLowerCase()
+      .replace(/['’]/g, "").replace(/\p{Pd}/gu, " ").replace(/\p{P}/gu, ""))
+    .join("").trim();
 }
 
 export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = []) {
@@ -100,14 +103,14 @@ export async function generateDiscordBotReply(question: string, model: string, h
   });
   if (!response.ok) throw new Error(`OpenAI returned status ${response.status}`);
   const result = await response.json() as { choices?: { message?: { content?: string } }[] };
-  const text = lowercaseReply(result.choices?.[0]?.message?.content?.trim() || "");
+  const text = formatReply(result.choices?.[0]?.message?.content?.trim() || "");
   if (!text) throw new Error("OpenAI returned no answer");
-  return text.length <= 1_900 ? text : `${text.slice(0, 1_899)}…`;
+  return text.slice(0, 1_900).trimEnd();
 }
 
 async function postReply(message: DiscordMention, content: string, config: DiscordBotConfig) {
   const body = JSON.stringify({
-    content: lowercaseReply(content), allowed_mentions: { parse: [], replied_user: false },
+    content: formatReply(content), allowed_mentions: { parse: [], replied_user: false },
     message_reference: { message_id: message.id, fail_if_not_exists: false },
     nonce: message.id, enforce_nonce: true,
   });
@@ -134,36 +137,85 @@ async function postReply(message: DiscordMention, content: string, config: Disco
   return null;
 }
 
-export async function handleDiscordMention(message: DiscordMention, config: DiscordBotConfig) {
-  const question = questionFromMention(message, config);
-  if (question === null) return "ignored";
+function startTyping(message: DiscordMention, config: DiscordBotConfig) {
+  const controller = new AbortController();
+  let sending = false;
+  async function send() {
+    if (sending || controller.signal.aborted) return;
+    sending = true;
+    try {
+      await fetch(`${DISCORD_API}/channels/${message.channelId}/typing`, {
+        method: "POST", headers: { Authorization: `Bot ${config.token}` },
+        cache: "no-store", redirect: "error",
+        signal: AbortSignal.any([controller.signal, AbortSignal.timeout(3_000)]),
+      });
+    } catch {
+      // Typing is best effort and must never prevent a reply.
+    } finally {
+      sending = false;
+    }
+  }
+  void send();
+  // Discord expires typing after ten seconds, so refresh while waiting or answering.
+  const timer = setInterval(() => { void send(); }, 8_000);
+  return () => { clearInterval(timer); controller.abort(); };
+}
+
+async function answerMention(message: DiscordMention, question: string, config: DiscordBotConfig, queued: boolean) {
   let claimed = false;
+  let stopTyping: (() => void) | undefined;
   try {
-    const claim = await claimMention(message, config);
-    if (claim === "duplicate" || claim === "cooldown") return claim;
+    let claim = await claimMention(message, config);
+    if (claim === "duplicate") return claim;
+    stopTyping = startTyping(message, config);
+    while (claim === "cooldown") {
+      queued = true;
+      // The shared claim also waits for this user's previous answer across listeners.
+      await new Promise((resolve) => setTimeout(resolve, Math.min(config.cooldownSeconds * 1_000, 2_000)));
+      claim = await claimMention(message, config);
+    }
+    if (claim === "duplicate") return claim;
     if (claim === "daily_limit") {
-      await postReply(message, "uhhhh iunno. bob's daily brain budget is gone. try tomorrow (utc).", config);
+      await postReply(message, "uhhhh iunno bobs daily brain budget is gone try tomorrow utc", config);
       return claim;
     }
     if (claim === "monthly_limit") {
-      await postReply(message, "uhhhh iunno. bob's monthly brain budget is gone. ask an organizer or try next month (utc).", config);
+      await postReply(message, "uhhhh iunno bobs monthly brain budget is gone ask an organizer or try next month utc", config);
       return claim;
     }
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
     let answer: string;
     if (!question) answer = "uhhhh iunno";
-    else if (question.length > MAX_QUESTION_LENGTH) answer = "uhhhh iunno. keep it under 2,000 characters, mortal.";
-    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config));
+    else if (question.length > MAX_QUESTION_LENGTH) answer = "uhhhh iunno keep it under 2000 characters mortal";
+    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued));
     const replyId = await postReply(message, answer, config);
     await recordReply(message.id, replyId, config);
     return replyId ? "answered" : "failed";
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      await postReply(message, "uhhhh iunno. brain not working. try again in a bit.", config);
+      await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
       await recordReply(message.id, null, config);
     }
     return "failed";
+  } finally {
+    stopTyping?.();
+  }
+}
+
+export async function handleDiscordMention(message: DiscordMention, config: DiscordBotConfig) {
+  const question = questionFromMention(message, config);
+  if (question === null) return "ignored";
+  // Preserve each person's message order without holding up other people.
+  const key = `${message.guildId}:${message.authorId}`;
+  const previous = userQueues.get(key);
+  const work = (previous ?? Promise.resolve()).catch(() => {})
+    .then(() => answerMention(message, question, config, !!previous));
+  userQueues.set(key, work);
+  try {
+    return await work;
+  } finally {
+    if (userQueues.get(key) === work) userQueues.delete(key);
   }
 }
