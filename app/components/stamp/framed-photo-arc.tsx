@@ -486,8 +486,8 @@ export default function FramedPhotoArc({
     <div
       className={
         isMobileLine
-          ? `relative w-full max-w-full overflow-x-clip ${className ?? ""}`
-          : `pointer-events-auto relative overflow-visible ${className ?? ""}`
+          ? `pointer-events-none relative w-full max-w-full overflow-x-clip ${className ?? ""}`
+          : `pointer-events-none relative overflow-visible ${className ?? ""}`
       }
       style={
         isMobileLine

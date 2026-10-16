@@ -157,7 +157,7 @@ export default function EventsSection() {
         className={`${SECTION_SHELL_CLASS} relative flex w-full flex-col gap-12 pt-0 py-[max(2rem,6vw)] pb-[max(5rem,10vw)] min-[1024px]:flex-row min-[1024px]:items-start min-[1024px]:justify-end min-[1024px]:gap-6 min-[1024px]:pt-[100px] min-[1024px]:pb-[clamp(5rem,10vw,8rem)]`}
       >
         <div
-          className="absolute z-[20] hidden min-[1024px]:block"
+          className="pointer-events-none absolute z-[20] hidden min-[1024px]:block"
           style={{
             left: arcCfg.insetXPx,
             top: arcCfg.insetYPx,
