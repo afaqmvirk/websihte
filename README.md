@@ -124,7 +124,13 @@ GET to the cron route; later listeners are started by Vercel automatically.
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
 tokens. Defaults allow 100 requests per UTC day, 1,000 per UTC month, and one
-per person every 15 seconds. The monthly count is atomic across instances and
+per person every two seconds. Follow-ups wait in order until the previous reply
+finishes and the cooldown expires, without a cooldown notice. A shared processing
+claim keeps overlapping listeners from answering the same person out of order;
+stale processing claims stop blocking new work after two minutes. Discord's typing
+indicator is refreshed while a message waits for admission or its answer is prepared.
+The queue lives in the active listener, so a process crash can still lose waiting
+messages. The monthly count is atomic across instances and
 counts failed attempts conservatively. Model cost depends on the question and
 conversation context at the [current Luna price](https://developers.openai.com/api/docs/models/gpt-6-luna).
 These are request quotas, not a provider billing cap. Other uses of the same API key are billed separately,
@@ -132,10 +138,11 @@ and changing models requires reviewing the cost estimate. Model spending and
 Vercel compute are also billed separately: a continuously connected listener
 consumes provisioned memory even while idle. The quota does not cap hosting usage.
 
-The persona is overlord bob: short lowercase replies, often just "uhhhh iunno",
-with public hackathon facts in `app/lib/discord-bot-knowledge.ts`. Keep that
-snapshot up to date when the website's event details change. Lowercase formatting
-preserves code and case-sensitive links.
+The persona is overlord bob: short lowercase replies without punctuation in speech,
+often just "uhhhh iunno", and brief in-character safety refusals that question the idea.
+Its public hackathon facts are in `app/lib/discord-bot-knowledge.ts`. Keep that
+snapshot up to date when the website's event details change. Speech formatting
+preserves literal code, email addresses, and case-sensitive links.
 
 Each accepted question can include the latest 25 messages from the same channel
 or Discord thread, plus the author's last 10 messages across server channels the

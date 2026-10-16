@@ -9,7 +9,7 @@ const otherId = "1560000000000000004";
 const now = Date.now();
 const current = { id:"1560000000000000100", channelId, authorId:userId };
 function entry(number: number, overrides = {}) {
-  return { id:String(1560000000000000000n + BigInt(number)),channel_id:channelId,
+  return { id:String(BigInt("1560000000000000000") + BigInt(number)),channel_id:channelId,
     author:{id:otherId},content:`message ${number}`,type:0,timestamp:new Date(now-1_000).toISOString(),...overrides };
 }
 
@@ -47,6 +47,20 @@ describe("bounded Discord conversation context",()=>{
     assert.equal(history[0].role,"user"); assert.equal(history[0].name,"current_user");
     assert.equal(history[1].role,"assistant"); assert.equal(history[1].name,"overlord_bob");
     assert.ok(history.every(x=>x.role!==("system" as string)));
+  });
+  it("includes a completed answer to an earlier question when a queued follow-up arrived first",()=>{
+    const history = selectDiscordConversation([
+      entry(90,{author:{id:userId},content:"should i mine crypto"}),
+      entry(100,{author:{id:userId},content:"but electricity is free"}),
+      entry(101,{author:{id:userId},content:"a later question"}),
+      entry(110,{author:{id:botId,bot:true},type:19,content:"probably not",message_reference:{message_id:entry(90).id}}),
+      entry(111,{author:{id:botId,bot:true},type:19,content:"answering the current question already",message_reference:{message_id:current.id}}),
+      entry(112,{author:{id:botId,bot:true},content:"unrelated new message"}),
+      entry(113,{author:{id:botId,bot:true},type:19,message_reference:{message_id:"invalid"}}),
+    ],[],current,botId,now);
+    assert.deepEqual(history.map(({role,content})=>[role,content]),[
+      ["user","should i mine crypto"], ["assistant","probably not"],
+    ]);
   });
   it("bounds UTF-8 context and clips long messages without breaking characters",()=>{
     const data = Array.from({length:25},(_,i)=>entry(i+30,{content:'🍞"\\\n'.repeat(500)}));

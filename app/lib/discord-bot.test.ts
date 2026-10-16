@@ -9,9 +9,10 @@ const botId = "1560000000000000001";
 const modelUrl = "https://api.openai.com/v1/chat/completions";
 let calls: { url: string; init?: RequestInit }[];
 let seen: Set<string>;
-let intercept: ((url: string, init?: RequestInit) => Response | null) | undefined;
+let intercept: ((url: string, init?: RequestInit) => Response | null | Promise<Response | null>) | undefined;
 const modelCalls = () => calls.filter(({ url }) => url === modelUrl);
-const replies = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "POST");
+const replies = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && url.endsWith("/messages") && init?.method === "POST");
+const typingCalls = () => calls.filter(({ url }) => url.endsWith("/typing"));
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -26,13 +27,14 @@ beforeEach(() => {
   calls = []; seen = new Set(); intercept = undefined;
   globalThis.fetch = async (input, init) => {
     const url = String(input); calls.push({ url, init });
-    const overridden = intercept?.(url, init); if (overridden) return overridden;
+    const overridden = await intercept?.(url, init); if (overridden) return overridden;
     if (url === modelUrl) return Response.json({ choices: [{ message: { content: "Build a toaster that reviews your code." } }] });
     if (url.endsWith("/rpc/claim_discord_bot_request")) {
       const id = JSON.parse(String(init?.body)).p_message_id;
       if (seen.has(id)) return Response.json("duplicate");
       seen.add(id); return Response.json("accepted");
     }
+    if (url.endsWith("/typing")) return new Response(null, { status: 204 });
     if (url.startsWith("https://discord.com/api/v10/channels/")) return init?.method === "POST"
       ? Response.json({ id: "1560000000000000005" }) : Response.json([]);
     if (url.startsWith("https://discord.com/api/v10/guilds/")) return Response.json({messages:[]});
@@ -51,6 +53,7 @@ describe("sih-inator mention bot", () => {
     assert.equal(isDiscordCronAuthorized(new Request(url)), false);
     assert.equal(isDiscordCronAuthorized(new Request(url, { headers: { authorization: "Bearer wrong" } })), false);
     assert.equal(isDiscordCronAuthorized(new Request(url, { headers: { authorization: `Bearer ${process.env.CRON_SECRET}` } })), true);
+    assert.equal(config().cooldownSeconds, 2);
     process.env.DISCORD_BOT_ENABLED = "false"; assert.equal(getDiscordBotConfig(), null);
     process.env.DISCORD_BOT_ENABLED = "true";
     process.env.DISCORD_BOT_DAILY_LIMIT = "1000000"; assert.equal(getDiscordBotConfig(), null);
@@ -73,8 +76,11 @@ describe("sih-inator mention bot", () => {
     assert.match(request.messages[0].content, /you are overlord bob/);
     assert.match(request.messages[0].content, /uhhhh iunno/);
     assert.match(request.messages[0].content, /november 15, 2026/);
+    assert.match(request.messages[0].content, /use no punctuation at all/);
+    assert.match(request.messages[0].content, /why would you even bother/);
     assert.equal(new Headers(modelCalls()[0].init?.headers).get("Authorization"), "Bearer synthetic-openai-api-key");
     assert.equal(JSON.parse(String(calls[0].init?.body)).p_monthly_limit, 1000);
+    assert.equal(JSON.parse(String(calls[0].init?.body)).p_cooldown_seconds, 2);
     const reply = JSON.parse(String(replies()[0].init?.body));
     assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
     assert.equal(reply.message_reference.message_id, message().id);
@@ -86,9 +92,98 @@ describe("sih-inator mention bot", () => {
     assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
     assert.equal(modelCalls().length, 1); assert.equal(replies().length, 1);
   });
-  it("enforces personal cooldowns and daily and monthly quotas before model calls", async () => {
-    intercept = (url) => url.includes("/rpc/") ? Response.json("cooldown") : null;
-    assert.equal(await handleDiscordMention(message(), config()), "cooldown"); assert.equal(replies().length, 0);
+  it("waits out the two-second cooldown and answers without a cooldown notice", async () => {
+    let admissions = 0;
+    intercept = (url) => url.includes("/rpc/") && admissions++ === 0 ? Response.json("cooldown") : null;
+    const started = Date.now();
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.ok(Date.now() - started >= 1_900);
+    assert.equal(admissions, 2); assert.equal(modelCalls().length, 1);
+    assert.equal(replies().length, 1); assert.equal(typingCalls().length, 1);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "build a toaster that reviews your code");
+  });
+  it("deduplicates a queued mention claimed by another listener during the wait", async () => {
+    let admissions = 0;
+    intercept = (url) => url.includes("/rpc/") ? Response.json(admissions++ === 0 ? "cooldown" : "duplicate") : null;
+    assert.equal(await handleDiscordMention(message(), config()), "duplicate");
+    assert.equal(admissions, 2); assert.equal(modelCalls().length, 0); assert.equal(replies().length, 0);
+  });
+  it("queues each person's follow-ups until their preceding reply has been sent", async () => {
+    const started = Promise.withResolvers<void>();
+    const answer = Promise.withResolvers<Response>();
+    const first = message();
+    const followup = message({ id: "1560000000000000006", content: `<@${botId}> but the electricity is free` });
+    intercept = (url) => {
+      if (url.endsWith("/messages?limit=25")) return Response.json([
+        { id: "1560000000000000008", channel_id: first.channelId, timestamp: new Date().toISOString(), type: 19,
+          author: { id: botId, bot: true }, content: "probably not", message_reference: { message_id: first.id } },
+      ]);
+      if (url !== modelUrl || modelCalls().length !== 1) return null;
+      started.resolve(); return answer.promise;
+    };
+    const firstWork = handleDiscordMention(first, config());
+    const nextWork = handleDiscordMention(followup, config());
+    await started.promise;
+    try {
+      assert.equal(modelCalls().length, 1);
+      assert.equal(calls.filter(({ url }) => url.includes("/rpc/")).length, 1);
+      assert.equal(replies().length, 0);
+    } finally {
+      answer.resolve(Response.json({ choices: [{ message: { content: "Probably not." } }] }));
+    }
+    assert.deepEqual(await Promise.all([firstWork, nextWork]), ["answered", "answered"]);
+    assert.deepEqual(replies().map(({ init }) => JSON.parse(String(init?.body)).message_reference.message_id), [first.id, followup.id]);
+    const firstReply = calls.indexOf(replies()[0]);
+    assert.ok(calls.indexOf(modelCalls()[1]) > firstReply);
+    assert.equal(JSON.parse(String(modelCalls()[1].init?.body)).messages.at(-2).content, "probably not");
+  });
+  it("lets another person get an answer while the first person's model is still working", async () => {
+    const started = Promise.withResolvers<void>();
+    const answer = Promise.withResolvers<Response>();
+    intercept = (url) => {
+      if (url !== modelUrl || modelCalls().length !== 1) return null;
+      started.resolve(); return answer.promise;
+    };
+    const firstWork = handleDiscordMention(message(), config());
+    await started.promise;
+    try {
+      assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", authorId: "1560000000000000007" }), config()), "answered");
+      assert.equal(replies().length, 1);
+    } finally {
+      answer.resolve(Response.json({ choices: [{ message: { content: "uhhhh iunno" } }] }));
+    }
+    assert.equal(await firstWork, "answered");
+  });
+  it("refreshes typing during a slow answer and stops it when the answer finishes", { timeout: 12_000 }, async () => {
+    const started = Promise.withResolvers<void>();
+    const refreshed = Promise.withResolvers<void>();
+    const answer = Promise.withResolvers<Response>();
+    intercept = (url) => {
+      if (url.endsWith("/typing") && typingCalls().length === 2) refreshed.resolve();
+      if (url !== modelUrl) return null;
+      started.resolve(); return answer.promise;
+    };
+    const work = handleDiscordMention(message(), config());
+    await started.promise;
+    try {
+      assert.equal(typingCalls().length, 1);
+      assert.equal(new Headers(typingCalls()[0].init?.headers).get("Authorization"), `Bot ${config().token}`);
+      await refreshed.promise;
+      assert.equal(replies().length, 0);
+    } finally {
+      answer.resolve(Response.json({ choices: [{ message: { content: "uhhhh iunno" } }] }));
+    }
+    assert.equal(await work, "answered");
+    assert.ok(typingCalls().every(({ init }) => init?.signal?.aborted));
+  });
+  it("still answers if Discord rejects or fails a typing indicator", async () => {
+    intercept = (url) => url.endsWith("/typing") ? Response.json({}, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    intercept = (url) => { if (url.endsWith("/typing")) throw new Error("Typing unavailable"); return null; };
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "answered");
+    assert.equal(replies().length, 2);
+  });
+  it("enforces daily and monthly quotas before model calls", async () => {
     intercept = (url) => url.includes("/rpc/") ? Response.json("daily_limit") : null;
     assert.equal(await handleDiscordMention(message(), config()), "daily_limit");
     assert.match(JSON.parse(String(replies()[0].init?.body)).content, /daily brain budget/); assert.equal(modelCalls().length, 0);
@@ -119,7 +214,7 @@ describe("sih-inator mention bot", () => {
     assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "failed");
   });
   it("respects Discord rate limits and reuses the nonce when retrying", async () => {
-    intercept = (url, init) => url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "POST" && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
+    intercept = (url, init) => url.endsWith("/messages") && init?.method === "POST" && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 2); assert.equal(replies()[0].init?.body, replies()[1].init?.body);
   });
@@ -162,10 +257,10 @@ describe("sih-inator mention bot", () => {
     assert.equal(JSON.parse(String(modelCalls()[0].init?.body)).messages.length,2);
     assert.equal(modelCalls().length,1);
   });
-  it("enforces lowercase speech while preserving links and code",async()=>{
-    intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I AM OVERLORD BOB. JOIN https://discord.gg/D7TBJNN8Vj OR TRY `someFunction()`"}}]}):null;
+  it("removes punctuation from lowercase speech while preserving literal links email and code",async()=>{
+    intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I'M OVERLORD BOB. LOW-EFFORT, REALLY?! JOIN https://discord.gg/D7TBJNN8Vj OR EMAIL Bob+test@Example.com OR TRY `someFunction()`"}}]}):null;
     assert.equal(await handleDiscordMention(message(),config()),"answered");
-    assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"i am overlord bob. join https://discord.gg/D7TBJNN8Vj or try `someFunction()`");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"im overlord bob low effort really join https://discord.gg/D7TBJNN8Vj or email Bob+test@Example.com or try `someFunction()`");
   });
   it("keeps cross-channel user context when current-channel history fails",async()=>{
     const current = message({id:"1560000000000000100"});
