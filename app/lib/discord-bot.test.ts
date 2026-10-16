@@ -13,6 +13,12 @@ let intercept: ((url: string, init?: RequestInit) => Response | null | Promise<R
 const modelCalls = () => calls.filter(({ url }) => url === modelUrl);
 const replies = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && url.endsWith("/messages") && init?.method === "POST");
 const typingCalls = () => calls.filter(({ url }) => url.endsWith("/typing"));
+const reactions = () => calls.filter(({ url, init }) => url.includes("/reactions/") && init?.method === "PUT");
+function reactionResponse(emoji: string, reply: string | null = null) {
+  return Response.json({ choices: [{ message: { content: null, tool_calls: [{
+    type: "function", function: { name: "react_to_message", arguments: JSON.stringify({ emoji, reply }) },
+  }] } }] });
+}
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -35,6 +41,7 @@ beforeEach(() => {
       seen.add(id); return Response.json("accepted");
     }
     if (url.endsWith("/typing")) return new Response(null, { status: 204 });
+    if (url.includes("/reactions/") && init?.method === "PUT") return new Response(null, { status: 204 });
     if (url.startsWith("https://discord.com/api/v10/channels/")) return init?.method === "POST"
       ? Response.json({ id: "1560000000000000005" }) : Response.json([]);
     if (url.startsWith("https://discord.com/api/v10/guilds/")) return Response.json({messages:[]});
@@ -220,7 +227,7 @@ describe("sih-inator mention bot", () => {
   });
   it("bounds output length and preserves success if delivery tracking fails", async () => {
     intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "x".repeat(3000) } }] }) : null;
-    assert.equal((await generateDiscordBotReply("Test", config().model)).length, 1900);
+    assert.equal((await generateDiscordBotReply("Test", config().model)).text.length, 1900);
     intercept = (url) => url.includes("/discord_bot_requests?") ? Response.json({}, { status: 403 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 1);
@@ -261,6 +268,67 @@ describe("sih-inator mention bot", () => {
     intercept = (url)=>url===modelUrl?Response.json({choices:[{message:{content:"I'M OVERLORD BOB. LOW-EFFORT, REALLY?! JOIN https://discord.gg/D7TBJNN8Vj OR EMAIL Bob+test@Example.com OR TRY `someFunction()`"}}]}):null;
     assert.equal(await handleDiscordMention(message(),config()),"answered");
     assert.equal(JSON.parse(String(replies()[0].init?.body)).content,"im overlord bob low effort really join https://discord.gg/D7TBJNN8Vj or email Bob+test@Example.com or try `someFunction()`");
+  });
+  it("offers one optional reaction tool scoped to the current message", async () => {
+    await handleDiscordMention(message(), config());
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.equal(request.tool_choice, "auto"); assert.equal(request.parallel_tool_calls, false);
+    assert.equal(request.tools.length, 1);
+    const tool = request.tools[0].function;
+    assert.equal(tool.name, "react_to_message"); assert.equal(tool.strict, true);
+    assert.equal(tool.parameters.additionalProperties, false);
+    assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["emoji", "reply"]);
+    assert.ok(tool.parameters.properties.emoji.enum.includes("💀"));
+    assert.match(request.messages[0].content, /why dont you do that im not wasting my precious tokens/);
+  });
+  it("can answer with just a reaction and still releases the processing claim", async () => {
+    intercept = (url) => url === modelUrl ? reactionResponse("💀") : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(reactions().length, 1); assert.equal(replies().length, 0);
+    const reaction = reactions()[0];
+    assert.equal(reaction.url, `https://discord.com/api/v10/channels/${message().channelId}/messages/${message().id}/reactions/${encodeURIComponent("💀")}/@me`);
+    assert.equal(new Headers(reaction.init?.headers).get("Authorization"), `Bot ${config().token}`);
+    const tracking = JSON.parse(String(calls.at(-1)?.init?.body));
+    assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, null);
+    assert.ok(typingCalls().every(({ init }) => init?.signal?.aborted));
+  });
+  it("can add a reaction alongside a short punctuation-free reply", async () => {
+    intercept = (url) => url === modelUrl ? reactionResponse("🙄", "Why don't YOU do that? I'm not wasting my precious tokens!") : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(reactions().length, 1); assert.equal(replies().length, 1);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "why dont you do that im not wasting my precious tokens");
+  });
+  it("does not add duplicate reactions across overlapping listeners", async () => {
+    intercept = (url) => url === modelUrl ? reactionResponse("🫡") : null;
+    const result = await Promise.all([handleDiscordMention(message(), config()), handleDiscordMention(message(), config())]);
+    assert.ok(result.includes("answered")); assert.ok(result.includes("duplicate"));
+    assert.equal(reactions().length, 1); assert.equal(modelCalls().length, 1);
+  });
+  it("falls back to text if Discord rejects or cannot deliver a reaction", async () => {
+    intercept = (url) => url === modelUrl ? reactionResponse("👍")
+      : url.includes("/reactions/") ? Response.json({}, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "uhhhh iunno");
+    intercept = (url) => {
+      if (url === modelUrl) return reactionResponse("👍", "bet");
+      if (url.includes("/reactions/")) throw new Error("Network unavailable");
+      return null;
+    };
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "answered");
+    assert.equal(JSON.parse(String(replies()[1].init?.body)).content, "bet");
+    assert.equal(modelCalls().length, 2);
+  });
+  it("rejects arbitrary emoji paths and malformed or unknown model actions", async () => {
+    for (const [index, result] of [
+      reactionResponse("../../another-message"),
+      Response.json({ choices: [{ message: { tool_calls: [{ type: "function", function: { name: "react_to_message", arguments: "{" } }] } }] }),
+      Response.json({ choices: [{ message: { tool_calls: [{ type: "function", function: { name: "delete_message", arguments: "{}" } }] } }] }),
+    ].entries()) {
+      intercept = (url) => url === modelUrl ? result : null;
+      assert.equal(await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)) }), config()), "failed");
+    }
+    assert.equal(reactions().length, 0);
+    assert.equal(replies().length, 3);
   });
   it("keeps cross-channel user context when current-channel history fails",async()=>{
     const current = message({id:"1560000000000000100"});
