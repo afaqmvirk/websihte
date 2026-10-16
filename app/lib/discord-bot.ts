@@ -9,7 +9,13 @@ const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
-type DiscordBotReply = { text: string; reaction?: string };
+const DELETE_REASONS = {
+  disrespect: "be respectful of one another",
+  harassment: "treat others the way you want to be treated",
+  spam: "repeated spam disrupts other people",
+};
+type DeleteReason = keyof typeof DELETE_REASONS;
+type DiscordBotReply = { text: string; reaction?: string; deleteReason?: DeleteReason };
 
 export function getDiscordBotConfig() {
   const token = process.env.DISCORD_BOT_TOKEN?.trim();
@@ -34,6 +40,7 @@ export type DiscordBotConfig = NonNullable<ReturnType<typeof getDiscordBotConfig
 export type DiscordMention = {
   id: string; guildId: string | null; channelId: string; authorId: string;
   content: string; authorIsBot: boolean; mentionedUserIds: string[];
+  canDelete?: boolean;
 };
 
 export function isDiscordCronAuthorized(request: Request) {
@@ -88,7 +95,7 @@ function formatReply(text: string) {
     .join("").trim();
 }
 
-export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = []): Promise<DiscordBotReply> {
+export async function generateDiscordBotReply(question: string, model: string, history: DiscordConversationMessage[] = [], canDelete = false): Promise<DiscordBotReply> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key) throw new Error("OpenAI authentication is unavailable");
   const response = await fetch(OPENAI_API, {
@@ -109,7 +116,18 @@ export async function generateDiscordBotReply(question: string, model: string, h
             required: ["emoji", "reply"],
           },
         },
-      }],
+      }, ...(canDelete ? [{
+        type: "function",
+        function: {
+          name: "delete_current_message", strict: true,
+          description: "Quietly delete only the current human message mentioning Bob for clear disrespect, targeted harassment, or repeated spam. Ordinary questions, criticism, harmless banter, and urgent requests for personal help must stay. No other message can be targeted.",
+          parameters: {
+            type: "object", additionalProperties: false,
+            properties: { reason: { type: "string", enum: Object.keys(DELETE_REASONS) } },
+            required: ["reason"],
+          },
+        },
+      }] : [])],
       tool_choice: "auto", parallel_tool_calls: false,
       messages: [
         { role: "system", content: `${DISCORD_BOT_SYSTEM_PROMPT}\n\ntoday in ottawa: ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" })}.` },
@@ -127,18 +145,60 @@ export async function generateDiscordBotReply(question: string, model: string, h
   const answer = result.choices?.[0]?.message;
   let content = answer?.content || "";
   let reaction: string | undefined;
+  let deleteReason: DeleteReason | undefined;
   const call = answer?.tool_calls?.[0];
   if (call) {
-    if (call.type !== "function" || call.function?.name !== "react_to_message") throw new Error("Unknown bot action");
-    const args = JSON.parse(call.function.arguments || "null") as { emoji?: unknown; reply?: unknown } | null;
-    if (!args || typeof args.emoji !== "string" || !REACTION_EMOJI.includes(args.emoji)
-      || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot reaction");
-    reaction = args.emoji;
-    content = typeof args.reply === "string" ? args.reply : "";
+    if (call.type !== "function" || !call.function) throw new Error("Unknown bot action");
+    const args = JSON.parse(call.function.arguments || "null") as Record<string, unknown> | null;
+    if (call.function.name === "react_to_message") {
+      if (!args || typeof args.emoji !== "string" || !REACTION_EMOJI.includes(args.emoji)
+        || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot reaction");
+      reaction = args.emoji;
+      content = typeof args.reply === "string" ? args.reply : "";
+    } else if (call.function.name === "delete_current_message" && canDelete) {
+      if (!args || Object.keys(args).length !== 1 || typeof args.reason !== "string"
+        || !Object.hasOwn(DELETE_REASONS, args.reason)) throw new Error("Invalid bot deletion");
+      deleteReason = args.reason as DeleteReason;
+      content = "";
+    } else throw new Error("Unknown bot action");
   }
   const text = formatReply(content).slice(0, 1_900).trimEnd();
-  if (!text && !reaction) throw new Error("OpenAI returned no answer");
-  return { text, reaction };
+  if (!text && !reaction && !deleteReason) throw new Error("OpenAI returned no answer");
+  return { text, reaction, deleteReason };
+}
+
+async function deleteMention(message: DiscordMention, reason: DeleteReason, config: DiscordBotConfig) {
+  if (!message.canDelete) return false;
+  try {
+    const url = `${DISCORD_API}/channels/${message.channelId}/messages/${message.id}`;
+    const current = await fetch(url, {
+      headers: { Authorization: `Bot ${config.token}` },
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000),
+    });
+    if (current.status === 404) {
+      const error = await current.json().catch(() => null) as { code?: number } | null;
+      return error?.code === 10008;
+    }
+    if (!current.ok) return false;
+    const target = await current.json() as { id?: string; content?: string; author?: { id?: string; bot?: boolean } };
+    if (target.id !== message.id || target.author?.id !== message.authorId || target.author.bot
+      || target.content !== message.content) return false;
+    const response = await fetch(url, {
+      method: "DELETE", headers: {
+        Authorization: `Bot ${config.token}`,
+        "X-Audit-Log-Reason": encodeURIComponent(`sih-inator moderation: ${DELETE_REASONS[reason]}`),
+      },
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(5_000),
+    });
+    if (response.ok) return true;
+    if (response.status === 404) {
+      const error = await response.json().catch(() => null) as { code?: number } | null;
+      return error?.code === 10008; // The current message has already been removed.
+    }
+  } catch {
+    // Never claim a deletion succeeded when Discord could not confirm it.
+  }
+  return false;
 }
 
 async function postReaction(message: DiscordMention, emoji: string, config: DiscordBotConfig) {
@@ -234,7 +294,14 @@ async function answerMention(message: DiscordMention, question: string, config: 
     let answer: DiscordBotReply;
     if (!question) answer = { text: "uhhhh iunno" };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
-    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued));
+    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued), message.canDelete === true);
+    if (answer.deleteReason) {
+      if (await deleteMention(message, answer.deleteReason, config)) {
+        await recordReply(message.id, null, config, true);
+        return "answered";
+      }
+      answer = { text: "cant remove that here bro" };
+    }
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
     const text = answer.text || (reacted ? "" : "uhhhh iunno");
     const replyId = text ? await postReply(message, text, config) : null;

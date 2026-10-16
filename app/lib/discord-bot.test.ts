@@ -14,9 +14,15 @@ const modelCalls = () => calls.filter(({ url }) => url === modelUrl);
 const replies = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && url.endsWith("/messages") && init?.method === "POST");
 const typingCalls = () => calls.filter(({ url }) => url.endsWith("/typing"));
 const reactions = () => calls.filter(({ url, init }) => url.includes("/reactions/") && init?.method === "PUT");
+const deletions = () => calls.filter(({ url, init }) => url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "DELETE");
 function reactionResponse(emoji: string, reply: string | null = null) {
   return Response.json({ choices: [{ message: { content: null, tool_calls: [{
     type: "function", function: { name: "react_to_message", arguments: JSON.stringify({ emoji, reply }) },
+  }] } }] });
+}
+function deletionResponse(reason = "spam", extra = {}) {
+  return Response.json({ choices: [{ message: { content: null, tool_calls: [{
+    type: "function", function: { name: "delete_current_message", arguments: JSON.stringify({ reason, ...extra }) },
   }] } }] });
 }
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
@@ -42,6 +48,12 @@ beforeEach(() => {
     }
     if (url.endsWith("/typing")) return new Response(null, { status: 204 });
     if (url.includes("/reactions/") && init?.method === "PUT") return new Response(null, { status: 204 });
+    if (url.startsWith("https://discord.com/api/v10/channels/") && init?.method === "DELETE") return new Response(null, { status: 204 });
+    const targetId = url.match(/\/messages\/(\d{17,20})$/)?.[1];
+    if (url.startsWith("https://discord.com/api/v10/channels/") && targetId) {
+      const target = message({ id: targetId });
+      return Response.json({ id: target.id, content: target.content, author: { id: target.authorId, bot: false } });
+    }
     if (url.startsWith("https://discord.com/api/v10/channels/")) return init?.method === "POST"
       ? Response.json({ id: "1560000000000000005" }) : Response.json([]);
     if (url.startsWith("https://discord.com/api/v10/guilds/")) return Response.json({messages:[]});
@@ -329,6 +341,86 @@ describe("sih-inator mention bot", () => {
     }
     assert.equal(reactions().length, 0);
     assert.equal(replies().length, 3);
+  });
+  it("only offers deletion when the current channel grants Manage Messages", async () => {
+    await handleDiscordMention(message({ canDelete: true }), config());
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "delete_current_message").function;
+    assert.equal(request.tools.length, 2); assert.equal(tool.strict, true);
+    assert.deepEqual(Object.keys(tool.parameters.properties), ["reason"]);
+    assert.deepEqual(tool.parameters.properties.reason.enum, ["disrespect", "harassment", "spam"]);
+    assert.equal(deletions().length, 0);
+  });
+  it("quietly deletes only the current mention and records completion with an audit reason", async () => {
+    intercept = (url) => url === modelUrl ? deletionResponse("harassment") : null;
+    const current = message({ canDelete: true });
+    assert.equal(await handleDiscordMention(current, config()), "answered");
+    assert.equal(deletions().length, 1); assert.equal(replies().length, 0); assert.equal(reactions().length, 0);
+    assert.equal(deletions()[0].url, `https://discord.com/api/v10/channels/${current.channelId}/messages/${current.id}`);
+    const headers = new Headers(deletions()[0].init?.headers);
+    assert.equal(headers.get("Authorization"), `Bot ${config().token}`);
+    assert.match(decodeURIComponent(headers.get("X-Audit-Log-Reason")!), /treat others the way you want to be treated/);
+    const tracking = JSON.parse(String(calls.at(-1)?.init?.body));
+    assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, null);
+  });
+  it("refuses a model deletion without channel permission", async () => {
+    intercept = (url) => url === modelUrl ? deletionResponse() : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    assert.equal(deletions().length, 0);
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.ok(request.tools.every((entry: { function: { name: string } }) => entry.function.name !== "delete_current_message"));
+  });
+  it("rejects unsupported deletion reasons and attempts to target another message", async () => {
+    for (const [index, result] of [
+      deletionResponse("annoying"),
+      deletionResponse("constructor"),
+      deletionResponse("spam", { message_id: "1560000000000000099" }),
+    ].entries()) {
+      intercept = (url) => url === modelUrl ? result : null;
+      assert.equal(await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)), canDelete: true }), config()), "failed");
+    }
+    assert.equal(deletions().length, 0);
+  });
+  it("does not delete twice when listeners overlap", async () => {
+    intercept = (url) => url === modelUrl ? deletionResponse() : null;
+    const current = message({ canDelete: true });
+    const results = await Promise.all([handleDiscordMention(current, config()), handleDiscordMention(current, config())]);
+    assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
+    assert.equal(deletions().length, 1);
+  });
+  it("acknowledges a failed deletion without claiming the message was removed", async () => {
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : init?.method === "DELETE" ? Response.json({}, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message({ canDelete: true }), config()), "answered");
+    assert.equal(deletions().length, 1);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "cant remove that here bro");
+  });
+  it("leaves an edited message alone after the model has made its decision", async () => {
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : /\/messages\/\d+$/.test(url) && init?.method !== "DELETE"
+        ? Response.json({ id: message().id, content: "sorry i take that back", author: { id: message().authorId } }) : null;
+    assert.equal(await handleDiscordMention(message({ canDelete: true }), config()), "answered");
+    assert.equal(deletions().length, 0);
+  });
+  it("does not delete an unreadable message or one belonging to a different author", async () => {
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : /\/messages\/\d+$/.test(url) && init?.method !== "DELETE" ? Response.json({}, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message({ canDelete: true }), config()), "answered");
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : /\/messages\/\d+$/.test(url) && init?.method !== "DELETE"
+        ? Response.json({ id: "1560000000000000006", content: message().content, author: { id: "1560000000000000099" } }) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", canDelete: true }), config()), "answered");
+    assert.equal(deletions().length, 0);
+  });
+  it("treats an already removed message as complete but not an unknown channel", async () => {
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : init?.method === "DELETE" ? Response.json({ code: 10008 }, { status: 404 }) : null;
+    assert.equal(await handleDiscordMention(message({ canDelete: true }), config()), "answered");
+    assert.equal(replies().length, 0);
+    intercept = (url, init) => url === modelUrl ? deletionResponse()
+      : init?.method === "DELETE" ? Response.json({ code: 10003 }, { status: 404 }) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", canDelete: true }), config()), "answered");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "cant remove that here bro");
   });
   it("keeps cross-channel user context when current-channel history fails",async()=>{
     const current = message({id:"1560000000000000100"});
