@@ -141,6 +141,8 @@ consumes provisioned memory even while idle. The quota does not cap hosting usag
 The persona is overlord bob: short lowercase replies without punctuation in speech,
 often just "uhhhh iunno", and brief in-character safety refusals that question the idea.
 Broad or oversized requests get a lazy, adversarial brush-off instead of a full plan.
+Serious topics outside hackathon context get a noncommittal "yeah i guess bro"
+style brush-off; genuine distress or immediate danger still gets a compassionate response.
 For messages that directly mention it, Bob can choose one emoji reaction, a text
 reply, or both. Reaction-only answers count as answered requests. If Discord rejects
 a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
