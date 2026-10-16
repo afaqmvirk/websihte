@@ -36,7 +36,6 @@ const MAIN_TRACKS: Prize[] = [
     title: "stupidest button",
     icon: "button",
     description: "make something cool happen with a useless button",
-    sponsor: { name: "Shopify", src: "/sponsors/shopify.svg", width: 304, height: 87 },
   },
   {
     title: "stupidest API",
@@ -52,9 +51,9 @@ const MAIN_TRACKS: Prize[] = [
 ];
 
 const GENERAL_PRIZES: Prize[] = [
-  { title: "stupidest", icon: "trophy", amount: "$500 cash" },
-  { title: "stupider", icon: "medal", amount: "$250 cash" },
-  { title: "stupid", icon: "ribbon", amount: "$100 cash" },
+  { title: "stupidest", icon: "trophy", amount: "$500" },
+  { title: "stupider", icon: "medal", amount: "$250" },
+  { title: "stupid", icon: "ribbon", amount: "$100" },
 ];
 
 const GOOGLE_CALENDAR_URL =

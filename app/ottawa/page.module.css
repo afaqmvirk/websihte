@@ -484,26 +484,27 @@
 
 .generalPrizeList {
   display: grid;
-  grid-template-columns: repeat(3, minmax(0, 1fr));
+  grid-template-columns: 1fr;
   margin: 0;
 }
 
 .generalPrizeList li {
+  display: grid;
   min-width: 0;
-  border-left: 1px solid rgb(255 255 255 / 0.32);
-  padding: 0 12px;
+  grid-template-columns: minmax(0, 1fr) max-content;
+  grid-template-areas: "icon amount" "title amount";
+  column-gap: 8px;
+  align-items: center;
+  border-top: 1px solid rgb(255 255 255 / 0.32);
+  padding: 12px 0;
 }
 
 .generalPrizeList li:first-child {
-  border-left: 0;
-  padding-left: 0;
-}
-
-.generalPrizeList li:last-child {
-  padding-right: 0;
+  border-top: 0;
 }
 
 .generalPrizeIcon {
+  grid-area: icon;
   display: block;
   width: 23px;
   height: 23px;
@@ -512,17 +513,21 @@
 }
 
 .generalPrizeList h3 {
+  grid-area: title;
   font-size: clamp(17px, 1.35vw, 22px);
   font-weight: 500;
   line-height: 0.95;
 }
 
 .generalPrizeList p {
-  margin: 9px 0 0;
-  font-size: 14px;
+  grid-area: amount;
+  margin: 0;
+  font-size: clamp(64px, 6vw, 80px);
   font-weight: 700;
   letter-spacing: -0.02em;
-  line-height: 1.08;
+  line-height: 0.9;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .sponsors {
@@ -1377,21 +1382,6 @@
 
   .themedPrizeList {
     grid-template-columns: 1fr;
-  }
-
-  .generalPrizeList {
-    grid-template-columns: 1fr;
-  }
-
-  .generalPrizeList li,
-  .generalPrizeList li:first-child,
-  .generalPrizeList li:last-child {
-    border-left: 0;
-    padding: 12px 0;
-  }
-
-  .generalPrizeList li + li {
-    border-top: 1px solid rgb(255 255 255 / 0.32);
   }
 
   .sponsors {
