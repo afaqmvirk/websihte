@@ -4,7 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FocusEvent, type FormEvent } from "react";
 import { APP_READY_GATES, markAppReady } from "@/components/shared/app-ready";
-import { discordInviteUrl } from "@/site";
+import { discordInviteUrl, instagramUrl } from "@/site";
 import { PrizeIcon, type PrizeIconName } from "./prize-icon";
 import styles from "./page.module.css";
 
@@ -636,9 +636,14 @@ export default function OttawaPage() {
               <h2 id="application-title" ref={confirmationHeadingRef} tabIndex={-1}>application received.</h2>
               <p>thanks for applying. we’ll be in touch with an update.</p>
               <p>join our discord to meet the community and get event updates.</p>
-              <a className={styles.discordCta} href={discordInviteUrl} target="_blank" rel="noopener noreferrer">
-                join our discord <span aria-hidden>↗</span>
-              </a>
+              <div className={styles.socialActions}>
+                <a className={styles.socialCta} href={discordInviteUrl} target="_blank" rel="noopener noreferrer">
+                  join our discord <span aria-hidden>↗</span>
+                </a>
+                <a className={styles.socialCta} href={instagramUrl} target="_blank" rel="noopener noreferrer">
+                  follow our instagram <span aria-hidden>↗</span>
+                </a>
+              </div>
               {submissionMessage && <p className={styles.receiptNotice}>{submissionMessage}</p>}
             </div>
           ) : (
