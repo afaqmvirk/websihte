@@ -4,6 +4,7 @@ import Image from "next/image";
 import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FocusEvent, type FormEvent } from "react";
 import { APP_READY_GATES, markAppReady } from "@/components/shared/app-ready";
+import { OTTAWA_FAQ } from "@/lib/ottawa-faq";
 import { discordInviteUrl, instagramUrl } from "@/site";
 import { PrizeIcon, type PrizeIconName } from "./prize-icon";
 import styles from "./page.module.css";
@@ -25,7 +26,7 @@ type Prize = {
   sponsor?: { name: string; src: string; width: number; height: number };
 };
 
-const MAIN_TRACKS: Prize[] = [
+const THEMED_PRIZES: Prize[] = [
   {
     title: "stupidest metric",
     icon: "metric",
@@ -47,6 +48,16 @@ const MAIN_TRACKS: Prize[] = [
     title: "stupidest AI",
     icon: "ai",
     description: "build a stupid AI agent",
+  },
+  {
+    title: "the great bob award",
+    icon: "bob",
+    description: "all hail overlord bob",
+  },
+  {
+    title: "stupidest journey",
+    icon: "journey",
+    description: "get to this hackathon from the furthest distance",
   },
 ];
 
@@ -537,7 +548,7 @@ export default function OttawaPage() {
               <div className={styles.prizeGroups}>
                 <section aria-label="themed prizes">
                   <ol className={styles.themedPrizeList}>
-                    {MAIN_TRACKS.map((prize) => (
+                    {THEMED_PRIZES.map((prize) => (
                       <li key={prize.title} className={prize.sponsor ? styles.sponsoredPrize : undefined}>
                         <PrizeIcon name={prize.icon} className={styles.prizeIcon} />
                         <div>
@@ -613,6 +624,23 @@ export default function OttawaPage() {
                   <Image src="/sponsors/cu-there.png" alt="CU There" width={1010} height={496} className={styles.cuThereLogo} />
                 </a>
               </div>
+            </div>
+          </section>
+
+          <section id="stupid-questions" className={styles.paperCard} aria-labelledby="stupid-questions-title">
+            <h2 id="stupid-questions-title">stupid questions</h2>
+            <div className={styles.faqList}>
+              {OTTAWA_FAQ.map(({ question, answer }) => (
+                <details key={question}>
+                  <summary>
+                    <span>{question}</span>
+                    <svg className={styles.faqIcon} viewBox="0 0 16 16" fill="none" aria-hidden>
+                      <path d="m3 6 5 5 5-5" stroke="currentColor" strokeWidth="1.5" />
+                    </svg>
+                  </summary>
+                  <p>{answer}</p>
+                </details>
+              ))}
             </div>
           </section>
         </div>

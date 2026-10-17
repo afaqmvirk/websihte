@@ -272,6 +272,50 @@
   text-transform: uppercase;
 }
 
+.faqList {
+  margin-top: 28px;
+  border-bottom: 1px solid rgb(0 0 0 / 0.2);
+}
+
+.faqList details {
+  border-top: 1px solid rgb(0 0 0 / 0.2);
+}
+
+.faqList summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 18px 0;
+  font-size: clamp(18px, 1.6vw, 23px);
+  letter-spacing: -0.025em;
+  line-height: 1.2;
+  list-style: none;
+  cursor: pointer;
+}
+
+.faqList summary::-webkit-details-marker {
+  display: none;
+}
+
+.faqIcon {
+  flex: none;
+  width: 16px;
+  height: 16px;
+}
+
+.faqList details[open] .faqIcon {
+  transform: rotate(180deg);
+}
+
+.faqList p {
+  margin: 0;
+  padding: 0 32px 20px 0;
+  font-size: 18px;
+  letter-spacing: -0.015em;
+  line-height: 1.4;
+}
+
 .agendaList,
 .themedPrizeList,
 .generalPrizeList {
@@ -1259,6 +1303,7 @@
 .sponsorCard:focus-visible,
 .applicationContact a:focus-visible,
 .socialCta:focus-visible,
+.faqList summary:focus-visible,
 .submitRow button:focus-visible,
 .confirmation a:focus-visible,
 .footer a:focus-visible {
