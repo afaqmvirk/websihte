@@ -26,6 +26,13 @@ const ICONS = {
       <path d="m3 6 5 4 4-6 4 6 5-4-2 12H5L3 6ZM6 21h12" />
     </>
   ),
+  journey: (
+    <>
+      <circle cx="12" cy="12" r="9" />
+      <ellipse cx="12" cy="12" rx="4" ry="9" />
+      <path d="M3 12h18" />
+    </>
+  ),
   trophy: (
     <>
       <path d="M7 3h10v5a5 5 0 0 1-10 0V3ZM7 5H3v3a4 4 0 0 0 4 4M17 5h4v3a4 4 0 0 1-4 4M12 13v5M8 21v-3h8v3M6 21h12" />
