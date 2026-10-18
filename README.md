@@ -121,7 +121,9 @@ reply in the same channel and ends after at most six replies in that chain,
 including the first human-triggered reply. Human messages can start a new exchange.
 It requests Guilds, GuildMessages, and MessageContent Gateway intents. Enable each application's
 Message Content setting in Discord so name triggers and REST history receive unmentioned messages;
-Server Members and Presence can stay disabled. History is fetched only after an
+Enable Bob's Server Members setting for directory listings; Rick and Krab can
+leave it disabled. Presence can stay disabled for all three. The Gateway still
+does not request member events or cache the directory. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
 Create a Discord application named `sih-inator`, copy its application ID, generate
@@ -211,6 +213,19 @@ tag Krab, whose money-only reply ends the exchange without tagging anyone. Names
 in plain model output do not cause notifications. Bob and Rick see their own prior
 messages as assistant history and the other overlords as separate speakers. Bot-to-bot replies
 use current-channel history only and cannot call image generation or moderation.
+
+Bob also has `search_server_members` on human-triggered replies. A username or
+server-nickname prefix searches the current server; an empty query lists a page,
+with `next_after` available for pagination. Each page has at most 20 members and
+each reply permits at most two lookups before a final answer or action. The model
+receives only IDs, usernames, display names, nicknames, and bot flags. Results are
+not stored or cached. Search is read-only; only `mention_users` can ping up to
+three IDs from the original targets or lookup results. Ambiguous matches should
+prompt a clarification. Failed lookups return no IDs and cannot authorize a ping.
+The directory tool is not available to Rick, Krab, or bot-to-bot replies. Discord
+requires Bob's Server Members application setting for the listing endpoint; no
+new Gateway intent is requested. See the official
+[Discord member API](https://docs.discord.com/developers/resources/guild#list-guild-members).
 
 The `generate_image` tool produces one draft only when the current human asks for
 an image. It calls the OpenAI Images API directly with `gpt-image-2.5-flare`, fixed

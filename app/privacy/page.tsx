@@ -143,6 +143,11 @@ export default function PrivacyPolicyPage() {
               other participants&apos; messages and the overlords&apos; replies.
               Bob and Rick can tag each other or Krab for a short conversation in that channel,
               and can tag you or people mentioned in the current exchange.
+              Bob can also search or list small pages of members in this server
+              to identify someone to tag. Each lookup includes at most 20 members,
+              with up to two lookups per reply. We send only their Discord IDs,
+              usernames, display names, server nicknames, and bot status to OpenAI
+              for that reply. We do not store or cache these directory results.
               If you ask for an image, we also send a short image description to
               OpenAI and post the generated image back to Discord. Images are not
               saved in our website database.
