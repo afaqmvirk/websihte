@@ -228,7 +228,7 @@ until the following month. Never commit bot tokens, cron secrets, or API keys.
 
 Run `bun test app/lib/discord-bot.test.ts` for bot checks and
 `bun test app/api/applications/route.test.ts` for the application flow.
-Apply `20261018035856_add_overlord_rick_and_image_tools.sql` before deploying these
+Apply `20261018040823_add_overlord_rick_and_image_tools.sql` before deploying these
 changes. `supabase/tests/discord-overlords.sql` checks the database claims and
 limits inside a transaction that rolls back its synthetic records. During a
 deployment, an existing ten-minute listener keeps its old configuration until
