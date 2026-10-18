@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
-          <time dateTime="2026-10-15">October 15, 2026</time>
+          <time dateTime="2026-10-18">October 18, 2026</time>
         </p>
       </header>
 
