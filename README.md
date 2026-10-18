@@ -113,7 +113,7 @@ Server Members and Presence can stay disabled. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
 Create a Discord application named `sih-inator`, copy its application ID, generate
-its bot token, and install it with View Channels, Add Reactions, Send Messages, Send Messages in
+its bot token, and install it with View Channels, Add Reactions, Embed Links, Send Messages, Send Messages in
 Threads, and Read Message History permissions. To enable moderation, grant Manage
 Messages in the channels where Bob should be able to delete messages. Set `DISCORD_BOT_TOKEN`,
 `DISCORD_APPLICATION_ID`, `OPENAI_API_KEY`, and a random `CRON_SECRET` of at least
@@ -150,6 +150,11 @@ same unimpressed response, based on the conversation rather than specific keywor
 For messages that directly mention it, Bob can choose one emoji reaction, a text
 reply, or both. Reaction-only answers count as answered requests. If Discord rejects
 a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
+Bob can also use `send_gif` to reply with one of eight verified reaction GIFs,
+alone or with a short caption. GIF links stay intact on their own line so Discord
+can embed them; allow Embed Links in the channels where Bob should display GIFs.
+The collection is fixed and needs no GIF API key or web search. GIFs use the same
+reply delivery, duplicate protection, queue, and quotas as text.
 The server rules are "be respectful of one another" and "treat others the way you
 want to be treated". With Manage Messages permission, Bob can quietly delete the
 current message mentioning him for clear disrespect, targeted harassment, or repeated

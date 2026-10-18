@@ -9,6 +9,17 @@ const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
+// Fixed, verified GIFs keep the model from inventing media URLs.
+const REACTION_GIFS = {
+  confused: "https://media.giphy.com/media/3o7aTskHEUdgCQAXde/giphy.gif",
+  applause: "https://media.giphy.com/media/5hHOBKJ8lw9OM/giphy.gif",
+  facepalm: "https://media.giphy.com/media/TJawtKM6OCKkvwCIqX/giphy.gif",
+  popcorn: "https://media.giphy.com/media/pUeXcg80cO8I8/giphy.gif",
+  shrug: "https://media.giphy.com/media/G5X63GrrLjjVK/giphy.gif",
+  hello: "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif",
+  thumbs_up: "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif",
+  typing_cat: "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif",
+};
 const DELETE_REASONS = {
   disrespect: "be respectful of one another",
   harassment: "treat others the way you want to be treated",
@@ -116,6 +127,20 @@ export async function generateDiscordBotReply(question: string, model: string, h
             required: ["emoji", "reply"],
           },
         },
+      }, {
+        type: "function",
+        function: {
+          name: "send_gif", strict: true,
+          description: "Send one reaction GIF as a reply to the current message, optionally with a short caption. Choose a fitting GIF for a GIF request, joke, banter, or acknowledgment. The server supplies the real GIF URL; do not invent one.",
+          parameters: {
+            type: "object", additionalProperties: false,
+            properties: {
+              gif: { type: "string", enum: Object.keys(REACTION_GIFS) },
+              reply: { type: ["string", "null"], description: "Optional short caption in Bob's voice, or null if the GIF is enough." },
+            },
+            required: ["gif", "reply"],
+          },
+        },
       }, ...(canDelete ? [{
         type: "function",
         function: {
@@ -145,6 +170,7 @@ export async function generateDiscordBotReply(question: string, model: string, h
   const answer = result.choices?.[0]?.message;
   let content = answer?.content || "";
   let reaction: string | undefined;
+  let gifUrl: string | undefined;
   let deleteReason: DeleteReason | undefined;
   const call = answer?.tool_calls?.[0];
   if (call) {
@@ -155,6 +181,12 @@ export async function generateDiscordBotReply(question: string, model: string, h
         || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot reaction");
       reaction = args.emoji;
       content = typeof args.reply === "string" ? args.reply : "";
+    } else if (call.function.name === "send_gif") {
+      if (!args || Object.keys(args).length !== 2 || typeof args.gif !== "string"
+        || !Object.hasOwn(REACTION_GIFS, args.gif)
+        || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot GIF");
+      gifUrl = REACTION_GIFS[args.gif as keyof typeof REACTION_GIFS];
+      content = typeof args.reply === "string" ? args.reply : "";
     } else if (call.function.name === "delete_current_message" && canDelete) {
       if (!args || Object.keys(args).length !== 1 || typeof args.reason !== "string"
         || !Object.hasOwn(DELETE_REASONS, args.reason)) throw new Error("Invalid bot deletion");
@@ -162,7 +194,9 @@ export async function generateDiscordBotReply(question: string, model: string, h
       content = "";
     } else throw new Error("Unknown bot action");
   }
-  const text = formatReply(content).slice(0, 1_900).trimEnd();
+  let text = formatReply(content).slice(0, 1_900 - (gifUrl ? gifUrl.length + 1 : 0)).trimEnd();
+  // Leave the full URL on its own line so Discord can display the animated GIF.
+  if (gifUrl) text = text ? `${text}\n${gifUrl}` : gifUrl;
   if (!text && !reaction && !deleteReason) throw new Error("OpenAI returned no answer");
   return { text, reaction, deleteReason };
 }
