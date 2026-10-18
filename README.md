@@ -100,13 +100,17 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
-## sih-inator Discord bot
+## Overlord Bob and Overlord Rick Discord bots
 
-The mention bot runs on this site's Vercel Pro project. The protected cron route
+The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
-suppress duplicate model calls and replies across instances. The bot responds
-only to direct user mentions in `DISCORD_GUILD_ID`, ignoring bots and global pings.
+suppress duplicate model calls and replies across instances, separately for each
+bot. Both respond to direct mentions in `DISCORD_GUILD_ID`. They also respond to
+mentions from the other configured overlord, while ignoring themselves, unrelated
+bots, webhooks, and global pings. A bot conversation must continue a database-tracked
+reply in the same channel and ends after at most six replies in that chain,
+including the first human-triggered reply. Human messages can start a new exchange.
 It requests only Guilds and GuildMessages Gateway intents. Enable the application's
 Message Content setting in Discord so REST history includes unmentioned messages;
 Server Members and Presence can stay disabled. History is fetched only after an
@@ -122,13 +126,23 @@ Messages in the channels where Bob should be able to delete messages. Set `DISCO
 No interactions endpoint is needed. Start the first listener with an authenticated
 GET to the cron route; later listeners are started by Vercel automatically.
 
+Create and install a second Discord application named `overlord rick`. Enable its
+Message Content setting, and give it the same messaging permissions plus Attach
+Files for images. Set `DISCORD_RICK_BOT_TOKEN`, `DISCORD_RICK_APPLICATION_ID`, and
+`DISCORD_RICK_ENABLED=true`. Bob's existing environment variables are unchanged;
+Rick needs his own token and application ID. Each bot can run independently, and
+the gateway route reports the personas it starts. Configuring the same account
+for both personas disables Rick rather than running two identities on one token.
+Grant Bob Attach Files too if he should generate images.
+
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
 tokens. Defaults allow 10,000 requests per UTC day, 310,000 per UTC month, and one
-per person every two seconds. Follow-ups wait in order until the previous reply
+per person per bot every two seconds. Daily and monthly allowances are shared
+across Bob and Rick. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
 claim keeps overlapping listeners from answering the same person out of order;
-stale processing claims stop blocking new work after two minutes. Discord's typing
+stale processing claims stop blocking new work after three minutes. Discord's typing
 indicator is refreshed while a message waits for admission or its answer is prepared.
 The queue lives in the active listener, so a process crash can still lose waiting
 messages. The monthly count is atomic across instances and
@@ -159,6 +173,30 @@ alone or with a short caption. GIF links stay intact on their own line so Discor
 can embed them; allow Embed Links in the channels where Bob should display GIFs.
 The collection is fixed and needs no GIF API key or web search. GIFs use the same
 reply delivery, duplicate protection, queue, and quotas as text.
+Rick shares Bob's writing rules, event facts, and tools, but his harmless banter
+confidently misunderstands simple things and proposes spectacularly stupid ideas.
+His persona does not change real event facts or the moderation and safety rules.
+
+Both bots can call `mention_users` to tag the other overlord, the current speaker,
+or people tagged in the current message (up to three targets per reply). The tool
+supplies the real Discord IDs; arbitrary IDs, roles, and mass mentions are rejected.
+Only deliberate tool-selected targets are allowed to ping. Names in plain model
+output do not cause notifications. Each bot sees its own prior messages as its
+assistant history and the other overlord as a separate speaker. Bot-to-bot replies
+use current-channel history only and cannot call image generation or moderation.
+
+The `generate_image` tool produces one draft only when the current human asks for
+an image. It calls the OpenAI Images API directly with `gpt-image-2.5-flare`, fixed
+`quality: low`, `1024x1024`, and compressed JPEG output, then uploads the bytes to
+Discord as an attachment. There is no new SDK, image host, or persistent image
+storage. Prompts are limited to 800 characters and attachments to 4 MB. The shared
+allowance defaults to 25 images per UTC day, with one image attempt per human per
+minute across both bots. Provider failures count conservatively; generation is
+not retried automatically. Set `DISCORD_BOT_IMAGE_DAILY_LIMIT` to 1–100 or set
+`DISCORD_BOT_IMAGES_ENABLED=false` to disable the tool. These image limits are
+separate from the text request allowance and are not a provider billing cap.
+Image requests keep the provider's standard moderation. See the official
+[OpenAI image generation documentation](https://developers.openai.com/api/docs/guides/image-generation).
 The server rules are "be respectful of one another" and "treat others the way you
 want to be treated". With Manage Messages permission, Bob can quietly delete the
 current message mentioning him for clear disrespect, targeted harassment, or repeated
@@ -177,18 +215,24 @@ are included once. Messages are ordered oldest to newest, the final question is
 the main request, and the prompt favours recent relevant messages over old ones.
 Other-channel messages are labelled as background. Each history message is clipped
 to 512 UTF-8 bytes; the complete context has a 48,000-byte ceiling including speaker
-labels. Other bots, webhooks, application notifications, attachments, and other
+labels. Unrelated bots, webhooks, application notifications, attachments, and other
 authors' messages from other channels are excluded. If one history source fails,
 the other still works; if both fail, the bot answers the current question alone.
 Message text is not saved to the site database or logged.
 The private quota table stores message,
-server, and user IDs, timestamps, delivery status, and reply IDs. Metadata older
+server, channel, and user IDs, bot identity, conversation depth, image-attempt
+timestamps, delivery status, and reply IDs. Metadata older
 than two days is pruned on the next request; prompt and answer text are not stored
 in the site database. A server-level monthly request count is retained separately
 until the following month. Never commit bot tokens, cron secrets, or API keys.
 
 Run `bun test app/lib/discord-bot.test.ts` for bot checks and
 `bun test app/api/applications/route.test.ts` for the application flow.
+Apply `20261018035856_add_overlord_rick_and_image_tools.sql` before deploying these
+changes. `supabase/tests/discord-overlords.sql` checks the database claims and
+limits inside a transaction that rolls back its synthetic records. During a
+deployment, an existing ten-minute listener keeps its old configuration until
+handover; wait for it to expire before testing the newly enabled personas.
 
 ## Getting Started
 

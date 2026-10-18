@@ -77,4 +77,16 @@ describe("bounded Discord conversation context",()=>{
     assert.deepEqual(selectDiscordConversation(null,null,current,botId,now),[]);
     assert.deepEqual(selectDiscordConversation([null,{},entry(1,{content:null})],[],current,botId,now),[]);
   });
+  it("keeps Bob and Rick distinct and excludes unrelated bots",()=>{
+    const rickId = "1560000000000000088";
+    const history = selectDiscordConversation([
+      entry(1,{author:{id:botId,bot:true},content:`hello <@${rickId}>`}),
+      entry(2,{author:{id:rickId,bot:true},content:`hi <@${botId}>`}),
+      entry(3,{author:{id:otherId,bot:true},content:"unrelated bot"}),
+    ],[],current,rickId,now,{persona:"rick",peers:[{applicationId:botId,persona:"bob",name:"overlord bob"}]});
+    assert.deepEqual(history,[
+      {role:"user",name:"overlord_bob",content:"hello overlord rick"},
+      {role:"assistant",name:"overlord_rick",content:"hi overlord bob"},
+    ]);
+  });
 });

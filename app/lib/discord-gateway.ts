@@ -15,16 +15,22 @@ export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 6
   });
   client.on(Events.Error, () => console.error("Discord Gateway connection error"));
   client.on(Events.MessageCreate, (message) => {
-    if (!message.inGuild() || message.author.bot || message.guildId !== config.guildId
+    if (!message.inGuild() || message.webhookId || message.author.id === config.applicationId
+      || (message.author.bot && !config.peers.some((peer) => peer.applicationId === message.author.id))
+      || message.guildId !== config.guildId
       || !message.mentions.users.has(config.applicationId)) return;
     const work = handleDiscordMention({
       id: message.id, guildId: message.guildId, channelId: message.channelId,
       authorId: message.author.id, content: message.content, authorIsBot: message.author.bot,
       mentionedUserIds: [...message.mentions.users.keys()],
+      mentionedUsers: [...message.mentions.users.values()].map((user) => ({ id: user.id, name: user.globalName || user.username })),
+      authorName: message.author.globalName || message.author.username,
+      authorIsWebhook: !!message.webhookId, referencedMessageId: message.reference?.messageId,
       canDelete: message.channel.permissionsFor(message.client.user)?.has(PermissionFlagsBits.ManageMessages) ?? false,
     }, config);
     pending.add(work);
-    void work.finally(() => pending.delete(work));
+    void work.catch(() => console.error("Discord bot mention failed", { bot: config.persona }))
+      .finally(() => pending.delete(work));
   });
   let timer: ReturnType<typeof setTimeout> | undefined;
   try {
