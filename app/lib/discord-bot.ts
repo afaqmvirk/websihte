@@ -39,7 +39,7 @@ type DeleteReason = keyof typeof DELETE_REASONS;
 type DiscordMentionTarget = { id: string; name: string };
 type DiscordBotReply = {
   text: string; reaction?: string; deleteReason?: DeleteReason;
-  mentionUserIds?: string[]; imagePrompt?: string; skipped?: boolean;
+  mentionUserIds?: string[]; imagePrompt?: string; gifUrl?: string; skipped?: boolean;
 };
 
 function botIdentity(persona: DiscordBotPersona) {
@@ -367,7 +367,7 @@ optional unpinged name mention:
   // Leave the full URL on its own line so Discord can display the animated GIF.
   if (gifUrl) text = text ? `${text}\n${gifUrl}` : gifUrl;
   if (!text && !reaction && !deleteReason && !imagePrompt) throw new Error("OpenAI returned no answer");
-  return { text, reaction, deleteReason, mentionUserIds, imagePrompt };
+  return { text, reaction, deleteReason, mentionUserIds, imagePrompt, gifUrl };
 }
 
 async function deleteMention(message: DiscordMention, reason: DeleteReason, config: DiscordBotConfig) {
@@ -459,9 +459,14 @@ async function postReply(
 
 async function postAnswer(
   message: DiscordMention, content: string, config: DiscordBotConfig,
-  options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage },
+  options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage; gifUrl?: string },
 ) {
   const parts = config.persona === "bob" ? splitDiscordReply(content) : (content ? [content] : []);
+  // The message cap may trim a very long caption; never drop its selected GIF.
+  if (options.gifUrl && !parts.at(-1)?.endsWith(options.gifUrl)) {
+    if (parts.length === MAX_DISCORD_REPLY_MESSAGES) parts[parts.length - 1] = options.gifUrl;
+    else parts.push(options.gifUrl);
+  }
   if (!parts.length && options.image) parts.push("");
   let replyId: string | null = null;
   for (const [part, text] of parts.entries()) {
@@ -609,7 +614,7 @@ async function answerMention(
     await pauseBeforeReply();
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
     const text = answer.text || (reacted || image ? "" : "uhhhh iunno");
-    const { replyId, complete } = await postAnswer(message, text, config, { image, mentionUserIds: answer.mentionUserIds });
+    const { replyId, complete } = await postAnswer(message, text, config, { image, mentionUserIds: answer.mentionUserIds, gifUrl: answer.gifUrl });
     const answered = complete && (!!replyId || reacted);
     await recordReply(message.id, replyId, config, answered);
     return answered ? "answered" : "failed";

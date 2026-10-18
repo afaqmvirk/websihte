@@ -903,6 +903,15 @@ describe("sih-inator mention bot", () => {
     assert.equal(replies().length, 6);
     assert.ok(replies().every(({ init }) => !JSON.parse(String(init?.body)).content.includes("https://")));
   });
+  it("preserves the selected GIF when a caption would exceed the message cap", async () => {
+    intercept = (url) => url === modelUrl ? gifResponse("hello", "short line\n".repeat(4) + "x".repeat(12_000)) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)).content as string);
+    assert.equal(parts.length, 5);
+    assert.ok(parts.every((part) => part.length <= 1_900));
+    assert.equal(parts[4], "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif");
+    assert.equal(parts.filter((part) => part.includes("https://")).length, 1);
+  });
   it("does not send duplicate GIFs across overlapping listeners and retries with the same nonce", async () => {
     intercept = (url) => url === modelUrl ? gifResponse("thumbs_up")
       : url.endsWith("/messages") && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
