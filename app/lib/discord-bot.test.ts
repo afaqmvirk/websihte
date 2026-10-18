@@ -42,6 +42,11 @@ function actionResponse(name: string, args: Record<string, unknown>) {
     type: "function", function: { name, arguments: JSON.stringify(args) },
   }] } }] });
 }
+function memberSearchResponse(args: unknown = { query: "ali", after: null }, id: unknown = "call_member_search") {
+  return Response.json({ choices: [{ message: { content: null, tool_calls: [{
+    id, type: "function", function: { name: "search_server_members", arguments: JSON.stringify(args) },
+  }] } }] });
+}
 function enableRick() {
   Object.assign(process.env, { DISCORD_RICK_ENABLED: "true", DISCORD_RICK_BOT_TOKEN: "synthetic-rick-token".repeat(4), DISCORD_RICK_APPLICATION_ID: rickId });
   const rick = getDiscordBotConfig("rick"); assert.ok(rick); return rick;
@@ -357,6 +362,131 @@ describe("sih-inator mention bot", () => {
     assert.equal(await handleDiscordMention(message({ authorId: rickId, authorIsBot: true, referencedMessageId: "1560000000000000000" }), config()), "conversation_limit");
     assert.equal(modelCalls().length, 0); assert.equal(replies().length, 0); assert.equal(typingCalls().length, 0);
   });
+  it("looks up a server member, passes the tool result back, and permits only the discovered ping", async () => {
+    const foundId = "1560000000000000090";
+    let turn = 0;
+    intercept = (url) => url === modelUrl
+      ? ++turn === 1 ? memberSearchResponse() : actionResponse("mention_users", { user_ids: [foundId], reply: "ALI. Soup?!" })
+      : url.includes("/members/search?") ? Response.json([{ user: { id: foundId, username: "alice", global_name: "Alice", email: "private@example.test" }, nick: "Ali", roles: ["private"] }]) : null;
+    const current = message({ content: `<@${botId}> ping ali` });
+    assert.equal(await handleDiscordMention(current, config()), "answered");
+    assert.equal(modelCalls().length, 2); assert.equal(replies().length, 1);
+    assert.equal(calls.filter(({ url }) => url.endsWith("/rpc/claim_discord_overlord_request")).length, 1);
+    const followup = JSON.parse(String(modelCalls()[1].init?.body));
+    assert.equal(followup.messages.at(-2).role, "assistant");
+    assert.equal(followup.messages.at(-2).tool_calls[0].id, "call_member_search");
+    assert.equal(followup.messages.at(-1).role, "tool");
+    assert.equal(followup.messages.at(-1).tool_call_id, "call_member_search");
+    const result = JSON.parse(followup.messages.at(-1).content);
+    assert.deepEqual(result.members, [{ id: foundId, username: "alice", displayName: "Alice", nickname: "Ali", bot: false }]);
+    const mentionTool = followup.tools.find((entry: { function: { name: string } }) => entry.function.name === "mention_users").function;
+    assert.ok(mentionTool.parameters.properties.user_ids.items.enum.includes(foundId));
+    const reply = JSON.parse(String(replies()[0].init?.body));
+    assert.equal(reply.content, `<@${foundId}> ali soup`);
+    assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false, users: [foundId] });
+    assert.equal(await handleDiscordMention(current, config()), "duplicate");
+    assert.equal(modelCalls().length, 2);
+  });
+  it("supports two directory pages before a final action without an unbounded model loop", async () => {
+    const firstId = "1560000000000000100", lastId = "1560000000000000119", nextId = "1560000000000000120";
+    let turn = 0;
+    intercept = (url) => {
+      if (url === modelUrl) {
+        turn++;
+        if (turn === 1) return memberSearchResponse({ query: "", after: null }, "call_page_one");
+        if (turn === 2) return memberSearchResponse({ query: "", after: lastId }, "call_page_two");
+        return actionResponse("mention_users", { user_ids: [firstId, nextId], reply: "hello" });
+      }
+      if (url.includes("/members?")) return Response.json(new URL(url).searchParams.has("after")
+        ? [{ user: { id: nextId, username: "next_member" } }]
+        : Array.from({ length: 20 }, (_, index) => ({ user: { id: String(BigInt(firstId) + BigInt(index)), username: `member${index}` } })));
+      return null;
+    };
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(modelCalls().length, 3); assert.equal(replies().length, 1);
+    const lastRequest = JSON.parse(String(modelCalls()[2].init?.body));
+    assert.ok(!lastRequest.tools.some((entry: { function: { name: string } }) => entry.function.name === "search_server_members"));
+    assert.deepEqual(lastRequest.messages.slice(-4).map((item: { role: string }) => item.role), ["assistant", "tool", "assistant", "tool"]);
+    assert.equal(calls.filter(({ url }) => url.includes("/members?")).length, 2);
+    const reply = JSON.parse(String(replies()[0].init?.body));
+    assert.deepEqual(reply.allowed_mentions.users, [firstId, nextId]);
+  });
+  it("rejects a third lookup even if the model calls a tool no longer offered", async () => {
+    let turn = 0;
+    intercept = (url) => url === modelUrl ? memberSearchResponse({ query: "ali", after: null }, `call_${++turn}`)
+      : url.includes("/members/search?") ? Response.json([]) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    assert.equal(modelCalls().length, 3);
+    assert.equal(calls.filter(({ url }) => url.includes("/members/search?")).length, 2);
+  });
+  it("rejects malformed lookup arguments or missing call IDs before reading the directory", async () => {
+    let lookupCalls = 0;
+    for (const [args, id] of [
+      [{ query: "ali", after: null, guild_id: "1560000000000000099" }, "call_valid"],
+      [{ query: "ali" }, "call_valid"], [{ query: null, after: null }, "call_valid"],
+      [{ query: "ali", after: "1560000000000000099" }, "call_valid"],
+      [{ query: "x".repeat(101), after: null }, "call_valid"],
+      [{ query: "ali", after: null }, undefined], [{ query: "ali", after: null }, "bad\ncall"],
+    ]) {
+      intercept = (url) => url === modelUrl ? id === undefined
+        ? Response.json({ choices: [{ message: { tool_calls: [{ type: "function", function: { name: "search_server_members", arguments: JSON.stringify(args) } }] } }] })
+        : memberSearchResponse(args, id) : null;
+      await assert.rejects(generateDiscordBotReply("find ali", config().model, [], false, { memberLookup: async () => {
+        lookupCalls++; return { members: [], next_after: null, truncated: false };
+      } }));
+    }
+    assert.equal(lookupCalls, 0);
+    assert.equal(calls.filter(({ url }) => url.includes("/members")).length, 0);
+  });
+  it("keeps distinct name matches and sends no ping when asking which person is meant", async () => {
+    let turn = 0;
+    intercept = (url) => url === modelUrl ? ++turn === 1 ? memberSearchResponse()
+      : Response.json({ choices: [{ message: { content: "which alice do you mean" } }] })
+      : url.includes("/members/search?") ? Response.json([
+        { user: { id: "1560000000000000090", username: "alice_one", global_name: "Alice" } },
+        { user: { id: "1560000000000000091", username: "alice_two", global_name: "Alice" } },
+      ]) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const request = JSON.parse(String(modelCalls()[1].init?.body));
+    assert.equal(JSON.parse(request.messages.at(-1).content).members.length, 2);
+    assert.match(request.messages[0].content, /ask which person is meant before pinging anyone/);
+    const reply = JSON.parse(String(replies()[0].init?.body));
+    assert.equal(reply.content, "which alice do you mean");
+    assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("handles a failed directory lookup without adding unverified IDs", async () => {
+    let turn = 0;
+    intercept = (url) => url === modelUrl ? ++turn === 1 ? memberSearchResponse()
+      : Response.json({ choices: [{ message: { content: "can you tag them directly" } }] })
+      : url.includes("/members/search?") ? Response.json({ secret: "do not expose" }, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const request = JSON.parse(String(modelCalls()[1].init?.body));
+    const result = JSON.parse(request.messages.at(-1).content);
+    assert.ok(result.error); assert.deepEqual(result.members, []); assert.doesNotMatch(JSON.stringify(result), /do not expose/);
+    const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "mention_users").function;
+    assert.deepEqual(tool.parameters.properties.user_ids.items.enum, [message().authorId]);
+    assert.deepEqual(JSON.parse(String(replies()[0].init?.body)).allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("keeps the member directory unavailable to Rick and bot-to-bot requests", async () => {
+    const rick = enableRick();
+    await handleDiscordMention(message({ content: `<@${rickId}> find alice`, mentionedUserIds: [rickId] }), rick);
+    await handleDiscordMention(message({ id: "1560000000000000009", authorId: rickId, authorIsBot: true, referencedMessageId: "1560000000000000000" }), config());
+    for (const call of modelCalls()) {
+      const request = JSON.parse(String(call.init?.body));
+      assert.ok(!request.tools.some((entry: { function: { name: string } }) => entry.function.name === "search_server_members"));
+    }
+    assert.equal(calls.filter(({ url }) => url.includes("/members")).length, 0);
+  });
+  it("rejects fabricated or excessive ping targets after a successful lookup", async () => {
+    for (const [index, userIds] of [["1560000000000000099"], ["1560000000000000090", "1560000000000000091", "1560000000000000092", "1560000000000000093"]].entries()) {
+      let turn = 0;
+      intercept = (url) => url === modelUrl ? ++turn === 1 ? memberSearchResponse()
+        : actionResponse("mention_users", { user_ids: userIds, reply: "hello" })
+        : url.includes("/members/search?") ? Response.json(Array.from({ length: 4 }, (_, number) => ({ user: { id: String(1560000000000000090n + BigInt(number)), username: `alice${number}` } }))) : null;
+      assert.equal(await handleDiscordMention(message({ id: String(1560000000000000010n + BigInt(index)) }), config()), "failed");
+      assert.deepEqual(JSON.parse(String(replies().at(-1)?.init?.body)).allowed_mentions, { parse: [], replied_user: false });
+    }
+  });
   it("tags only explicit known targets and preserves Discord mention syntax", async () => {
     enableRick();
     intercept = (url) => url === modelUrl ? actionResponse("mention_users", { user_ids: [rickId, message().authorId], reply: "RICK. Explain Soup?!" }) : null;
@@ -633,7 +763,7 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message(), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     assert.equal(request.tool_choice, "auto"); assert.equal(request.parallel_tool_calls, false);
-    assert.equal(request.tools.length, 4);
+    assert.equal(request.tools.length, 5);
     const tool = request.tools[0].function;
     assert.equal(tool.name, "react_to_message"); assert.equal(tool.strict, true);
     assert.equal(tool.parameters.additionalProperties, false);
@@ -751,7 +881,7 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message({ canDelete: true }), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "delete_current_message").function;
-    assert.equal(request.tools.length, 5); assert.equal(tool.strict, true);
+    assert.equal(request.tools.length, 6); assert.equal(tool.strict, true);
     assert.deepEqual(Object.keys(tool.parameters.properties), ["reason"]);
     assert.deepEqual(tool.parameters.properties.reason.enum, ["disrespect", "harassment", "spam"]);
     assert.equal(deletions().length, 0);
