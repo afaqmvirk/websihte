@@ -123,12 +123,23 @@ export default function PrivacyPolicyPage() {
               private organizer channel on Discord to notify the team of new applications.
             </p>
 
-            <h3>when you mention our Discord bots</h3>
+            <h3>when you interact with our Discord bots</h3>
             <p>
-              If you mention sih-inator (overlord bob) or overlord rick, we send your question and
+              If you tag sih-inator (overlord bob) or overlord rick, we send your question and
               up to 25 recent messages from the same Discord channel or thread,
               plus up to 10 earlier messages from you across server channels the
-              bot can access, to OpenAI to generate a reply. This can include
+              bot can access, to OpenAI to generate a reply.
+            </p>
+            <p>
+              The bots also check messages in server channels they can access for
+              the standalone, case-sensitive names bob or spongebob, and rick or patrick.
+              When one appears, we may send that message and up to 25 recent messages
+              from the same channel or thread to OpenAI to decide whether it clearly
+              refers to the bot and whether to reply. The bot can stay silent. These
+              name checks do not include your messages from other channels.
+            </p>
+            <p>
+              This context can include
               other participants&apos; messages and both bots&apos; replies.
               The bots can tag each other for a short conversation in that channel,
               and can tag you or people mentioned in the current exchange.

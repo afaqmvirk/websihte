@@ -106,13 +106,21 @@ The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. Both respond to direct mentions in `DISCORD_GUILD_ID`. They also respond to
+bot. Both respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
+also invite Bob with the standalone, case-sensitive words `bob` or `spongebob`,
+and Rick with `rick` or `patrick`. The model uses current-channel context to
+decide whether the name clearly refers to this bot; it can silently skip passing
+mentions, cartoons, other people, uncertain references, or messages where it has
+nothing worth adding. These optional checks use the normal request claims and
+quotas, including decisions to stay silent. Skips complete the claim without a
+reply ID, typing indicator, reaction, or error/quota notice. Unpinged chat cannot
+invoke moderation. They also respond to
 mentions from the other configured overlord, while ignoring themselves, unrelated
 bots, webhooks, and global pings. A bot conversation must continue a database-tracked
 reply in the same channel and ends after at most six replies in that chain,
 including the first human-triggered reply. Human messages can start a new exchange.
-It requests only Guilds and GuildMessages Gateway intents. Enable the application's
-Message Content setting in Discord so REST history includes unmentioned messages;
+It requests Guilds, GuildMessages, and MessageContent Gateway intents. Enable each application's
+Message Content setting in Discord so name triggers and REST history receive unmentioned messages;
 Server Members and Presence can stay disabled. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
@@ -143,7 +151,11 @@ across Bob and Rick. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
 claim keeps overlapping listeners from answering the same person out of order;
 stale processing claims stop blocking new work after three minutes. Discord's typing
-indicator is refreshed while a message waits for admission or its answer is prepared.
+indicator is refreshed while a tagged message waits for admission or its answer is prepared.
+Both bots keep typing for an extra random one to five seconds after preparing a
+response, including reactions and GIFs. An optional name mention starts typing only
+after the model chooses to join in. The extra pause also preserves each person's
+reply order.
 The queue lives in the active listener, so a process crash can still lose waiting
 messages. The monthly count is atomic across instances and
 counts failed attempts conservatively. Model cost depends on the question and
@@ -174,7 +186,8 @@ can embed them; allow Embed Links in the channels where Bob should display GIFs.
 The collection is fixed and needs no GIF API key or web search. GIFs use the same
 reply delivery, duplicate protection, queue, and quotas as text.
 Rick shares Bob's writing rules, event facts, and tools, but his harmless banter
-confidently misunderstands simple things and proposes spectacularly stupid ideas.
+confidently misunderstands simple things and proposes spectacularly stupid ideas,
+using small everyday words and short plain phrases.
 His persona does not change real event facts or the moderation and safety rules.
 
 Both bots can call `mention_users` to tag the other overlord, the current speaker,
@@ -208,7 +221,7 @@ Its public hackathon facts are in `app/lib/discord-bot-knowledge.ts`. Keep that
 snapshot up to date when the website's event details change. Speech formatting
 preserves literal code, email addresses, and case-sensitive links.
 
-Each accepted question can include the latest 25 messages from the same channel
+Each accepted tagged question can include the latest 25 messages from the same channel
 or Discord thread, plus the author's last 10 messages across server channels the
 bot can access. The latter uses Discord's author-filtered guild search; overlaps
 are included once. Messages are ordered oldest to newest, the final question is
@@ -218,7 +231,7 @@ to 512 UTF-8 bytes; the complete context has a 48,000-byte ceiling including spe
 labels. Unrelated bots, webhooks, application notifications, attachments, and other
 authors' messages from other channels are excluded. If one history source fails,
 the other still works; if both fail, the bot answers the current question alone.
-Message text is not saved to the site database or logged.
+Unpinged name checks use only current-channel history. Message text is not saved to the site database or logged.
 The private quota table stores message,
 server, channel, and user IDs, bot identity, conversation depth, image-attempt
 timestamps, delivery status, and reply IDs. Metadata older

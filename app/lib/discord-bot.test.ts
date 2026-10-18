@@ -1,10 +1,14 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { generateDiscordBotReply, getDiscordBotConfig, getDiscordBotConfigs, handleDiscordMention, isDiscordCronAuthorized, type DiscordMention } from "./discord-bot";
+import { generateDiscordBotReply, getDiscordBotConfig, getDiscordBotConfigs, getDiscordMessageTrigger, handleDiscordMention as handleDiscordMentionWithDelay, isDiscordCronAuthorized, type DiscordBotConfig, type DiscordMention } from "./discord-bot";
 
 const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "DISCORD_RICK_ENABLED", "DISCORD_RICK_BOT_TOKEN", "DISCORD_RICK_APPLICATION_ID", "DISCORD_BOT_IMAGES_ENABLED", "DISCORD_BOT_IMAGE_DAILY_LIMIT", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
 const originalEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 const originalFetch = globalThis.fetch;
+const originalRandom = Math.random;
+// Keep real cooldown/typing timers; inject only the new deliberate reply pause.
+const handleDiscordMention = (message: DiscordMention, config: DiscordBotConfig, waitBeforeReply: (milliseconds: number) => Promise<void> = async () => {}) =>
+  handleDiscordMentionWithDelay(message, config, waitBeforeReply);
 const botId = "1560000000000000001";
 const rickId = "1560000000000000088";
 const modelUrl = "https://api.openai.com/v1/chat/completions";
@@ -79,10 +83,98 @@ beforeEach(() => {
 });
 afterEach(() => {
   globalThis.fetch = originalFetch;
+  Math.random = originalRandom;
   envNames.forEach((name) => { if (originalEnv[name] === undefined) delete process.env[name]; else process.env[name] = originalEnv[name]; });
 });
 
 describe("sih-inator mention bot", () => {
+  it("recognizes each bot's exact lowercase names as individual words", () => {
+    const rick = enableRick();
+    for (const [bot, accepted, rejected] of [
+      [config(), ["bob", "hey bob", "spongebob can you help", "(bob)", "bob's brain"],
+        ["Bob", "BOB", "SpongeBob", "bobcat", "xbob", "bob2", "bob_name", "ébob", "bobé", "rick", "patrick"]],
+      [rick, ["rick", "hey patrick", "rick's brain", "(patrick)"],
+        ["Rick", "Patrick", "trick", "ricky", "patrick2", "rick_name", "rické", "bob", "spongebob"]],
+    ] as const) {
+      for (const content of accepted) assert.equal(getDiscordMessageTrigger(message({ content, mentionedUserIds: [] }), bot), "name", content);
+      for (const content of rejected) assert.equal(getDiscordMessageTrigger(message({ content, mentionedUserIds: [] }), bot), null, content);
+    }
+    assert.equal(calls.length, 0);
+  });
+  it("never uses names to start bot loops or bypass server and webhook filters", () => {
+    enableRick();
+    const candidate = message({ content: "bob", mentionedUserIds: [] });
+    for (const overrides of [
+      { authorId: rickId, authorIsBot: true, referencedMessageId: candidate.id },
+      { authorId: botId }, { authorIsWebhook: true }, { guildId: "1560000000000000099" }, { id: "bad" },
+    ]) assert.equal(getDiscordMessageTrigger({ ...candidate, ...overrides }, config()), null);
+    assert.equal(getDiscordMessageTrigger(message({ content: `<@${botId}> BOB` }), config()), "mention");
+  });
+  it("can silently skip a name mention without typing or reacting and deduplicates the decision", async () => {
+    intercept = (url) => url === modelUrl ? actionResponse("skip_response", {}) : null;
+    const candidate = message({ content: "spongebob was on tv last night", mentionedUserIds: [], canDelete: true });
+    let pauses = 0;
+    assert.equal(await handleDiscordMention(candidate, config(), async () => { pauses++; }), "ignored");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.ok(request.tools.some((tool: { function: { name: string } }) => tool.function.name === "skip_response"));
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => tool.function.name === "delete_current_message"));
+    assert.equal(calls.filter(({ url }) => url.includes("/messages/search?")).length, 0);
+    assert.equal(replies().length, 0); assert.equal(reactions().length, 0); assert.equal(typingCalls().length, 0); assert.equal(pauses, 0);
+    assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "answered");
+    assert.equal(await handleDiscordMention(candidate, config()), "duplicate");
+    assert.equal(modelCalls().length, 1);
+  });
+  it("answers a relevant unpinged name through the normal reply and quota flow", async () => {
+    const candidate = message({ content: "bob what should we build", mentionedUserIds: [] });
+    assert.equal(await handleDiscordMention(candidate, config()), "answered");
+    assert.equal(modelCalls().length, 1); assert.equal(typingCalls().length, 1); assert.equal(replies().length, 1);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).message_reference.message_id, candidate.id);
+    assert.deepEqual(JSON.parse(String(replies()[0].init?.body)).allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("keeps name-triggered quota notices and failures silent", async () => {
+    const candidate = message({ content: "rick what is this", mentionedUserIds: [] });
+    const rick = enableRick();
+    for (const claim of ["daily_limit", "monthly_limit"]) {
+      intercept = (url) => url.includes("/rpc/") ? Response.json(claim) : null;
+      assert.equal(await handleDiscordMention(candidate, rick), claim);
+    }
+    intercept = (url) => url === modelUrl ? Response.json({}, { status: 503 }) : null;
+    assert.equal(await handleDiscordMention(candidate, rick), "failed");
+    assert.equal(replies().length, 0); assert.equal(typingCalls().length, 0);
+  });
+  it("offers skipping only for optional responses and rejects malformed skip actions", async () => {
+    intercept = (url) => url === modelUrl ? actionResponse("skip_response", {}) : null;
+    await assert.rejects(generateDiscordBotReply("hi", config().model));
+    const direct = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.ok(!direct.tools.some((tool: { function: { name: string } }) => tool.function.name === "skip_response"));
+    for (const args of [{ reply: "hi" }, [], true]) {
+      intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { tool_calls: [{
+        type: "function", function: { name: "skip_response", arguments: JSON.stringify(args) },
+      }] } }] }) : null;
+      await assert.rejects(generateDiscordBotReply("bob", config().model, [], false, { optionalResponse: true }));
+    }
+  });
+  it("holds text and reaction replies for an extra random one to five seconds while typing", async () => {
+    const rick = enableRick();
+    for (const [index, bot, random, expected] of [[0, config(), 0, 1_000], [1, rick, 0.999999, 5_000]] as const) {
+      const waiting = Promise.withResolvers<number>();
+      const release = Promise.withResolvers<void>();
+      Math.random = () => random;
+      intercept = (url) => url === modelUrl && index === 1 ? reactionResponse("👍") : null;
+      const replyCount = replies().length, reactionCount = reactions().length;
+      const work = handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)),
+        content: `<@${bot.applicationId}> hi`, mentionedUserIds: [bot.applicationId] }), bot,
+      (milliseconds) => { waiting.resolve(milliseconds); return release.promise; });
+      try {
+        assert.equal(await waiting.promise, expected);
+        assert.equal(replies().length, replyCount); assert.equal(reactions().length, reactionCount);
+        assert.equal(typingCalls().at(-1)?.init?.signal?.aborted, false);
+      } finally { release.resolve(); }
+      assert.equal(await work, "answered");
+      assert.ok(typingCalls().every(({ init }) => init?.signal?.aborted));
+    }
+    assert.equal(replies().length, 1); assert.equal(reactions().length, 1);
+  });
   it("requires correct cron authentication and valid bot configuration", () => {
     const url = "https://www.stupideas.com/api/discord/gateway";
     assert.equal(isDiscordCronAuthorized(new Request(url)), false);

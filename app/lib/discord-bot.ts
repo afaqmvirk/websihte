@@ -8,6 +8,10 @@ const SNOWFLAKE = /^\d{17,20}$/;
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
+const BOT_NAMES = {
+  bob: /(?<![\p{L}\p{M}\p{N}_])(?:bob|spongebob)(?![\p{L}\p{M}\p{N}_])/u,
+  rick: /(?<![\p{L}\p{M}\p{N}_])(?:rick|patrick)(?![\p{L}\p{M}\p{N}_])/u,
+};
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
 // Fixed, verified GIFs keep the model from inventing media URLs.
@@ -30,7 +34,7 @@ type DeleteReason = keyof typeof DELETE_REASONS;
 type DiscordMentionTarget = { id: string; name: string };
 type DiscordBotReply = {
   text: string; reaction?: string; deleteReason?: DeleteReason;
-  mentionUserIds?: string[]; imagePrompt?: string;
+  mentionUserIds?: string[]; imagePrompt?: string; skipped?: boolean;
 };
 
 function botIdentity(persona: DiscordBotPersona) {
@@ -86,13 +90,19 @@ export function isDiscordCronAuthorized(request: Request) {
   return actual.length === expected.length && timingSafeEqual(actual, expected);
 }
 
-function questionFromMention(message: DiscordMention, config: DiscordBotConfig) {
+export function getDiscordMessageTrigger(message: DiscordMention, config: DiscordBotConfig) {
   const peer = config.peers.find((bot) => bot.applicationId === message.authorId);
   if (message.authorIsWebhook || message.authorId === config.applicationId
     || (message.authorIsBot && (!peer || !message.referencedMessageId || !SNOWFLAKE.test(message.referencedMessageId)))
     || message.guildId !== config.guildId
-    || !message.mentionedUserIds.includes(config.applicationId)
     || ![message.id, message.channelId, message.authorId].every((id) => SNOWFLAKE.test(id))) return null;
+  if (message.mentionedUserIds.includes(config.applicationId)) return "mention";
+  // Names never start or extend a bot-to-bot loop. Only exact lowercase words qualify.
+  if (!message.authorIsBot && BOT_NAMES[config.persona].test(message.content)) return "name";
+  return null;
+}
+
+function questionFromMention(message: DiscordMention, config: DiscordBotConfig) {
   return message.content.replace(new RegExp(`<@!?${config.applicationId}>`, "g"), "")
     .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]/g, "").trim();
 }
@@ -138,7 +148,7 @@ function formatReply(text: string) {
 
 type ReplyOptions = {
   persona?: DiscordBotPersona; mentionTargets?: DiscordMentionTarget[];
-  canGenerateImage?: boolean; currentSpeaker?: string;
+  canGenerateImage?: boolean; currentSpeaker?: string; optionalResponse?: boolean;
 };
 
 export async function generateDiscordBotReply(
@@ -181,7 +191,14 @@ export async function generateDiscordBotReply(
             required: ["gif", "reply"],
           },
         },
-      }, ...(targets.length ? [{
+      }, ...(options.optionalResponse ? [{
+        type: "function",
+        function: {
+          name: "skip_response", strict: true,
+          description: "Stay completely silent when this unpinged message is not clearly addressing or discussing you, or when you have nothing worth adding. No text, reaction, GIF, or other action is sent.",
+          parameters: { type: "object", properties: {}, additionalProperties: false, required: [] },
+        },
+      }] : []), ...(targets.length ? [{
         type: "function",
         function: {
           name: "mention_users", strict: true,
@@ -223,7 +240,12 @@ export async function generateDiscordBotReply(
       }] : [])],
       tool_choice: "auto", parallel_tool_calls: false,
       messages: [
-        { role: "system", content: `${getDiscordBotSystemPrompt(options.persona)}\n\ntoday in ottawa: ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" })}.` },
+        { role: "system", content: `${getDiscordBotSystemPrompt(options.persona)}\n\ntoday in ottawa: ${new Date().toLocaleDateString("en-CA", { timeZone: "America/Toronto" })}.${options.optionalResponse ? `
+
+optional unpinged name mention:
+- nobody tagged you. the current message contains one of your names: ${options.persona === "rick" ? "rick or patrick" : "bob or spongebob"}. first carefully decide whether the current message and channel context clearly refer to you, the discord bot. make this routing decision carefully even if your character is stupid.
+- use skip_response when the name refers to a cartoon, another person, a quote, code, or an unrelated topic, or when it is only mentioned in passing. uncertainty means skip_response. a bare call of your name can address you when the channel context supports it.
+- you may also use skip_response when people are talking about you but you have nothing worth adding. you do not need to answer every name mention. when you join in, keep it short and relevant. never announce that you decided to skip.` : ""}` },
         ...history,
         { role: "user", name: options.currentSpeaker ?? "current_user", content: question },
       ],
@@ -247,7 +269,10 @@ export async function generateDiscordBotReply(
   if (call) {
     if (call.type !== "function" || !call.function) throw new Error("Unknown bot action");
     const args = JSON.parse(call.function.arguments || "null") as Record<string, unknown> | null;
-    if (call.function.name === "react_to_message") {
+    if (call.function.name === "skip_response" && options.optionalResponse) {
+      if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length !== 0) throw new Error("Invalid skipped response");
+      return { text: "", skipped: true };
+    } else if (call.function.name === "react_to_message") {
       if (!args || typeof args.emoji !== "string" || !REACTION_EMOJI.includes(args.emoji)
         || (args.reply !== null && typeof args.reply !== "string")) throw new Error("Invalid bot reaction");
       reaction = args.emoji;
@@ -436,13 +461,23 @@ function startTyping(message: DiscordMention, config: DiscordBotConfig) {
   return () => { clearInterval(timer); controller.abort(); };
 }
 
-async function answerMention(message: DiscordMention, question: string, config: DiscordBotConfig, queued: boolean) {
+async function answerMention(
+  message: DiscordMention, question: string, config: DiscordBotConfig, queued: boolean,
+  optionalResponse: boolean, waitBeforeReply: (milliseconds: number) => Promise<void>,
+) {
   let claimed = false;
   let stopTyping: (() => void) | undefined;
+  let paused = false;
+  async function pauseBeforeReply() {
+    if (paused) return;
+    paused = true;
+    stopTyping ??= startTyping(message, config);
+    await waitBeforeReply((1 + Math.floor(Math.random() * 5)) * 1_000);
+  }
   try {
     let claim = await claimMention(message, config);
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
-    stopTyping = startTyping(message, config);
+    if (!optionalResponse) stopTyping = startTyping(message, config);
     while (claim === "cooldown") {
       queued = true;
       // The shared claim also waits for this user's previous answer across listeners.
@@ -451,11 +486,17 @@ async function answerMention(message: DiscordMention, question: string, config: 
     }
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
     if (claim === "daily_limit") {
-      if (!message.authorIsBot) await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
+      if (!message.authorIsBot && !optionalResponse) {
+        await pauseBeforeReply();
+        await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
+      }
       return claim;
     }
     if (claim === "monthly_limit") {
-      if (!message.authorIsBot) await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
+      if (!message.authorIsBot && !optionalResponse) {
+        await pauseBeforeReply();
+        await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
+      }
       return claim;
     }
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
@@ -463,11 +504,18 @@ async function answerMention(message: DiscordMention, question: string, config: 
     let answer: DiscordBotReply;
     if (!question) answer = { text: "uhhhh iunno" };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
-    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued),
-      message.canDelete === true && !message.authorIsBot, {
+    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
+      message.canDelete === true && !message.authorIsBot && !optionalResponse, {
         persona: config.persona, mentionTargets: mentionTargets(message, config), canGenerateImage: !message.authorIsBot,
         currentSpeaker: message.authorIsBot ? `overlord_${config.peers.find((peer) => peer.applicationId === message.authorId)!.persona}` : "current_user",
+        optionalResponse,
       });
+    if (answer.skipped) {
+      // A deliberate no-op completes the claim, like a reaction-only answer without a reply ID.
+      await recordReply(message.id, null, config, true);
+      return "ignored";
+    }
+    stopTyping ??= startTyping(message, config);
     if (answer.deleteReason) {
       if (await deleteMention(message, answer.deleteReason, config)) {
         await recordReply(message.id, null, config, true);
@@ -481,6 +529,7 @@ async function answerMention(message: DiscordMention, question: string, config: 
       image = drawing.image;
       if (drawing.text) answer = { text: drawing.text };
     }
+    await pauseBeforeReply();
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
     const text = answer.text || (reacted || image ? "" : "uhhhh iunno");
     const replyId = text || image ? await postReply(message, text, config, { image, mentionUserIds: answer.mentionUserIds }) : null;
@@ -490,7 +539,10 @@ async function answerMention(message: DiscordMention, question: string, config: 
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
+      if (!optionalResponse) {
+        await pauseBeforeReply();
+        await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
+      }
       await recordReply(message.id, null, config);
     }
     return "failed";
@@ -499,14 +551,19 @@ async function answerMention(message: DiscordMention, question: string, config: 
   }
 }
 
-export async function handleDiscordMention(message: DiscordMention, config: DiscordBotConfig) {
+export async function handleDiscordMention(
+  message: DiscordMention, config: DiscordBotConfig,
+  waitBeforeReply: (milliseconds: number) => Promise<void> = (milliseconds) => new Promise((resolve) => setTimeout(resolve, milliseconds)),
+) {
+  const trigger = getDiscordMessageTrigger(message, config);
+  if (!trigger) return "ignored";
   const question = questionFromMention(message, config);
-  if (question === null) return "ignored";
+  if (trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
   // Preserve each person's message order without holding up other people.
   const key = `${config.persona}:${message.guildId}:${message.authorId}`;
   const previous = userQueues.get(key);
   const work = (previous ?? Promise.resolve()).catch(() => {})
-    .then(() => answerMention(message, question, config, !!previous));
+    .then(() => answerMention(message, question, config, !!previous, trigger === "name", waitBeforeReply));
   userQueues.set(key, work);
   try {
     return await work;
