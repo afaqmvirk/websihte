@@ -123,18 +123,24 @@ export default function PrivacyPolicyPage() {
               private organizer channel on Discord to notify the team of new applications.
             </p>
 
-            <h3>when you mention our Discord bot</h3>
+            <h3>when you mention our Discord bots</h3>
             <p>
-              If you mention sih-inator (overlord bob), we send your question and
+              If you mention sih-inator (overlord bob) or overlord rick, we send your question and
               up to 25 recent messages from the same Discord channel or thread,
               plus up to 10 earlier messages from you across server channels the
               bot can access, to OpenAI to generate a reply. This can include
-              other participants&apos; messages and the bot&apos;s replies.
+              other participants&apos; messages and both bots&apos; replies.
+              The bots can tag each other for a short conversation in that channel,
+              and can tag you or people mentioned in the current exchange.
+              If you ask for an image, we also send a short image description to
+              OpenAI and post the generated image back to Discord. Images are not
+              saved in our website database.
               We use temporary speaker labels to distinguish participants. We do
               not include other participants&apos; messages from other channels,
               private application notifications, or attachments in this context.
               We keep message, server, and user IDs, timestamps, reply IDs, and
-              delivery status in our private database for duplicate handling and
+              delivery status, bot identity, conversation depth, and image usage
+              in our private database for duplicate handling and
               usage limits. Metadata older than two days is removed on the next
               request. We also keep a server-level monthly request count until
               the next month. Conversation context is fetched when needed; we do

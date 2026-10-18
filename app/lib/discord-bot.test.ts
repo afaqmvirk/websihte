@@ -1,11 +1,12 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, describe, it } from "node:test";
-import { generateDiscordBotReply, getDiscordBotConfig, handleDiscordMention, isDiscordCronAuthorized, type DiscordMention } from "./discord-bot";
+import { generateDiscordBotReply, getDiscordBotConfig, getDiscordBotConfigs, handleDiscordMention, isDiscordCronAuthorized, type DiscordMention } from "./discord-bot";
 
-const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
+const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "DISCORD_RICK_ENABLED", "DISCORD_RICK_BOT_TOKEN", "DISCORD_RICK_APPLICATION_ID", "DISCORD_BOT_IMAGES_ENABLED", "DISCORD_BOT_IMAGE_DAILY_LIMIT", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
 const originalEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 const originalFetch = globalThis.fetch;
 const botId = "1560000000000000001";
+const rickId = "1560000000000000088";
 const modelUrl = "https://api.openai.com/v1/chat/completions";
 let calls: { url: string; init?: RequestInit }[];
 let seen: Set<string>;
@@ -30,6 +31,15 @@ function deletionResponse(reason = "spam", extra = {}) {
     type: "function", function: { name: "delete_current_message", arguments: JSON.stringify({ reason, ...extra }) },
   }] } }] });
 }
+function actionResponse(name: string, args: Record<string, unknown>) {
+  return Response.json({ choices: [{ message: { content: null, tool_calls: [{
+    type: "function", function: { name, arguments: JSON.stringify(args) },
+  }] } }] });
+}
+function enableRick() {
+  Object.assign(process.env, { DISCORD_RICK_ENABLED: "true", DISCORD_RICK_BOT_TOKEN: "synthetic-rick-token".repeat(4), DISCORD_RICK_APPLICATION_ID: rickId });
+  const rick = getDiscordBotConfig("rick"); assert.ok(rick); return rick;
+}
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -46,8 +56,9 @@ beforeEach(() => {
     const url = String(input); calls.push({ url, init });
     const overridden = await intercept?.(url, init); if (overridden) return overridden;
     if (url === modelUrl) return Response.json({ choices: [{ message: { content: "Build a toaster that reviews your code." } }] });
-    if (url.endsWith("/rpc/claim_discord_bot_request")) {
-      const id = JSON.parse(String(init?.body)).p_message_id;
+    if (url.endsWith("/rpc/claim_discord_overlord_request")) {
+      const args = JSON.parse(String(init?.body));
+      const id = `${args.p_bot_id}:${args.p_message_id}`;
       if (seen.has(id)) return Response.json("duplicate");
       seen.add(id); return Response.json("accepted");
     }
@@ -87,6 +98,134 @@ describe("sih-inator mention bot", () => {
     process.env.DISCORD_BOT_MONTHLY_LIMIT = "310001"; assert.equal(getDiscordBotConfig(), null);
     process.env.DISCORD_BOT_MONTHLY_LIMIT = "310000"; assert.equal(config().monthlyLimit, 310_000);
     delete process.env.OPENAI_API_KEY; assert.equal(getDiscordBotConfig(), null);
+  });
+  it("configures two distinct bot accounts and keeps Rick disabled until configured", () => {
+    assert.deepEqual(getDiscordBotConfigs().map(({ persona }) => persona), ["bob"]);
+    const rick = enableRick();
+    assert.deepEqual(getDiscordBotConfigs().map(({ persona }) => persona), ["bob", "rick"]);
+    assert.equal(rick.peers[0].applicationId, botId);
+    assert.equal(config().peers[0].applicationId, rickId);
+    process.env.DISCORD_RICK_APPLICATION_ID = botId;
+    assert.equal(getDiscordBotConfig("rick"), null);
+    assert.deepEqual(config().peers, []);
+  });
+  it("uses Rick's stupid persona with the shared writing style and real event facts", async () => {
+    const rick = enableRick();
+    const current = message({ content: `<@${rickId}> what is a submarine`, mentionedUserIds: [rickId] });
+    assert.equal(await handleDiscordMention(current, rick), "answered");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.match(request.messages[0].content, /^you are overlord rick/);
+    assert.match(request.messages[0].content, /extremely extremely stupid/);
+    assert.match(request.messages[0].content, /use no punctuation at all/);
+    assert.match(request.messages[0].content, /november 15, 2026/);
+    assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${rick.token}`);
+    assert.ok(calls.at(-1)?.url.endsWith("&bot_id=eq.rick"));
+  });
+  it("allows both bots to answer the same human mention with independent claims", async () => {
+    const rick = enableRick();
+    const current = message({ content: `<@${botId}> <@${rickId}> argue about soup`, mentionedUserIds: [botId, rickId] });
+    assert.deepEqual(await Promise.all([handleDiscordMention(current, config()), handleDiscordMention(current, rick)]), ["answered", "answered"]);
+    assert.equal(modelCalls().length, 2);
+    assert.equal(replies().length, 2);
+  });
+  it("answers an authenticated peer with channel context but no image or moderation tools", async () => {
+    enableRick();
+    const current = message({ authorId: rickId, authorIsBot: true, referencedMessageId: "1560000000000000000", canDelete: true });
+    assert.equal(await handleDiscordMention(current, config()), "answered");
+    const claim = JSON.parse(String(calls[0].init?.body));
+    assert.equal(claim.p_peer_bot_id, "rick");
+    assert.equal(claim.p_parent_message_id, current.referencedMessageId);
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.equal(request.messages.at(-1).name, "overlord_rick");
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => ["generate_image", "delete_current_message"].includes(tool.function.name)));
+    assert.equal(calls.filter(({ url }) => url.includes("/messages/search?")).length, 0);
+  });
+  it("ignores self messages webhooks unknown bots and peers without a reply reference", async () => {
+    enableRick();
+    for (const entry of [
+      message({ authorId: botId, authorIsBot: true }),
+      message({ authorId: rickId, authorIsBot: true }),
+      message({ authorId: rickId, authorIsBot: true, authorIsWebhook: true, referencedMessageId: "1560000000000000000" }),
+      message({ authorIsBot: true, referencedMessageId: "1560000000000000000" }),
+    ]) assert.equal(await handleDiscordMention(entry, config()), "ignored");
+    assert.equal(calls.length, 0);
+  });
+  it("ends a bot conversation silently when shared storage reaches its turn limit", async () => {
+    enableRick();
+    intercept = (url) => url.includes("/rpc/") ? Response.json("conversation_limit") : null;
+    assert.equal(await handleDiscordMention(message({ authorId: rickId, authorIsBot: true, referencedMessageId: "1560000000000000000" }), config()), "conversation_limit");
+    assert.equal(modelCalls().length, 0); assert.equal(replies().length, 0); assert.equal(typingCalls().length, 0);
+  });
+  it("tags only explicit known targets and preserves Discord mention syntax", async () => {
+    enableRick();
+    intercept = (url) => url === modelUrl ? actionResponse("mention_users", { user_ids: [rickId, message().authorId], reply: "RICK. Explain Soup?!" }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const reply = JSON.parse(String(replies()[0].init?.body));
+    assert.equal(reply.content, `<@${rickId}> <@${message().authorId}> rick explain soup`);
+    assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false, users: [rickId, message().authorId] });
+  });
+  it("rejects arbitrary ping targets and strips mentions from ordinary model output", async () => {
+    intercept = (url) => url === modelUrl ? actionResponse("mention_users", { user_ids: ["1560000000000000099"], reply: "hello" }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: `<@${rickId}> @everyone HEY!` } }] }) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "answered");
+    const reply = JSON.parse(String(replies()[1].init?.body));
+    assert.doesNotMatch(reply.content, /<@|@everyone/);
+    assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("generates one fixed low-quality image and uploads it as a Discord attachment", async () => {
+    const imageBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x11, 0xff, 0xd9]);
+    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose wearing a crown", reply: "BEHOLD. GOOSE!" })
+      : url.endsWith("/rpc/claim_discord_bot_image") ? Response.json("accepted")
+      : url.endsWith("/images/generations") ? Response.json({ data: [{ b64_json: imageBytes.toString("base64") }] }) : null;
+    assert.equal(await handleDiscordMention(message({ content: `<@${botId}> draw a goose wearing a crown` }), config()), "answered");
+    const imageCall = calls.find(({ url }) => url.endsWith("/images/generations"))!;
+    const request = JSON.parse(String(imageCall.init?.body));
+    assert.equal(request.model, "gpt-image-2.5-flare"); assert.equal(request.quality, "low");
+    assert.equal(request.size, "1024x1024"); assert.equal(request.n, 1); assert.equal(request.output_format, "jpeg");
+    assert.equal(request.moderation, "auto"); assert.match(request.safety_identifier, /^[a-f0-9]{64}$/);
+    const form = replies()[0].init?.body; assert.ok(form instanceof FormData);
+    const payload = JSON.parse(String(form.get("payload_json")));
+    assert.equal(payload.content, "behold goose"); assert.equal(payload.nonce, message().id);
+    assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
+    const file = form.get("files[0]"); assert.ok(file instanceof Blob);
+    assert.equal(file.type, "image/jpeg"); assert.deepEqual(Buffer.from(await file.arrayBuffer()), imageBytes);
+    assert.equal(new Headers(replies()[0].init?.headers).has("Content-Type"), false);
+    assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "answered");
+  });
+  it("enforces shared image quotas before spending on generation", async () => {
+    for (const [index, limit] of ["daily_limit", "cooldown", "duplicate"].entries()) {
+      intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose", reply: null })
+        : url.endsWith("/rpc/claim_discord_bot_image") ? Response.json(limit) : null;
+      const outcome = await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)) }), config());
+      assert.equal(outcome, limit === "duplicate" ? "failed" : "answered");
+    }
+    assert.equal(calls.filter(({ url }) => url.endsWith("/images/generations")).length, 0);
+    assert.match(JSON.parse(String(replies()[0].init?.body)).content, /drawing budget/);
+    assert.match(JSON.parse(String(replies()[1].init?.body)).content, /needs a minute/);
+  });
+  it("does not upload malformed images or claim a refused drawing succeeded", async () => {
+    for (const [index, result] of [
+      Response.json({ error: { message: "provider refusal" } }, { status: 400 }),
+      Response.json({ data: [{ b64_json: Buffer.from("not a JPEG").toString("base64") }] }),
+      Response.json({ data: [{ url: "https://example.com/untrusted.jpg" }] }),
+    ].entries()) {
+      intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose", reply: "i drew it" })
+        : url.endsWith("/rpc/claim_discord_bot_image") ? Response.json("accepted")
+        : url.endsWith("/images/generations") ? result : null;
+      assert.equal(await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)) }), config()), "answered");
+    }
+    assert.ok(replies().every(({ init }) => typeof init?.body === "string" && JSON.parse(init.body).content === "cant draw that one rn bro"));
+  });
+  it("disables image tools through configuration and rejects invented tool parameters", async () => {
+    process.env.DISCORD_BOT_IMAGES_ENABLED = "false";
+    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose", reply: null }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    assert.ok(JSON.parse(String(modelCalls()[0].init?.body)).tools.every((tool: { function: { name: string } }) => tool.function.name !== "generate_image"));
+    process.env.DISCORD_BOT_IMAGES_ENABLED = "true";
+    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose", reply: null, n: 20 }) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "failed");
+    assert.equal(calls.filter(({ url }) => url.endsWith("/images/generations")).length, 0);
   });
   it("ignores bots, unmentioned messages, global pings, and other servers", async () => {
     for (const entry of [message({ authorIsBot: true }), message({ mentionedUserIds: [] }), message({ content: "@everyone hello", mentionedUserIds: [] }), message({ guildId: "1560000000000000099" })]) assert.equal(await handleDiscordMention(entry, config()), "ignored");
@@ -293,7 +432,7 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message(), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     assert.equal(request.tool_choice, "auto"); assert.equal(request.parallel_tool_calls, false);
-    assert.equal(request.tools.length, 2);
+    assert.equal(request.tools.length, 4);
     const tool = request.tools[0].function;
     assert.equal(tool.name, "react_to_message"); assert.equal(tool.strict, true);
     assert.equal(tool.parameters.additionalProperties, false);
@@ -411,7 +550,7 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message({ canDelete: true }), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "delete_current_message").function;
-    assert.equal(request.tools.length, 3); assert.equal(tool.strict, true);
+    assert.equal(request.tools.length, 5); assert.equal(tool.strict, true);
     assert.deepEqual(Object.keys(tool.parameters.properties), ["reason"]);
     assert.deepEqual(tool.parameters.properties.reason.enum, ["disrespect", "harassment", "spam"]);
     assert.equal(deletions().length, 0);
