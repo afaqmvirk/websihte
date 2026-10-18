@@ -20,6 +20,11 @@ function reactionResponse(emoji: string, reply: string | null = null) {
     type: "function", function: { name: "react_to_message", arguments: JSON.stringify({ emoji, reply }) },
   }] } }] });
 }
+function gifResponse(gif: string, reply: string | null = null, extra = {}) {
+  return Response.json({ choices: [{ message: { content: null, tool_calls: [{
+    type: "function", function: { name: "send_gif", arguments: JSON.stringify({ gif, reply, ...extra }) },
+  }] } }] });
+}
 function deletionResponse(reason = "spam", extra = {}) {
   return Response.json({ choices: [{ message: { content: null, tool_calls: [{
     type: "function", function: { name: "delete_current_message", arguments: JSON.stringify({ reason, ...extra }) },
@@ -288,13 +293,70 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message(), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     assert.equal(request.tool_choice, "auto"); assert.equal(request.parallel_tool_calls, false);
-    assert.equal(request.tools.length, 1);
+    assert.equal(request.tools.length, 2);
     const tool = request.tools[0].function;
     assert.equal(tool.name, "react_to_message"); assert.equal(tool.strict, true);
     assert.equal(tool.parameters.additionalProperties, false);
     assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["emoji", "reply"]);
     assert.ok(tool.parameters.properties.emoji.enum.includes("💀"));
     assert.match(request.messages[0].content, /why dont you do that im not wasting my precious tokens/);
+  });
+  it("offers a GIF tool with a fixed collection and optional caption", async () => {
+    await handleDiscordMention(message(), config());
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "send_gif").function;
+    assert.equal(tool.strict, true);
+    assert.equal(tool.parameters.additionalProperties, false);
+    assert.deepEqual(tool.parameters.required, ["gif", "reply"]);
+    assert.deepEqual(tool.parameters.properties.gif.enum, ["confused", "applause", "facepalm", "popcorn", "shrug", "hello", "thumbs_up", "typing_cat"]);
+    assert.deepEqual(tool.parameters.properties.reply.type, ["string", "null"]);
+    assert.match(request.messages[0].content, /you can use send_gif/);
+    assert.match(request.messages[0].content, /do not force a gif into every reply/);
+  });
+  it("can send a GIF alone as a reply without pings and records its delivery", async () => {
+    intercept = (url) => url === modelUrl ? gifResponse("popcorn") : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(replies().length, 1); assert.equal(reactions().length, 0);
+    const reply = JSON.parse(String(replies()[0].init?.body));
+    assert.equal(reply.content, "https://media.giphy.com/media/pUeXcg80cO8I8/giphy.gif");
+    assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
+    assert.equal(reply.message_reference.message_id, message().id);
+    assert.equal(reply.nonce, message().id); assert.equal(reply.enforce_nonce, true);
+    assert.equal(reply.flags, undefined);
+    const tracking = JSON.parse(String(calls.at(-1)?.init?.body));
+    assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, "1560000000000000005");
+  });
+  it("formats GIF captions while keeping case-sensitive URLs intact", async () => {
+    intercept = (url) => url === modelUrl ? gifResponse("confused", "UHHHH IUNNO?!") : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "uhhhh iunno\nhttps://media.giphy.com/media/3o7aTskHEUdgCQAXde/giphy.gif");
+    intercept = (url) => url === modelUrl ? gifResponse("typing_cat", "X".repeat(3_000)) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "answered");
+    const content = JSON.parse(String(replies()[1].init?.body)).content;
+    assert.equal(content.length, 1_900);
+    assert.ok(content.endsWith("\nhttps://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"));
+  });
+  it("rejects unsupported GIFs, arbitrary URLs, invalid captions, and extra targets", async () => {
+    for (const [index, result] of [
+      gifResponse("missing"), gifResponse("constructor"), gifResponse("__proto__"),
+      gifResponse("https://example.com/untrusted.gif"),
+      gifResponse("hello", null, { reply: 42 }),
+      gifResponse("hello", null, { channel_id: "1560000000000000099" }),
+    ].entries()) {
+      intercept = (url) => url === modelUrl ? result : null;
+      assert.equal(await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)) }), config()), "failed");
+    }
+    assert.equal(replies().length, 6);
+    assert.ok(replies().every(({ init }) => !JSON.parse(String(init?.body)).content.includes("https://")));
+  });
+  it("does not send duplicate GIFs across overlapping listeners and retries with the same nonce", async () => {
+    intercept = (url) => url === modelUrl ? gifResponse("thumbs_up")
+      : url.endsWith("/messages") && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
+    const results = await Promise.all([handleDiscordMention(message(), config()), handleDiscordMention(message(), config())]);
+    assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
+    assert.equal(modelCalls().length, 1); assert.equal(replies().length, 2);
+    assert.equal(replies()[0].init?.body, replies()[1].init?.body);
+    assert.equal(JSON.parse(String(replies()[1].init?.body)).content, "https://media.giphy.com/media/111ebonMs90YLu/giphy.gif");
   });
   it("can answer with just a reaction and still releases the processing claim", async () => {
     intercept = (url) => url === modelUrl ? reactionResponse("💀") : null;
@@ -349,7 +411,7 @@ describe("sih-inator mention bot", () => {
     await handleDiscordMention(message({ canDelete: true }), config());
     const request = JSON.parse(String(modelCalls()[0].init?.body));
     const tool = request.tools.find((entry: { function: { name: string } }) => entry.function.name === "delete_current_message").function;
-    assert.equal(request.tools.length, 2); assert.equal(tool.strict, true);
+    assert.equal(request.tools.length, 3); assert.equal(tool.strict, true);
     assert.deepEqual(Object.keys(tool.parameters.properties), ["reason"]);
     assert.deepEqual(tool.parameters.properties.reason.enum, ["disrespect", "harassment", "spam"]);
     assert.equal(deletions().length, 0);
