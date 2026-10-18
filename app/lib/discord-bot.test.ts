@@ -506,7 +506,7 @@ describe("sih-inator mention bot", () => {
   });
   it("generates one fixed low-quality image and uploads it as a Discord attachment", async () => {
     const imageBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0x11, 0xff, 0xd9]);
-    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose wearing a crown", reply: "BEHOLD. GOOSE!" })
+    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose wearing a crown", reply: "BEHOLD. GOOSE!\nFEAR HIM!" })
       : url.endsWith("/rpc/claim_discord_bot_image") ? Response.json("accepted")
       : url.endsWith("/images/generations") ? Response.json({ data: [{ b64_json: imageBytes.toString("base64") }] }) : null;
     assert.equal(await handleDiscordMention(message({ content: `<@${botId}> draw a goose wearing a crown` }), config()), "answered");
@@ -522,6 +522,9 @@ describe("sih-inator mention bot", () => {
     const file = form.get("files[0]"); assert.ok(file instanceof Blob);
     assert.equal(file.type, "image/jpeg"); assert.deepEqual(Buffer.from(await file.arrayBuffer()), imageBytes);
     assert.equal(new Headers(replies()[0].init?.headers).has("Content-Type"), false);
+    assert.equal(replies().length, 2);
+    assert.equal(JSON.parse(String(replies()[1].init?.body)).content, "fear him");
+    assert.equal(JSON.parse(String(replies()[1].init?.body)).attachments, undefined);
     assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "answered");
   });
   it("enforces shared image quotas before spending on generation", async () => {
@@ -588,6 +591,86 @@ describe("sih-inator mention bot", () => {
     const results = await Promise.all([handleDiscordMention(message(), config()), handleDiscordMention(message(), config())]);
     assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
     assert.equal(modelCalls().length, 1); assert.equal(replies().length, 1);
+  });
+  it("sends Bob's lines as ordered messages with distinct stable nonces and one tracked reply", async () => {
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "FIRST.\n\nSecond!" } }] }) : null;
+    const results = await Promise.all([handleDiscordMention(message(), config()), handleDiscordMention(message(), config())]);
+    assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
+    assert.equal(modelCalls().length, 1);
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)));
+    assert.deepEqual(parts.map((part) => part.content), ["first", "second"]);
+    assert.deepEqual(parts.map((part) => part.nonce), [message().id, `${message().id}:1`]);
+    assert.ok(parts.every((part) => part.enforce_nonce && part.message_reference.message_id === message().id));
+    assert.ok(parts.every((part) => part.allowed_mentions.parse.length === 0 && !part.allowed_mentions.replied_user));
+    const tracking = JSON.parse(String(calls.find(({ url }) => url.includes("/discord_bot_requests?"))?.init?.body));
+    assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, "1560000000000000005");
+    assert.match(JSON.parse(String(modelCalls()[0].init?.body)).messages[0].content, /line break between complete thoughts/);
+  });
+  it("delivers long Bob replies across messages without the old 1900-character cutoff", async () => {
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "x".repeat(3_000) } }] }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)).content as string);
+    assert.deepEqual(parts.map((part) => part.length), [1_900, 1_100]);
+    assert.equal(parts.join(""), "x".repeat(3_000));
+  });
+  it("does not repeat deliberate pings in later messages", async () => {
+    intercept = (url) => url === modelUrl ? actionResponse("mention_users", {
+      user_ids: [message().authorId], reply: "first thought\nsecond thought",
+    }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)));
+    assert.equal(parts[0].content, `<@${message().authorId}> first thought`);
+    assert.deepEqual(parts[0].allowed_mentions.users, [message().authorId]);
+    assert.equal(parts[1].content, "second thought");
+    assert.deepEqual(parts[1].allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("keeps Rick's replies in one message", async () => {
+    const rick = enableRick();
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "first thought\nsecond thought" } }] }) : null;
+    assert.equal(await handleDiscordMention(message({ content: `<@${rickId}> hi`, mentionedUserIds: [rickId] }), rick), "answered");
+    assert.equal(replies().length, 1);
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "first thought\nsecond thought");
+  });
+  it("retries a later message with its own nonce without resending earlier messages", async () => {
+    intercept = (url, init) => url === modelUrl ? Response.json({ choices: [{ message: { content: "first\nsecond" } }] })
+      : url.endsWith("/messages") && init?.method === "POST" && replies().length === 2
+        ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)));
+    assert.deepEqual(parts.map((part) => part.content), ["first", "second", "second"]);
+    assert.deepEqual(parts.map((part) => part.nonce), [message().id, `${message().id}:1`, `${message().id}:1`]);
+    assert.equal(replies()[1].init?.body, replies()[2].init?.body);
+  });
+  it("stops after a failed message and records partial delivery as failed", async () => {
+    intercept = (url, init) => url === modelUrl ? Response.json({ choices: [{ message: { content: "first\nsecond\nthird" } }] })
+      : url.endsWith("/messages") && init?.method === "POST" && replies().length === 2
+        ? Response.json({}, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    assert.equal(replies().length, 2);
+    const tracking = JSON.parse(String(calls.at(-1)?.init?.body));
+    assert.equal(tracking.status, "failed"); assert.equal(tracking.reply_message_id, "1560000000000000005");
+  });
+  it("keeps a person's next request queued until every message in the answer finishes", async () => {
+    const started = Promise.withResolvers<void>();
+    const release = Promise.withResolvers<Response>();
+    intercept = (url, init) => {
+      if (url === modelUrl) return Response.json({ choices: [{ message: { content: "first\nsecond" } }] });
+      if (url.endsWith("/messages") && init?.method === "POST" && replies().length === 2) {
+        started.resolve(); return release.promise;
+      }
+      return null;
+    };
+    const first = handleDiscordMention(message(), config());
+    await started.promise;
+    const followup = handleDiscordMention(message({ id: "1560000000000000006" }), config());
+    try {
+      await Promise.resolve();
+      assert.equal(modelCalls().length, 1);
+      assert.equal(calls.filter(({ url }) => url.includes("/rpc/")).length, 1);
+      assert.equal(calls.filter(({ url }) => url.includes("/discord_bot_requests?")).length, 0);
+    } finally { release.resolve(Response.json({ id: "1560000000000000007" })); }
+    assert.deepEqual(await Promise.all([first, followup]), ["answered", "answered"]);
+    assert.equal(replies().length, 4);
   });
   it("waits out the two-second cooldown and answers without a cooldown notice", async () => {
     let admissions = 0;
@@ -715,9 +798,9 @@ describe("sih-inator mention bot", () => {
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 2); assert.equal(replies()[0].init?.body, replies()[1].init?.body);
   });
-  it("bounds output length and preserves success if delivery tracking fails", async () => {
-    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "x".repeat(3000) } }] }) : null;
-    assert.equal((await generateDiscordBotReply("Test", config().model)).text.length, 1900);
+  it("bounds total output length and preserves success if delivery tracking fails", async () => {
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "x".repeat(12_000) } }] }) : null;
+    assert.equal((await generateDiscordBotReply("Test", config().model)).text.length, 9_500);
     intercept = (url) => url.includes("/discord_bot_requests?") ? Response.json({}, { status: 403 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
     assert.equal(replies().length, 1);
@@ -799,12 +882,13 @@ describe("sih-inator mention bot", () => {
   it("formats GIF captions while keeping case-sensitive URLs intact", async () => {
     intercept = (url) => url === modelUrl ? gifResponse("confused", "UHHHH IUNNO?!") : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");
-    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "uhhhh iunno\nhttps://media.giphy.com/media/3o7aTskHEUdgCQAXde/giphy.gif");
+    assert.deepEqual(replies().map(({ init }) => JSON.parse(String(init?.body)).content), ["uhhhh iunno", "https://media.giphy.com/media/3o7aTskHEUdgCQAXde/giphy.gif"]);
     intercept = (url) => url === modelUrl ? gifResponse("typing_cat", "X".repeat(3_000)) : null;
     assert.equal(await handleDiscordMention(message({ id: "1560000000000000006" }), config()), "answered");
-    const content = JSON.parse(String(replies()[1].init?.body)).content;
-    assert.equal(content.length, 1_900);
-    assert.ok(content.endsWith("\nhttps://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif"));
+    const parts = replies().slice(2).map(({ init }) => JSON.parse(String(init?.body)).content as string);
+    assert.equal(parts.length, 3);
+    assert.equal(parts.slice(0, 2).join(""), "x".repeat(3_000));
+    assert.equal(parts[2], "https://media.giphy.com/media/JIX9t2j0ZTN9S/giphy.gif");
   });
   it("rejects unsupported GIFs, arbitrary URLs, invalid captions, and extra targets", async () => {
     for (const [index, result] of [
@@ -818,6 +902,15 @@ describe("sih-inator mention bot", () => {
     }
     assert.equal(replies().length, 6);
     assert.ok(replies().every(({ init }) => !JSON.parse(String(init?.body)).content.includes("https://")));
+  });
+  it("preserves the selected GIF when a caption would exceed the message cap", async () => {
+    intercept = (url) => url === modelUrl ? gifResponse("hello", "short line\n".repeat(4) + "x".repeat(12_000)) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "answered");
+    const parts = replies().map(({ init }) => JSON.parse(String(init?.body)).content as string);
+    assert.equal(parts.length, 5);
+    assert.ok(parts.every((part) => part.length <= 1_900));
+    assert.equal(parts[4], "https://media.giphy.com/media/xT9IgG50Fb7Mi0prBC/giphy.gif");
+    assert.equal(parts.filter((part) => part.includes("https://")).length, 1);
   });
   it("does not send duplicate GIFs across overlapping listeners and retries with the same nonce", async () => {
     intercept = (url) => url === modelUrl ? gifResponse("thumbs_up")
