@@ -17,13 +17,14 @@ export async function generateDiscordImage(prompt: string, userId: string): Prom
   if (!key || !getDiscordImageConfig() || !prompt.trim() || prompt.length > MAX_IMAGE_PROMPT_LENGTH) {
     throw new Error("Image generation is unavailable");
   }
-  // One fixed, inexpensive draft. The model cannot request more images or higher settings.
+  // A landscape draft at the minimum pixel count costs less than the square default.
+  // The model cannot request more images or higher settings.
   const response = await fetch("https://api.openai.com/v1/images/generations", {
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gpt-image-2.5-flare", prompt: prompt.trim(), n: 1, quality: "low",
-      size: "1024x1024", output_format: "jpeg", output_compression: 60, moderation: "auto",
+      size: "1024x640", output_format: "jpeg", output_compression: 60, moderation: "auto",
       safety_identifier: createHash("sha256").update(`discord:${userId}`).digest("hex"),
     }),
     cache: "no-store", redirect: "error", signal: AbortSignal.timeout(90_000),
