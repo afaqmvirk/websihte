@@ -100,13 +100,13 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
-## Overlord Bob and Overlord Rick Discord bots
+## Overlord Bob, Overlord Rick, and Overlord Krab Discord bots
 
 The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. Both respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
+bot. All three respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
 also invite Bob with the standalone, case-sensitive words `bob` or `spongebob`,
 and Rick with `rick` or `patrick`. The model uses current-channel context to
 decide whether the name clearly refers to this bot; it can silently skip passing
@@ -115,7 +115,7 @@ nothing worth adding. These optional checks use the normal request claims and
 quotas, including decisions to stay silent. Skips complete the claim without a
 reply ID, typing indicator, reaction, or error/quota notice. Unpinged chat cannot
 invoke moderation. They also respond to
-mentions from the other configured overlord, while ignoring themselves, unrelated
+mentions from the other configured overlords, while ignoring themselves, unrelated
 bots, webhooks, and global pings. A bot conversation must continue a database-tracked
 reply in the same channel and ends after at most six replies in that chain,
 including the first human-triggered reply. Human messages can start a new exchange.
@@ -140,8 +140,21 @@ Files for images. Set `DISCORD_RICK_BOT_TOKEN`, `DISCORD_RICK_APPLICATION_ID`, a
 `DISCORD_RICK_ENABLED=true`. Bob's existing environment variables are unchanged;
 Rick needs his own token and application ID. Each bot can run independently, and
 the gateway route reports the personas it starts. Configuring the same account
-for both personas disables Rick rather than running two identities on one token.
+for multiple personas keeps only the first enabled identity (Bob, then Rick, then Krab).
 Grant Bob Attach Files too if he should generate images.
+
+Create and install a third Discord application named `overlord krab`. Enable its
+Message Content setting and grant View Channels, Send Messages, Send Messages in
+Threads, and Read Message History. Set `DISCORD_KRAB_BOT_TOKEN`,
+`DISCORD_KRAB_APPLICATION_ID`, and `DISCORD_KRAB_ENABLED=true`. Krab replies to
+direct mentions and standalone, case-sensitive `krab` or `krabs` in human messages.
+Every successful reply contains only `money`, repeated 1–32 times and separated by
+spaces. A SHA-256 hash of the message ID determines the count, with descending
+weights 32, 31, …, 1: one repetition is 32 times as likely as 32 repetitions.
+The same message always produces the same reply. Krab uses no OpenAI key, model,
+history fetching, image generation, reactions, or moderation. He shares the
+request claims, quotas, and peer tracking, with a fixed one-second typing pause;
+quota limits and failures stay silent so he never says anything except `money`.
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
@@ -190,12 +203,13 @@ confidently misunderstands simple things and proposes spectacularly stupid ideas
 using small everyday words and short plain phrases.
 His persona does not change real event facts or the moderation and safety rules.
 
-Both bots can call `mention_users` to tag the other overlord, the current speaker,
+Bob and Rick can call `mention_users` to tag another overlord, the current speaker,
 or people tagged in the current message (up to three targets per reply). The tool
 supplies the real Discord IDs; arbitrary IDs, roles, and mass mentions are rejected.
-Only deliberate tool-selected targets are allowed to ping. Names in plain model
-output do not cause notifications. Each bot sees its own prior messages as its
-assistant history and the other overlord as a separate speaker. Bot-to-bot replies
+Only deliberate tool-selected targets are allowed to ping. Bob and Rick can also
+tag Krab, whose money-only reply ends the exchange without tagging anyone. Names
+in plain model output do not cause notifications. Bob and Rick see their own prior
+messages as assistant history and the other overlords as separate speakers. Bot-to-bot replies
 use current-channel history only and cannot call image generation or moderation.
 
 The `generate_image` tool produces one draft only when the current human asks for
@@ -242,8 +256,9 @@ until the following month. Never commit bot tokens, cron secrets, or API keys.
 
 Run `bun test app/lib/discord-bot.test.ts` for bot checks and
 `bun test app/api/applications/route.test.ts` for the application flow.
-Apply `20261018040823_add_overlord_rick_and_image_tools.sql` before deploying these
-changes. `supabase/tests/discord-overlords.sql` checks the database claims and
+Apply `20261018040823_add_overlord_rick_and_image_tools.sql`, then
+`20261018045313_add_overlord_krab.sql` before deploying these changes.
+`supabase/tests/discord-overlords.sql` checks the database claims and
 limits inside a transaction that rolls back its synthetic records. During a
 deployment, an existing ten-minute listener keeps its old configuration until
 handover; wait for it to expire before testing the newly enabled personas.
