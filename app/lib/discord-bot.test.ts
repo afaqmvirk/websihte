@@ -274,7 +274,7 @@ describe("sih-inator mention bot", () => {
     const imageCall = calls.find(({ url }) => url.endsWith("/images/generations"))!;
     const request = JSON.parse(String(imageCall.init?.body));
     assert.equal(request.model, "gpt-image-2.5-flare"); assert.equal(request.quality, "low");
-    assert.equal(request.size, "1024x1024"); assert.equal(request.n, 1); assert.equal(request.output_format, "jpeg");
+    assert.equal(request.size, "1024x640"); assert.equal(request.n, 1); assert.equal(request.output_format, "jpeg");
     assert.equal(request.moderation, "auto"); assert.match(request.safety_identifier, /^[a-f0-9]{64}$/);
     const form = replies()[0].init?.body; assert.ok(form instanceof FormData);
     const payload = JSON.parse(String(form.get("payload_json")));

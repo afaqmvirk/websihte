@@ -200,10 +200,11 @@ use current-channel history only and cannot call image generation or moderation.
 
 The `generate_image` tool produces one draft only when the current human asks for
 an image. It calls the OpenAI Images API directly with `gpt-image-2.5-flare`, fixed
-`quality: low`, `1024x1024`, and compressed JPEG output, then uploads the bytes to
+`quality: low`, `1024x640`, and compressed JPEG output, then uploads the bytes to
 Discord as an attachment. There is no new SDK, image host, or persistent image
-storage. Prompts are limited to 800 characters and attachments to 4 MB. The shared
-allowance defaults to 25 images per UTC day, with one image attempt per human per
+storage. The landscape size uses the model's minimum supported pixel count to
+reduce image output cost. Prompts are limited to 800 characters and attachments
+to 4 MB. The shared allowance defaults to 25 images per UTC day, with one image attempt per human per
 minute across both bots. Provider failures count conservatively; generation is
 not retried automatically. Set `DISCORD_BOT_IMAGE_DAILY_LIMIT` to 1–100 or set
 `DISCORD_BOT_IMAGES_ENABLED=false` to disable the tool. These image limits are
