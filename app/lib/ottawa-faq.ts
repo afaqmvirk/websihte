@@ -19,4 +19,8 @@ export const OTTAWA_FAQ = [
     question: "can i be part of a team?",
     answer: "yes. teams of up to 4 people. you can also hack solo.",
   },
+  {
+    question: "when will i know the result of my application?",
+    answer: "stay tuned. applications are reviewed on a rolling basis, the earlier you apply the better.",
+  },
 ] as const;

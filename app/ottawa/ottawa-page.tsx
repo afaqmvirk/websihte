@@ -680,7 +680,6 @@ export default function OttawaPage() {
             <p className={styles.sectionNumber} aria-hidden>④</p>
             <h2 id="application-title">apply to build.</h2>
             <p>
-              tell us who you are and what gloriously unnecessary thing you want to make. rough ideas are very welcome.
               <span className={styles.applicationDeadline}>
                 applications close <time dateTime="2026-11-02">02 november at midnight</time> EDT.
               </span>
