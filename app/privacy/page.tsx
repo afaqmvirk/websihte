@@ -140,8 +140,8 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               This context can include
-              other participants&apos; messages and both bots&apos; replies.
-              The bots can tag each other for a short conversation in that channel,
+              other participants&apos; messages and the overlords&apos; replies.
+              Bob and Rick can tag each other or Krab for a short conversation in that channel,
               and can tag you or people mentioned in the current exchange.
               If you ask for an image, we also send a short image description to
               OpenAI and post the generated image back to Discord. Images are not
@@ -156,6 +156,14 @@ export default function PrivacyPolicyPage() {
               request. We also keep a server-level monthly request count until
               the next month. Conversation context is fetched when needed; we do
               not store message, question, or answer text in that database.
+            </p>
+            <p>
+              Overlord krab replies to direct tags and standalone, case-sensitive
+              krab or krabs in human messages. His replies contain only the word
+              money repeated 1–32 times, determined from the message ID with shorter
+              replies weighted more heavily. Krab does not send messages to OpenAI
+              or fetch conversation history. The same private metadata tracking
+              and usage limits apply to his replies.
             </p>
 
             <h3>when you email us</h3>

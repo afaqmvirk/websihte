@@ -1,16 +1,19 @@
 import { timingSafeEqual } from "node:crypto";
 import { getApplicationStorageConfig } from "@/lib/application-storage";
 import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/discord-bot-context";
-import { getDiscordBotSystemPrompt, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
+import { getDiscordBotSystemPrompt, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
+import { generateKrabReply } from "@/lib/discord-bot-krab";
 import { generateDiscordImage, getDiscordImageConfig, MAX_IMAGE_PROMPT_LENGTH, type DiscordGeneratedImage } from "@/lib/discord-bot-image";
 
 const SNOWFLAKE = /^\d{17,20}$/;
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
+const BOT_PERSONAS = ["bob", "rick", "krab"] as const;
 const BOT_NAMES = {
   bob: /(?<![\p{L}\p{M}\p{N}_])(?:bob|spongebob)(?![\p{L}\p{M}\p{N}_])/u,
   rick: /(?<![\p{L}\p{M}\p{N}_])(?:rick|patrick)(?![\p{L}\p{M}\p{N}_])/u,
+  krab: /(?<![\p{L}\p{M}\p{N}_])(?:krab|krabs)(?![\p{L}\p{M}\p{N}_])/u,
 };
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
@@ -38,8 +41,8 @@ type DiscordBotReply = {
 };
 
 function botIdentity(persona: DiscordBotPersona) {
-  const prefix = persona === "rick" ? "DISCORD_RICK" : "DISCORD";
-  const enabled = process.env[persona === "rick" ? "DISCORD_RICK_ENABLED" : "DISCORD_BOT_ENABLED"] === "true";
+  const prefix = persona === "bob" ? "DISCORD" : `DISCORD_${persona.toUpperCase()}`;
+  const enabled = process.env[persona === "bob" ? "DISCORD_BOT_ENABLED" : `${prefix}_ENABLED`] === "true";
   const token = process.env[`${prefix}_BOT_TOKEN`]?.trim();
   const applicationId = process.env[`${prefix}_APPLICATION_ID`]?.trim() || "";
   if (!enabled || !token || token.length < 40 || /\s/.test(token) || !SNOWFLAKE.test(applicationId)) return null;
@@ -47,31 +50,35 @@ function botIdentity(persona: DiscordBotPersona) {
 }
 
 export function getDiscordBotConfig(persona: DiscordBotPersona = "bob") {
-  const identity = botIdentity(persona);
   const guildId = process.env.DISCORD_GUILD_ID?.trim() || "1483863305360511016";
   const model = process.env.DISCORD_BOT_MODEL?.trim() || "gpt-6-luna";
+  const modelReady = !!process.env.OPENAI_API_KEY?.trim() && /^[\w.-]+$/.test(model);
+  const identities: NonNullable<ReturnType<typeof botIdentity>>[] = [];
+  for (const bot of BOT_PERSONAS) {
+    const candidate = botIdentity(bot);
+    if (!candidate || (bot !== "krab" && !modelReady)) continue;
+    // First configured account wins, including when three personas are enabled.
+    if (!identities.some((other) => other.applicationId === candidate.applicationId || other.token === candidate.token)) {
+      identities.push(candidate);
+    }
+  }
+  const identity = identities.find((bot) => bot.persona === persona);
   const dailyLimit = Number(process.env.DISCORD_BOT_DAILY_LIMIT || 10_000);
   const monthlyLimit = Number(process.env.DISCORD_BOT_MONTHLY_LIMIT || 310_000);
   const cooldownSeconds = Number(process.env.DISCORD_BOT_COOLDOWN_SECONDS || 2);
   const storage = getApplicationStorageConfig();
   if (!identity || !SNOWFLAKE.test(guildId)
-    || !process.env.OPENAI_API_KEY?.trim() || !/^[\w.-]+$/.test(model)
     || !Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 10_000
     || !Number.isInteger(monthlyLimit) || monthlyLimit < 1 || monthlyLimit > 310_000
     || !Number.isInteger(cooldownSeconds) || cooldownSeconds < 1 || cooldownSeconds > 3_600
     || !storage) return null;
-  const other = botIdentity(persona === "bob" ? "rick" : "bob");
-  // A token accidentally configured twice must never create two personas on one account.
-  if (other && (other.applicationId === identity.applicationId || other.token === identity.token)) {
-    if (persona === "rick") return null;
-    return { ...identity, guildId, model, dailyLimit, monthlyLimit, cooldownSeconds, storage, peers: [] };
-  }
-  const peers = other ? [{ persona: other.persona, applicationId: other.applicationId, name: other.name }] : [];
+  const peers = identities.filter((bot) => bot.persona !== persona)
+    .map(({ persona, applicationId, name }) => ({ persona, applicationId, name }));
   return { ...identity, guildId, model, dailyLimit, monthlyLimit, cooldownSeconds, storage, peers };
 }
 
 export function getDiscordBotConfigs() {
-  return (["bob", "rick"] as const).map(getDiscordBotConfig).filter((config) => config !== null);
+  return BOT_PERSONAS.map(getDiscordBotConfig).filter((config) => config !== null);
 }
 
 export type DiscordBotConfig = NonNullable<ReturnType<typeof getDiscordBotConfig>>;
@@ -147,7 +154,7 @@ function formatReply(text: string) {
 }
 
 type ReplyOptions = {
-  persona?: DiscordBotPersona; mentionTargets?: DiscordMentionTarget[];
+  persona?: DiscordAiBotPersona; mentionTargets?: DiscordMentionTarget[];
   canGenerateImage?: boolean; currentSpeaker?: string; optionalResponse?: boolean;
 };
 
@@ -472,7 +479,7 @@ async function answerMention(
     if (paused) return;
     paused = true;
     stopTyping ??= startTyping(message, config);
-    await waitBeforeReply((1 + Math.floor(Math.random() * 5)) * 1_000);
+    await waitBeforeReply(config.persona === "krab" ? 1_000 : (1 + Math.floor(Math.random() * 5)) * 1_000);
   }
   try {
     let claim = await claimMention(message, config);
@@ -486,14 +493,14 @@ async function answerMention(
     }
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
     if (claim === "daily_limit") {
-      if (!message.authorIsBot && !optionalResponse) {
+      if (config.persona !== "krab" && !message.authorIsBot && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
       }
       return claim;
     }
     if (claim === "monthly_limit") {
-      if (!message.authorIsBot && !optionalResponse) {
+      if (config.persona !== "krab" && !message.authorIsBot && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
       }
@@ -502,7 +509,8 @@ async function answerMention(
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
     let answer: DiscordBotReply;
-    if (!question) answer = { text: "uhhhh iunno" };
+    if (config.persona === "krab") answer = { text: generateKrabReply(message.id) };
+    else if (!question) answer = { text: "uhhhh iunno" };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
       message.canDelete === true && !message.authorIsBot && !optionalResponse, {
@@ -539,7 +547,7 @@ async function answerMention(
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      if (!optionalResponse) {
+      if (config.persona !== "krab" && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
       }
@@ -558,7 +566,7 @@ export async function handleDiscordMention(
   const trigger = getDiscordMessageTrigger(message, config);
   if (!trigger) return "ignored";
   const question = questionFromMention(message, config);
-  if (trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
+  if (config.persona !== "krab" && trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
   // Preserve each person's message order without holding up other people.
   const key = `${config.persona}:${message.guildId}:${message.authorId}`;
   const previous = userQueues.get(key);

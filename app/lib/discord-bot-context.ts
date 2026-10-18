@@ -1,3 +1,5 @@
+import type { DiscordBotPersona } from "@/lib/discord-bot-knowledge";
+
 const SNOWFLAKE = /^\d{17,20}$/;
 const MAX_CONTEXT_BYTES = 48_000;
 const MAX_MESSAGE_BYTES = 512;
@@ -10,8 +12,8 @@ export type DiscordConversationMessage = {
 
 type Mention = { id: string; channelId: string; authorId: string; authorIsBot?: boolean };
 type BotContextIdentity = {
-  persona?: "bob" | "rick";
-  peers?: { applicationId: string; persona: "bob" | "rick"; name: string }[];
+  persona?: DiscordBotPersona;
+  peers?: { applicationId: string; persona: DiscordBotPersona; name: string }[];
 };
 type HistoryMessage = {
   id: string; channel_id: string; timestamp: string; content: string;

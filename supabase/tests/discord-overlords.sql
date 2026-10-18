@@ -13,11 +13,13 @@ declare
   result text;
   turn integer;
 begin
-  -- A single human can mention both bots; deduplication is per bot.
+  -- A single human can mention all three bots; deduplication is per bot.
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'bob') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'rick') = 'accepted';
+  assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'krab') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'bob') = 'duplicate';
-  assert (select count(*) from public.discord_bot_requests where guild_id = test_guild) = 2;
+  assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'krab') = 'duplicate';
+  assert (select count(*) from public.discord_bot_requests where guild_id = test_guild) = 3;
 
   -- A peer cannot start from an untracked or cross-channel parent.
   assert public.claim_discord_overlord_request('9999999999999999911', test_guild, '9999999999999999921', test_channel, 'rick',
@@ -27,8 +29,8 @@ begin
 
   -- Six replies per chain including the human-triggered reply, then silence.
   for turn in 1..6 loop
-    bot := case when turn % 2 = 1 then 'rick' else 'bob' end;
-    peer := case when bot = 'rick' then 'bob' else 'rick' end;
+    bot := case when turn % 3 = 1 then 'krab' when turn % 3 = 2 then 'rick' else 'bob' end;
+    peer := case when turn % 3 = 1 then 'bob' when turn % 3 = 2 then 'krab' else 'rick' end;
     next_id := (9999999999999999930::numeric + turn)::text;
     update public.discord_bot_requests set status = 'answered', created_at = now() - interval '4 seconds' where guild_id = test_guild;
     result := public.claim_discord_overlord_request(next_id, test_guild, '9999999999999999921', test_channel, bot,
@@ -50,6 +52,18 @@ begin
   assert public.claim_discord_bot_image('9999999999999999931', 'rick') = 'forbidden';
   assert public.claim_discord_overlord_request('9999999999999999950', test_guild, '9999999999999999951', test_channel, 'bob') = 'accepted';
   assert public.claim_discord_bot_image('9999999999999999950', 'bob', 1) = 'daily_limit';
+
+  -- Krab shares admission limits but never receives image privileges.
+  assert public.claim_discord_overlord_request('9999999999999999960', test_guild, human_id, test_channel, 'krab') = 'cooldown';
+  assert public.claim_discord_overlord_request('9999999999999999960', test_guild, human_id, test_channel, 'krab', 1) = 'daily_limit';
+  begin
+    perform public.claim_discord_bot_image(root_id, 'krab');
+    assert false, 'Krab must not be allowed to generate images';
+  exception when raise_exception then
+    assert sqlerrm = 'Invalid image request';
+  end;
+  update public.discord_bot_monthly_usage set request_count = 310000 where guild_id = test_guild;
+  assert public.claim_discord_overlord_request('9999999999999999960', test_guild, '9999999999999999961', test_channel, 'krab') = 'monthly_limit';
 
   -- New functions remain private and retain invoker privileges.
   assert not has_function_privilege('anon', 'public.claim_discord_bot_image(text,text,integer)', 'execute');
