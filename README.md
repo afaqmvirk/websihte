@@ -171,6 +171,14 @@ Both bots keep typing for an extra random one to five seconds after preparing a
 response, including reactions and GIFs. An optional name mention starts typing only
 after the model chooses to join in. The extra pause also preserves each person's
 reply order.
+Bob can split an answer into up to five ordered messages: ordinary line breaks
+start a new message, and longer lines wrap at word boundaries within 1,900 characters.
+Code blocks stay together where possible; oversized blocks are split with their
+fences preserved. Remaining short lines share the fifth message. The 512-token
+output limit still applies. Only the first message can ping selected users or
+carry an image attachment. Each part uses a distinct stable Discord nonce for
+retries. The request stays queued until all parts finish, and a failed part stops
+later sends and records failure while retaining the first reply ID for tracking.
 The queue lives in the active listener, so a process crash can still lose waiting
 messages. The monthly count is atomic across instances and
 counts failed attempts conservatively. Model cost depends on the question and

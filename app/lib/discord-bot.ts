@@ -3,6 +3,7 @@ import { getApplicationStorageConfig } from "@/lib/application-storage";
 import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/discord-bot-context";
 import { getDiscordBotSystemPrompt, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
 import { generateKrabReply } from "@/lib/discord-bot-krab";
+import { MAX_DISCORD_REPLY_LENGTH, MAX_DISCORD_REPLY_MESSAGES, splitDiscordReply } from "@/lib/discord-bot-replies";
 import { findDiscordServerMembers, MAX_MEMBER_QUERY_LENGTH, validDiscordMemberQuery, type DiscordMemberSearch } from "@/lib/discord-bot-members";
 import { generateDiscordImage, getDiscordImageConfig, MAX_IMAGE_PROMPT_LENGTH, type DiscordGeneratedImage } from "@/lib/discord-bot-image";
 
@@ -358,8 +359,10 @@ optional unpinged name mention:
   }
   // Only the deliberate mention tool can create live mention syntax.
   const mentions = mentionUserIds?.map((id) => `<@${id}>`).join(" ") || "";
+  const textLimit = MAX_DISCORD_REPLY_LENGTH * ((options.persona ?? "bob") === "bob" ? MAX_DISCORD_REPLY_MESSAGES : 1);
   let text = formatReply(content.replace(/<@!?\d{17,20}>/g, ""))
-    .slice(0, 1_900 - (gifUrl ? gifUrl.length + 1 : 0) - (mentions ? mentions.length + 1 : 0)).trimEnd();
+    .slice(0, textLimit - (gifUrl ? gifUrl.length + 1 : 0) - (mentions ? mentions.length + 1 : 0))
+    .replace(/[\uD800-\uDBFF]$/, "").trimEnd();
   if (mentions) text = text ? `${mentions} ${text}` : mentions;
   // Leave the full URL on its own line so Discord can display the animated GIF.
   if (gifUrl) text = text ? `${text}\n${gifUrl}` : gifUrl;
@@ -416,13 +419,13 @@ async function postReaction(message: DiscordMention, emoji: string, config: Disc
 
 async function postReply(
   message: DiscordMention, content: string, config: DiscordBotConfig,
-  options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage } = {},
+  options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage; part?: number } = {},
 ) {
   const payload = JSON.stringify({
     content: formatReply(content),
     allowed_mentions: { parse: [], replied_user: false, ...(options.mentionUserIds?.length ? { users: options.mentionUserIds } : {}) },
     message_reference: { message_id: message.id, fail_if_not_exists: false },
-    nonce: message.id, enforce_nonce: true,
+    nonce: options.part ? `${message.id}:${options.part}` : message.id, enforce_nonce: true,
     ...(options.image ? { attachments: [{ id: 0, filename: options.image.filename }] } : {}),
   });
   let body: string | FormData = payload;
@@ -452,6 +455,24 @@ async function postReply(
     if (attempt < 2) await new Promise((resolve) => setTimeout(resolve, delay));
   }
   return null;
+}
+
+async function postAnswer(
+  message: DiscordMention, content: string, config: DiscordBotConfig,
+  options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage },
+) {
+  const parts = config.persona === "bob" ? splitDiscordReply(content) : (content ? [content] : []);
+  if (!parts.length && options.image) parts.push("");
+  let replyId: string | null = null;
+  for (const [part, text] of parts.entries()) {
+    const id = await postReply(message, text, config, { part,
+      ...(part === 0 ? options : {}),
+    });
+    if (!id) return { replyId, complete: false };
+    // The first message remains the canonical reply for bounded peer exchanges.
+    replyId ??= id;
+  }
+  return { replyId, complete: true };
 }
 
 function mentionTargets(message: DiscordMention, config: DiscordBotConfig): DiscordMentionTarget[] {
@@ -588,8 +609,8 @@ async function answerMention(
     await pauseBeforeReply();
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
     const text = answer.text || (reacted || image ? "" : "uhhhh iunno");
-    const replyId = text || image ? await postReply(message, text, config, { image, mentionUserIds: answer.mentionUserIds }) : null;
-    const answered = !!replyId || reacted;
+    const { replyId, complete } = await postAnswer(message, text, config, { image, mentionUserIds: answer.mentionUserIds });
+    const answered = complete && (!!replyId || reacted);
     await recordReply(message.id, replyId, config, answered);
     return answered ? "answered" : "failed";
   } catch {
