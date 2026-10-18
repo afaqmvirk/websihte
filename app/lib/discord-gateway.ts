@@ -1,11 +1,10 @@
 import { Client, Events, GatewayIntentBits, Options, PermissionFlagsBits } from "discord.js";
-import { handleDiscordMention, type DiscordBotConfig } from "@/lib/discord-bot";
+import { getDiscordMessageTrigger, handleDiscordMention, type DiscordBotConfig, type DiscordMention } from "@/lib/discord-bot";
 
 export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 600_000) {
   const client = new Client({
-    // Direct mentions need no privileged Gateway intent. History is fetched on demand
-    // over REST using the app's Message Content setting, rather than caching all messages.
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages],
+    // Message Content is needed to spot unpinged names; messages are still not cached.
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
     makeCache: Options.cacheWithLimits({ MessageManager: 0 }),
     allowedMentions: { parse: [], repliedUser: false },
   });
@@ -15,19 +14,18 @@ export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 6
   });
   client.on(Events.Error, () => console.error("Discord Gateway connection error"));
   client.on(Events.MessageCreate, (message) => {
-    if (!message.inGuild() || message.webhookId || message.author.id === config.applicationId
-      || (message.author.bot && !config.peers.some((peer) => peer.applicationId === message.author.id))
-      || message.guildId !== config.guildId
-      || !message.mentions.users.has(config.applicationId)) return;
-    const work = handleDiscordMention({
+    if (!message.inGuild()) return;
+    const incoming: DiscordMention = {
       id: message.id, guildId: message.guildId, channelId: message.channelId,
       authorId: message.author.id, content: message.content, authorIsBot: message.author.bot,
       mentionedUserIds: [...message.mentions.users.keys()],
       mentionedUsers: [...message.mentions.users.values()].map((user) => ({ id: user.id, name: user.globalName || user.username })),
       authorName: message.author.globalName || message.author.username,
       authorIsWebhook: !!message.webhookId, referencedMessageId: message.reference?.messageId,
-      canDelete: message.channel.permissionsFor(message.client.user)?.has(PermissionFlagsBits.ManageMessages) ?? false,
-    }, config);
+    };
+    if (!getDiscordMessageTrigger(incoming, config)) return;
+    incoming.canDelete = message.channel.permissionsFor(message.client.user)?.has(PermissionFlagsBits.ManageMessages) ?? false;
+    const work = handleDiscordMention(incoming, config);
     pending.add(work);
     void work.catch(() => console.error("Discord bot mention failed", { bot: config.persona }))
       .finally(() => pending.delete(work));

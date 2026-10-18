@@ -90,6 +90,7 @@ export function selectDiscordConversation(
 export async function getDiscordConversation(
   message: Mention, config: { token: string; applicationId: string; guildId: string } & BotContextIdentity,
   includeCompletedReplies = false,
+  channelOnly = false,
 ): Promise<DiscordConversationMessage[]> {
   async function readHistory(url: string, allowIndexRetry = false): Promise<unknown> {
     for (let attempt = 0; attempt < 2; attempt++) {
@@ -115,7 +116,7 @@ export async function getDiscordConversation(
   });
   const results = await Promise.allSettled([
     readHistory(`https://discord.com/api/v10/channels/${message.channelId}/messages?${includeCompletedReplies ? "" : `before=${message.id}&`}limit=25`),
-    message.authorIsBot ? Promise.resolve({ messages: [] })
+    message.authorIsBot || channelOnly ? Promise.resolve({ messages: [] })
       : readHistory(`https://discord.com/api/v10/guilds/${config.guildId}/messages/search?${query}`, true),
   ]);
   if (results.some((result) => result.status === "rejected")) {
