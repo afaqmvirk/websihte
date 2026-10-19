@@ -100,13 +100,13 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
-## Overlord Bob, Overlord Rick, and Overlord Krab Discord bots
+## Overlord Bob, Rick, Krab, and Gerald Discord bots
 
 The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. All three respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
+bot. All four respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
 also invite Bob with the standalone, case-sensitive words `bob` or `spongebob`,
 and Rick with `rick` or `patrick`. The model uses current-channel context to
 decide whether the name clearly refers to this bot; it can silently skip passing
@@ -122,7 +122,7 @@ including the first human-triggered reply. Human messages can start a new exchan
 It requests Guilds, GuildMessages, and MessageContent Gateway intents. Enable each application's
 Message Content setting in Discord so name triggers and REST history receive unmentioned messages;
 Enable Bob's Server Members setting for directory listings; Rick and Krab can
-leave it disabled. Presence can stay disabled for all three. The Gateway still
+leave it disabled. Presence can stay disabled for all four. The Gateway still
 does not request member events or cache the directory. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
@@ -147,22 +147,37 @@ Grant Bob Attach Files too if he should generate images.
 
 Create and install a third Discord application named `overlord krab`. Enable its
 Message Content setting and grant View Channels, Send Messages, Send Messages in
-Threads, and Read Message History. Set `DISCORD_KRAB_BOT_TOKEN`,
+Threads, Read Message History, and Attach Files. Set `DISCORD_KRAB_BOT_TOKEN`,
 `DISCORD_KRAB_APPLICATION_ID`, and `DISCORD_KRAB_ENABLED=true`. Krab replies to
 direct mentions and standalone, case-sensitive `krab` or `krabs` in human messages.
-Every successful reply contains only `money`, repeated 1–32 times and separated by
-spaces. A SHA-256 hash of the message ID determines the count, with descending
+Most replies contain only `money`, repeated 1–32 times and separated by
+spaces. About 20% instead contain one of seven supplied money photos as a JPEG
+attachment with no caption. The original files are in `public/discord/krab/` and
+are explicitly included in the Gateway function's file trace. A SHA-256 hash of
+the message ID determines the reply choice and photo, so retries keep the same
+response. The text count uses descending
 weights 32, 31, …, 1: one repetition is 32 times as likely as 32 repetitions.
 The same message always produces the same reply. Krab uses no OpenAI key, model,
 history fetching, image generation, reactions, or moderation. He shares the
 request claims, quotas, and peer tracking, with a fixed one-second typing pause;
-quota limits and failures stay silent so he never says anything except `money`.
+quota limits and failures stay silent. An unreadable photo falls back to his usual
+money text. Fixed photos do not spend the separate AI image-generation allowance.
+
+Create and install a fourth Discord application named `overlord gerald`. Enable
+Message Content and grant View Channels, Send Messages, Send Messages in Threads,
+and Read Message History. Set `DISCORD_GERALD_BOT_TOKEN`,
+`DISCORD_GERALD_APPLICATION_ID`, and `DISCORD_GERALD_ENABLED=true`. Gerald answers
+direct tags and standalone, case-sensitive `gerald` in human messages with a
+space-separated sequence of `meow`, `miau`, and `mrow`, 1–32 words long with shorter
+sequences favoured. The message ID seeds the sequence so duplicate deliveries
+cannot change it. Like Krab, he uses no OpenAI, history, tools, or pings and keeps
+the one-second typing pause, shared admission limits, and silent failure behavior.
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
 tokens. Defaults allow 10,000 requests per UTC day, 310,000 per UTC month, and one
 per person per bot every two seconds. Daily and monthly allowances are shared
-across Bob and Rick. Follow-ups wait in order until the previous reply
+across all four bots. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
 claim keeps overlapping listeners from answering the same person out of order;
 stale processing claims stop blocking new work after three minutes. Discord's typing
@@ -231,7 +246,7 @@ Bob and Rick can call `mention_users` to tag another overlord, the current speak
 or people tagged in the current message (up to three targets per reply). The tool
 supplies the real Discord IDs; arbitrary IDs, roles, and mass mentions are rejected.
 Only deliberate tool-selected targets are allowed to ping. Bob and Rick can also
-tag Krab, whose money-only reply ends the exchange without tagging anyone. Names
+tag Krab or Gerald, whose fixed replies end the exchange without tagging anyone. Names
 in plain model output do not cause notifications. Bob and Rick see their own prior
 messages as assistant history and the other overlords as separate speakers. Bot-to-bot replies
 use current-channel history only and cannot call image generation or moderation.
@@ -295,7 +310,8 @@ until the following month. Never commit bot tokens, cron secrets, or API keys.
 Run `bun test app/lib/discord-bot.test.ts` for bot checks and
 `bun test app/api/applications/route.test.ts` for the application flow.
 Apply `20261018040823_add_overlord_rick_and_image_tools.sql`, then
-`20261018045313_add_overlord_krab.sql` before deploying these changes.
+`20261018045313_add_overlord_krab.sql`, then
+`20261019040834_add_overlord_gerald.sql` before enabling Gerald.
 `supabase/tests/discord-overlords.sql` checks the database claims and
 limits inside a transaction that rolls back its synthetic records. During a
 deployment, an existing ten-minute listener keeps its old configuration until
