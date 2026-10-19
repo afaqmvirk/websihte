@@ -1,0 +1,32 @@
+import assert from "node:assert/strict";
+import { readFile } from "node:fs/promises";
+import { describe, it } from "node:test";
+import { getSqudClarinet, loadSqudClarinet } from "./discord-bot-clarinet";
+
+describe("Squd clarinet voice clips", () => {
+  it("selects repeatable clips across all 32 original MIDI melodies", async () => {
+    const selected = new Map<string, string>();
+    for (let index = 0; index < 2_000; index++) {
+      const id = String(1560000000000000000n + BigInt(index));
+      const clip = getSqudClarinet(id);
+      assert.deepEqual(getSqudClarinet(id), clip);
+      selected.set(clip.file, id);
+    }
+    assert.equal(selected.size, 32);
+    for (const [file, id] of selected) {
+      const reference = getSqudClarinet(id);
+      const clip = await loadSqudClarinet(id);
+      assert.equal(clip.filename, file); assert.equal(clip.contentType, "audio/ogg");
+      assert.ok(clip.duration > 1 && clip.duration < 10);
+      assert.ok(Buffer.from(clip.bytes).includes(Buffer.from("OpusHead")));
+      const waveform = Buffer.from(clip.waveform, "base64");
+      assert.ok(waveform.length > 10 && waveform.length <= 256);
+      assert.ok(waveform.some((sample) => sample > 0));
+      const midi = await readFile(`public/discord/squd/${reference.midi}`);
+      assert.equal(midi.subarray(0, 4).toString(), "MThd");
+      assert.equal(midi.readUInt16BE(10), 1); // One track.
+      assert.ok(midi.includes(Buffer.from([0xc0, 71]))); // GM clarinet.
+      assert.ok(midi.includes(Buffer.from([0xff, 0x2f, 0]))); // End of track.
+    }
+  });
+});

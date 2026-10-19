@@ -13,15 +13,17 @@ declare
   result text;
   turn integer;
 begin
-  -- A single human can mention all four bots; deduplication is per bot.
+  -- A single human can mention all five bots; deduplication is per bot.
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'bob') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'rick') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'krab') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'gerald') = 'accepted';
+  assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'squd') = 'accepted';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'bob') = 'duplicate';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'krab') = 'duplicate';
   assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'gerald') = 'duplicate';
-  assert (select count(*) from public.discord_bot_requests where guild_id = test_guild) = 4;
+  assert public.claim_discord_overlord_request(root_id, test_guild, human_id, test_channel, 'squd') = 'duplicate';
+  assert (select count(*) from public.discord_bot_requests where guild_id = test_guild) = 5;
   assert public.claim_discord_overlord_request('9999999999999999970', test_guild, '9999999999999999971', test_channel, 'gerald',
     p_peer_bot_id => 'bob', p_parent_message_id => root_id) = 'accepted';
   assert public.claim_discord_overlord_request('9999999999999999971', test_guild, '9999999999999999972', test_channel, 'bob',
@@ -55,6 +57,9 @@ begin
   assert public.claim_discord_bot_image(root_id, 'bob') = 'accepted';
   assert public.claim_discord_bot_image(root_id, 'bob') = 'duplicate';
   assert public.claim_discord_bot_image(root_id, 'rick') = 'cooldown';
+  assert public.claim_discord_bot_image(root_id, 'squd') = 'cooldown';
+  assert public.claim_discord_overlord_request('9999999999999999980', test_guild, '9999999999999999981', test_channel, 'squd') = 'accepted';
+  assert public.claim_discord_bot_image('9999999999999999980', 'squd') = 'accepted';
   assert public.claim_discord_bot_image('9999999999999999931', 'rick') = 'forbidden';
   assert public.claim_discord_overlord_request('9999999999999999950', test_guild, '9999999999999999951', test_channel, 'bob') = 'accepted';
   assert public.claim_discord_bot_image('9999999999999999950', 'bob', 1) = 'daily_limit';
