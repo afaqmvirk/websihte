@@ -83,7 +83,7 @@ export default function PastSponsorsSection() {
         </defs>
       </svg>
       <div className={`section-shell ${styles.heading}`}>
-        <h2 id="past-sponsors-title">thank you to our past sponsors</h2>
+        <h2 id="past-sponsors-title">thank you to our past and current sponsors</h2>
       </div>
       <div id="past-sponsors-scroll" className={styles.viewport}>
         <div className={styles.track}>
