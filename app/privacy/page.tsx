@@ -175,8 +175,9 @@ export default function PrivacyPolicyPage() {
               limits apply to their replies.
             </p>
             <p>
-              Overlord squd can also ask the text model to compose a short note
-              sequence, which our server plays using sampled clarinet notes and
+              Overlord squd can also ask the text model to select a short melody
+              from a locally stored collection of 1,000 songs or compose a note
+              sequence. Our server plays the notes using sampled clarinet and
               sends as a voice message. The performance adds deliberate mistakes
               and squeaks. Forty saved performances of ten familiar tunes provide
               a fallback for named songs. No voice recording or separate
