@@ -1,4 +1,29 @@
 import { createHash } from "node:crypto";
+import { readFile } from "node:fs/promises";
+import { join } from "node:path";
+import type { DiscordVoiceClip } from "@/lib/discord-bot-clarinet";
+import deepMeow from "../../public/discord/gerald/deep-meow.json";
+
+export function shouldGeraldDeepMeow(messageId: string) {
+  const ticket = createHash("sha256").update(`gerald-deep-meow:${messageId}`).digest().readUInt32BE(0);
+  return ticket % 5 === 0;
+}
+
+export async function generateGeraldAnswer(messageId: string): Promise<{ text: string; voice?: DiscordVoiceClip }> {
+  if (shouldGeraldDeepMeow(messageId)) {
+    try {
+      const bytes = await readFile(join(process.cwd(), "public/discord/gerald", deepMeow.file));
+      if (bytes.length >= 32 && bytes.length <= 500_000 && bytes.subarray(0, 4).toString() === "OggS"
+        && bytes.includes(Buffer.from("OpusHead"))) {
+        return { text: "", voice: { bytes, filename: deepMeow.file, contentType: "audio/ogg",
+          duration: deepMeow.duration, waveform: deepMeow.waveform } };
+      }
+    } catch {
+      // An unavailable clip keeps Gerald's usual text reply.
+    }
+  }
+  return { text: generateGeraldReply(messageId) };
+}
 
 export function generateGeraldReply(messageId: string) {
   // Random-looking per message, but repeatable across retries and overlapping listeners.
