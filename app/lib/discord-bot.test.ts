@@ -7,7 +7,9 @@ import { generateGeraldReply, shouldGeraldDeepMeow } from "./discord-bot-gerald"
 import deepMeow from "../../public/discord/gerald/deep-meow.json";
 import { readFile } from "node:fs/promises";
 import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
-import { getSqudClarinet } from "./discord-bot-clarinet";
+import { renderClarinetScore } from "./discord-bot-clarinet-render";
+const clarinetScore = { tempo_bpm: 160, notes: [67, 69, 71, 72].map((pitch) => ({ pitch, beats: 1 })) };
+const clarinetArgs = (song: string | null = null) => ({ song, ...clarinetScore });
 
 const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "DISCORD_RICK_ENABLED", "DISCORD_RICK_BOT_TOKEN", "DISCORD_RICK_APPLICATION_ID", "DISCORD_KRAB_ENABLED", "DISCORD_KRAB_BOT_TOKEN", "DISCORD_KRAB_APPLICATION_ID", "DISCORD_BOT_IMAGES_ENABLED", "DISCORD_BOT_IMAGE_DAILY_LIMIT", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
 envNames.push("DISCORD_GERALD_ENABLED", "DISCORD_GERALD_BOT_TOKEN", "DISCORD_GERALD_APPLICATION_ID");
@@ -134,29 +136,37 @@ describe("sih-inator mention bot", () => {
   });
   it("sends a selected clarinet as a caption-free native Discord voice message", async () => {
     const squd = enableSqud();
-    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", {}) : null;
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs()) : null;
     const current = message({ mentionedUserIds: [squdId] });
     assert.equal(await handleDiscordMention(current, squd), "answered");
     const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
     const payload = JSON.parse(String(body.get("payload_json")));
-    const clip = getSqudClarinet(current.id);
+    const clip = await renderClarinetScore(clarinetScore, current.id);
     assert.equal(payload.flags, 1 << 13);
     assert.equal(Object.hasOwn(payload, "content"), false);
-    assert.deepEqual(payload.attachments, [{ id: 0, filename: clip.file, duration_secs: clip.duration, waveform: clip.waveform }]);
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: clip.filename, duration_secs: clip.duration, waveform: clip.waveform }]);
     assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
     const audio = body.get("files[0]"); assert.ok(audio instanceof Blob);
     assert.equal(audio.type, "audio/ogg");
-    assert.deepEqual(Buffer.from(await audio.arrayBuffer()), await readFile(`public/discord/squd/${clip.file}`));
+    assert.deepEqual(Buffer.from(await audio.arrayBuffer()), Buffer.from(clip.bytes));
     assert.equal(await handleDiscordMention(current, squd), "duplicate");
     assert.equal(replies().length, 1);
   });
   it("rejects clarinet actions for other bots and arbitrary clarinet arguments", async () => {
     const squd = enableSqud();
-    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", {}) : null;
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs()) : null;
     assert.equal(await handleDiscordMention(message(), config()), "failed");
     intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", { file: "arbitrary.mid", reply: "hey" }) : null;
     assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", mentionedUserIds: [squdId] }), squd), "failed");
     assert.ok(replies().every(({ init }) => typeof init?.body === "string"));
+  });
+  it("passes a named tune and Luna's new notes through the clarinet action", async () => {
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs("weezer_buddy_holly")) : null;
+    const answer = await generateDiscordBotReply("play the weezer lick", "gpt-6-luna", [], false, { persona: "squd" });
+    assert.equal(answer.clarinetSong, "weezer_buddy_holly");
+    assert.deepEqual(answer.clarinetScore, clarinetScore);
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", { ...clarinetArgs(), song: "arbitrary_song" }) : null;
+    await assert.rejects(generateDiscordBotReply("play something", "gpt-6-luna", [], false, { persona: "squd" }));
   });
   it("recognizes each bot's exact lowercase names as individual words", () => {
     const rick = enableRick();

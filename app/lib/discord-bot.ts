@@ -4,7 +4,9 @@ import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/d
 import { getDiscordBotSystemPrompt, isDiscordAiBotPersona, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
 import { generateKrabAnswer } from "@/lib/discord-bot-krab";
 import { generateGeraldAnswer } from "@/lib/discord-bot-gerald";
-import { loadSqudClarinet, type DiscordVoiceClip } from "@/lib/discord-bot-clarinet";
+import { loadSqudClarinet, SQUD_CLARINET_SONGS, type DiscordVoiceClip } from "@/lib/discord-bot-clarinet";
+import { CLARINET_SCORE_PROPERTIES, CLARINET_MELODY_REFERENCES, parseClarinetScore, type ClarinetScore } from "@/lib/discord-bot-clarinet-score";
+import { createClarinetPerformance } from "@/lib/discord-bot-clarinet-render";
 import { MAX_DISCORD_REPLY_LENGTH, MAX_DISCORD_REPLY_MESSAGES, splitDiscordReply } from "@/lib/discord-bot-replies";
 import { findDiscordServerMembers, MAX_MEMBER_QUERY_LENGTH, validDiscordMemberQuery, type DiscordMemberSearch } from "@/lib/discord-bot-members";
 import { generateDiscordImage, getDiscordImageConfig, MAX_IMAGE_PROMPT_LENGTH, type DiscordGeneratedImage } from "@/lib/discord-bot-image";
@@ -48,6 +50,8 @@ type DiscordBotReply = {
   image?: DiscordGeneratedImage;
   voice?: DiscordVoiceClip;
   clarinet?: boolean;
+  clarinetSong?: string;
+  clarinetScore?: ClarinetScore;
 };
 
 function botIdentity(persona: DiscordBotPersona) {
@@ -207,7 +211,7 @@ async function requestDiscordBotReply(
   const response = await fetch(OPENAI_API, {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model, reasoning_effort: "none", max_completion_tokens: 512, store: false,
+      model, reasoning_effort: "none", max_completion_tokens: options.persona === "squd" ? 1024 : 512, store: false,
       tools: [{
         type: "function",
         function: {
@@ -247,8 +251,11 @@ async function requestDiscordBotReply(
         type: "function",
         function: {
           name: "send_clarinet", strict: true,
-          description: "Reply with a terrible solo clarinet rendition of a familiar tune as a voice message instead of text. The server randomly selects a deterministic performance with wrong notes squeaks and bad timing. You cannot choose a specific song. Use occasionally when a performance fits, or for a clarinet request. No spoken voice, caption, or arbitrary files.",
-          parameters: { type: "object", properties: {}, additionalProperties: false, required: [] },
+          description: `Compose a short clarinet performance on the fly. Write 4 to 24 concert MIDI notes and a tempo; the server plays them with a sampled clarinet and adds bad timing pitch wobble and squeaks. Match a requested tune rather than playing a random one. Choose the matching song ID for a known reference and preserve its melody; use null for a new improvisation or another tune. Keep the phrase under eight seconds and use short recognizable excerpts for songs. No lyrics spoken voice code URLs or arbitrary files. Known melody references (quarter-note beats): ${CLARINET_MELODY_REFERENCES}`,
+          parameters: { type: "object", properties: {
+            song: { type: ["string", "null"], enum: [...SQUD_CLARINET_SONGS, null], description: "Matching known song, or null for a fresh improvisation or an unlisted tune. Used only as a reference and fallback." },
+            ...CLARINET_SCORE_PROPERTIES,
+          }, additionalProperties: false, required: ["song", "tempo_bpm", "notes"] },
         },
       }] : []), ...(canLookupMembers ? [{
         type: "function",
@@ -354,8 +361,10 @@ optional unpinged name mention:
         ],
       });
     } else if (call.function.name === "send_clarinet" && options.persona === "squd") {
-      if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length !== 0) throw new Error("Invalid clarinet request");
-      return { text: "", clarinet: true };
+      if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length !== 3
+        || (args.song !== null && (typeof args.song !== "string" || !SQUD_CLARINET_SONGS.includes(args.song)))) throw new Error("Invalid clarinet request");
+      const clarinetScore = parseClarinetScore({ tempo_bpm: args.tempo_bpm, notes: args.notes });
+      return { text: "", clarinet: true, clarinetScore, ...(typeof args.song === "string" ? { clarinetSong: args.song } : {}) };
     } else if (call.function.name === "skip_response" && options.optionalResponse) {
       if (!args || typeof args !== "object" || Array.isArray(args) || Object.keys(args).length !== 0) throw new Error("Invalid skipped response");
       return { text: "", skipped: true };
@@ -646,7 +655,7 @@ async function answerMention(
     let image: DiscordGeneratedImage | undefined = answer.image;
     let voice = answer.voice;
     if (answer.clarinet && config.persona === "squd") {
-      try { voice = await loadSqudClarinet(message.id); }
+      try { voice = answer.clarinetScore ? await createClarinetPerformance(answer.clarinetScore, message.id, answer.clarinetSong) : await loadSqudClarinet(message.id, answer.clarinetSong); }
       catch { answer = { text: "even the clarinet is tired of this" }; }
     }
     if (answer.imagePrompt) {

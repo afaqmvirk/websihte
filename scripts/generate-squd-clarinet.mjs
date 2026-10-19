@@ -3,7 +3,7 @@ import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { spawnSync } from "node:child_process";
 
-// Hand-sequenced public-domain tune excerpts, deliberately played badly.
+// Hand-sequenced short tune excerpts, deliberately played badly.
 // Render with a sampled clarinet instead of an oscillator approximation.
 // GeneralUser GS 2.0.3 by S. Christian Collins; see scripts/licenses/GeneralUser-GS.txt.
 const rate = 48_000;
@@ -19,9 +19,9 @@ if (createHash("sha256").update(await readFile(soundfont)).digest("hex") !== "95
 await mkdir(target, { recursive: true });
 await mkdir(temporary, { recursive: true });
 const catalog = [];
-// Pitches are MIDI numbers; durations are quarter-note beats. No modern arrangements
-// or third-party recordings are used. Four bad takes per tune make 32 clips.
-const tunes = [
+// Pitches are MIDI numbers; durations are quarter-note beats. No third-party
+// recordings or vocals are used. Append groups to preserve existing clip IDs/seeds.
+const tuneGroups = [[
   { title: "Twinkle Twinkle Little Star", pitches: [60, 60, 67, 67, 69, 69, 67, 65, 65, 64, 64, 62, 62, 60], beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 1, 1, 2] },
   { title: "Mary Had a Little Lamb", pitches: [64, 62, 60, 62, 64, 64, 64, 62, 62, 62, 64, 67, 67], beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
   { title: "Frere Jacques", pitches: [60, 62, 64, 60, 60, 62, 64, 60, 64, 65, 67, 64, 65, 67], beats: [1, 1, 1, 1, 1, 1, 1, 1, 1, 1, 2, 1, 1, 2] },
@@ -30,7 +30,18 @@ const tunes = [
   { title: "London Bridge Is Falling Down", pitches: [67, 69, 67, 65, 64, 65, 67, 62, 64, 65, 64, 65, 67], beats: [1.5, 0.5, 1, 1, 1, 1, 2, 1, 1, 2, 1, 1, 2] },
   { title: "Old MacDonald Had a Farm", pitches: [67, 67, 67, 62, 64, 64, 62, 71, 71, 69, 69, 67], beats: [1, 1, 1, 1, 1, 1, 2, 1, 1, 1, 1, 4] },
   { title: "Happy Birthday", pitches: [67, 67, 69, 67, 72, 71, 67, 67, 69, 67, 74, 72], beats: [0.75, 0.25, 1, 1, 1, 2, 0.75, 0.25, 1, 1, 1, 2] },
-];
+], [
+  // Only the short instrumental motifs, not either complete song/theme.
+  { id: "weezer_buddy_holly", title: "Weezer Buddy Holly lick", tempoBpm: 121, keepMelody: true,
+    pitches: [80, 75, 80, 82, 83, 82, 80, 76, 75], beats: [0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 0.5, 1] },
+  { id: "spongebob_nose_flute", title: "SpongeBob nose-flute outro", tempoBpm: 158, keepMelody: true,
+    pitches: [79, 81, 83, 81, 83, 79, 74, 79], beats: [0.25, 0.25, 0.25, 0.25, 0.5, 0.5, 0.5, 1] },
+]];
+const tunes = tuneGroups.flat();
+await writeFile("app/lib/discord-bot-clarinet-tunes.json", JSON.stringify(tunes.map((tune) => ({
+  song: tune.id ?? tune.title.toLowerCase().replace(/[^a-z0-9]+/g, "_"), title: tune.title, pitches: tune.pitches, beats: tune.beats,
+})), null, 2) + "\n");
+const performances = tuneGroups.flatMap((group) => Array.from({ length: 4 }, (_, take) => group.map((tune) => ({ tune, take }))).flat());
 function run(command, args, options = {}) {
   const result = spawnSync(command, args, { windowsHide: true, maxBuffer: 4_000_000, ...options });
   if (result.error || result.status !== 0) throw new Error(`${command} failed: ${result.error?.message || result.stderr?.toString()}`);
@@ -41,20 +52,20 @@ function variable(value) {
   while ((value >>= 7)) bytes.unshift((value & 127) | 128);
   return bytes;
 }
-for (let variant = 0; variant < 32; variant++) {
+for (const [variant, { tune, take }] of performances.entries()) {
   let state = createHash("sha256").update(`squd-clarinet-v3:${variant}`).digest().readUInt32BE(0);
   const random = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 2 ** 32; };
-  const tune = tunes[variant % tunes.length];
-  const tempoBpm = 154 + Math.floor(random() * 29);
-  const transpose = Math.floor(variant / tunes.length) % 2 === 1 ? 2 : 0;
+  const tempoBpm = (tune.tempoBpm ?? 154) + Math.floor(random() * (tune.keepMelody ? 13 : 29)) - (tune.keepMelody ? 6 : 0);
+  const transpose = take % 2 === 1 ? 2 : 0;
   const notes = tune.pitches.map((originalPitch, index) => {
     // Preserve the opening motif, then stumble on occasional notes and timing.
-    const wrongNote = index > 3 && random() < 0.16 ? (random() < 0.5 ? -1 : 1) : 0;
+    const wrongNote = !tune.keepMelody && index > 3 && random() < 0.16 ? (random() < 0.5 ? -1 : 1) : 0;
     return { pitch: originalPitch + transpose + wrongNote,
       ticks: Math.max(160, Math.round(tune.beats[index] * 480 * (0.82 + random() * 0.35))), velocity: 75 + Math.floor(random() * 43),
-      rest: index > 7 && random() < 0.08,
+      rest: !tune.keepMelody && index > 7 && random() < 0.08,
       // A clarinet's register break overblows a twelfth. Each phrase has several squeaks.
-      squeak: index % 4 === 2, bend: 8192 + Math.floor((random() - 0.5) * 2600), vibrato: 8 + Math.floor(random() * 24) };
+      squeak: tune.keepMelody ? index === Math.floor(tune.pitches.length / 2) : index % 4 === 2,
+      bend: 8192 + Math.floor((random() - 0.5) * 2600), vibrato: 8 + Math.floor(random() * 24) };
   });
   const tempo = Buffer.alloc(3); tempo.writeUIntBE(Math.round(60_000_000 / tempoBpm), 0, 3);
   const events = [0, 0xff, 0x51, 3, ...tempo, 0, 0xc0, 71, 0, 0xb0, 7, 110]; // GM clarinet, program 72 (1-based).
@@ -102,13 +113,16 @@ for (let variant = 0; variant < 32; variant++) {
   samples.forEach((sample, index) => wav.writeInt16LE(Math.max(-32768, Math.min(32767, sample)), 44 + index * 2));
   const wavPath = join(temporary, `${stem}.wav`);
   await writeFile(wavPath, wav);
-  run(encoder, ["-v", "error", "-y", "-i", wavPath, "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact", "-c:a", "libopus", "-b:a", "32k", "-ac", "1", "-ar", String(rate), "-serial_offset", String(variant), join(target, `${stem}.ogg`)]);
+  const encodedPath = join(temporary, `${stem}.ogg`);
+  run(encoder, ["-v", "error", "-y", "-i", wavPath, "-map_metadata", "-1", "-fflags", "+bitexact", "-flags:a", "+bitexact", "-c:a", "libopus", "-b:a", "32k", "-ac", "1", "-ar", String(rate), "-serial_offset", String(variant), encodedPath]);
+  await writeFile(join(target, `${stem}.ogg`), await readFile(encodedPath));
   const waveform = [];
   for (let start = 0; start < samples.length; start += rate / 10) {
     const segment = samples.slice(start, start + rate / 10);
     waveform.push(Math.min(255, Math.round(Math.sqrt(segment.reduce((sum, sample) => sum + sample * sample, 0) / segment.length) / 40)));
   }
-  catalog.push({ title: tune.title, file: `${stem}.ogg`, midi: `${stem}.mid`, duration: samples.length / rate, waveform: Buffer.from(waveform).toString("base64") });
+  catalog.push({ song: tune.id ?? tune.title.toLowerCase().replace(/[^a-z0-9]+/g, "_"), title: tune.title,
+    file: `${stem}.ogg`, midi: `${stem}.mid`, duration: samples.length / rate, waveform: Buffer.from(waveform).toString("base64") });
 }
 await writeFile(join(target, "catalog.json"), JSON.stringify(catalog, null, 2) + "\n");
 console.log(`Generated ${catalog.length} deterministic bad clarinet renditions of ${tunes.length} familiar tunes`);

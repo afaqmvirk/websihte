@@ -190,34 +190,52 @@ permissions plus Attach Files and Send Voice Messages. He answers tags and the
 standalone lowercase name `squd`.
 
 Squd can choose `send_clarinet` to answer with an instrumental voice message
-instead of text. A message-ID hash selects one of 32 deterministic bad clarinet
-renditions of eight familiar public-domain tunes, stored as MIDI alongside
-pre-rendered mono 48 kHz Opus/OGG audio
-and waveform metadata in `public/discord/squd/`. The message uses Discord's native
-voice flag and contains one audio attachment with no caption. The `.mid` files
-remain available too; no AI audio service or runtime encoder is needed. The audio
-uses the sampled General MIDI clarinet from [GeneralUser GS 2.0.3 by S. Christian
+instead of text. Luna writes 4–24 notes and a tempo in the existing text-model
+tool call. A bounded server renderer plays the new phrase with sampled clarinet
+notes, adds pitch wobble, squeaks and bad timing, and encodes a mono 48 kHz
+Opus/OGG voice message with waveform metadata. There is no extra model call or
+audio-generation API. Instrument samples and the portable Opus encoder are bundled;
+FluidSynth and FFmpeg are used only when rebuilding assets locally.
+
+The message contains one audio attachment with no caption. Named requests use
+the matching melody reference; arbitrary short tunes or improvisations can be
+composed too. Generated phrases are capped at eight seconds before performance
+effects and ten seconds after them. Scores use bounded pitches, note counts
+and durations. No generated code is executed. A message-ID
+seed keeps rendering stable on retries while different messages get different
+performance mistakes.
+
+Forty saved performances of ten familiar tunes remain as a fallback for named
+songs, stored as MIDI plus pre-rendered audio in `public/discord/squd/`. If an
+unlisted performance fails, Squd sends a short failure reply instead of a random
+different song. The audio uses the sampled General MIDI clarinet from
+[GeneralUser GS 2.0.3 by S. Christian
 Collins](https://www.schristiancollins.com/generaluser.php), with deliberate
 register-break squeaks, uneven breath-like dynamics, vibrato, and pitch wobble.
 The repertoire is Twinkle Twinkle Little Star, Mary Had a Little Lamb, Frere
 Jacques, Ode to Joy, Jingle Bells, London Bridge Is Falling Down, Old MacDonald
-Had a Farm, and Happy Birthday. Each has four takes with missed notes, wrong
-notes, and bad timing while preserving the opening motif. The server picks the
-song; the model cannot promise a specific title. The clips are normalized with
-headroom rather than made louder to sound harsher.
+Had a Farm, Happy Birthday, the short Weezer Buddy Holly lick, and the short
+nose-flute ending of the SpongeBob opening theme, played on clarinet. Each saved
+tune has four takes. The clips are normalized with headroom.
 
 Regenerate with `node scripts/generate-squd-clarinet.mjs`, FluidSynth 2.6.1, and
 FFmpeg. Set `SQUD_CLARINET_SOUNDFONT` to a local `GeneralUser-GS.sf2`, and optionally
 `FLUIDSYNTH_BIN` / `FFMPEG_BIN` to the executables. The generator pins the SoundFont
 SHA-256 `9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe`
 from [upstream revision 684543d](https://github.com/mrbumpy409/GeneralUser-GS/tree/684543d5e5efaef08d02be50dcda8d552478fa60).
-Its license is retained in `scripts/licenses/GeneralUser-GS.txt`. Only rendered
-audio, hand-sequenced MIDI, and metadata are deployed; the SoundFont stays local.
+Its license is retained in `scripts/licenses/GeneralUser-GS.txt`. Rendered audio,
+instrument samples, hand-sequenced MIDI, and metadata are deployed; the SoundFont
+and build tools stay local.
+Rebuild the individual-note bank with `node scripts/generate-squd-clarinet-samples.mjs`
+using the same tools and SoundFont. The generated melody references live in
+`app/lib/discord-bot-clarinet-tunes.json`; the sampled notes and license are in
+`public/discord/squd/samples/`.
 See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
-tokens. Defaults allow 10,000 requests per UTC day, 310,000 per UTC month, and one
+tokens (1,024 for Squd's note sequences). Defaults allow 10,000 requests per UTC
+day, 310,000 per UTC month, and one
 per person per bot every two seconds. Daily and monthly allowances are shared
 across all five bots. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
