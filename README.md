@@ -165,12 +165,17 @@ money text. Fixed photos do not spend the separate AI image-generation allowance
 
 Create and install a fourth Discord application named `overlord gerald`. Enable
 Message Content and grant View Channels, Send Messages, Send Messages in Threads,
-and Read Message History. Set `DISCORD_GERALD_BOT_TOKEN`,
+Read Message History, Attach Files, and Send Voice Messages. Set `DISCORD_GERALD_BOT_TOKEN`,
 `DISCORD_GERALD_APPLICATION_ID`, and `DISCORD_GERALD_ENABLED=true`. Gerald answers
 direct tags and standalone, case-sensitive `gerald` in human messages with a
 space-separated sequence of `meow`, `miau`, and `mrow`, 1–32 words long with shorter
-sequences favoured. The message ID seeds the sequence so duplicate deliveries
-cannot change it. Like Krab, he uses no OpenAI, history, tools, or pings and keeps
+sequences favoured. About one in five replies instead sends the
+[deep meow](https://www.youtube.com/watch?v=MnURI2mo6Wg) as a caption-free native
+Discord voice message. The message ID seeds both choices so duplicate deliveries
+cannot change them. The clip and waveform metadata are bundled in
+`public/discord/gerald/`; an unreadable clip falls back to text. Regenerate both
+with `node scripts/download-gerald-meow.mjs` using yt-dlp, Node, and FFmpeg.
+Like Krab, he uses no OpenAI, history, tools, or pings and keeps
 the one-second typing pause, shared admission limits, and silent failure behavior.
 
 Squd is a fifth account, `overlord squd`, using the shared text model and concise
