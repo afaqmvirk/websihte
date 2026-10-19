@@ -3,7 +3,8 @@ import { afterEach, beforeEach, describe, it } from "node:test";
 import { generateDiscordBotReply, getDiscordBotConfig, getDiscordBotConfigs, getDiscordMessageTrigger, handleDiscordMention as handleDiscordMentionWithDelay, isDiscordCronAuthorized, type DiscordBotConfig, type DiscordMention } from "./discord-bot";
 import { generateKrabReply } from "./discord-bot-krab";
 import { getKrabMoneyPhoto, KRAB_MONEY_PHOTOS } from "./discord-bot-krab";
-import { generateGeraldReply } from "./discord-bot-gerald";
+import { generateGeraldReply, shouldGeraldDeepMeow } from "./discord-bot-gerald";
+import deepMeow from "../../public/discord/gerald/deep-meow.json";
 import { readFile } from "node:fs/promises";
 import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
 import { renderClarinetScore } from "./discord-bot-clarinet-render";
@@ -433,6 +434,31 @@ describe("sih-inator mention bot", () => {
     }
     assert.equal(replies().length, 3);
     assert.equal(modelCalls().length, 0);
+    assert.equal(reactions().length, 0); assert.equal(deletions().length, 0);
+    assert.ok(calls.every(({ init }) => init?.method === "POST" || init?.method === "PATCH"));
+  });
+  it("sends Gerald's deep meow as a native voice reply without model calls or duplicate uploads", async () => {
+    const gerald = enableGerald();
+    delete process.env.OPENAI_API_KEY;
+    Math.random = () => { throw new Error("Gerald must not need mutable random state"); };
+    const id = Array.from({ length: 100 }, (_, index) => String(1560000000000000000n + BigInt(index)))
+      .find(shouldGeraldDeepMeow);
+    assert.ok(id);
+    const current = message({ id, content: "gerald", mentionedUserIds: [] });
+    assert.equal(await handleDiscordMention(current, gerald, async (ms) => assert.equal(ms, 1_000)), "answered");
+    const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+    const payload = JSON.parse(String(body.get("payload_json")));
+    assert.equal(payload.flags, 1 << 13);
+    assert.equal(Object.hasOwn(payload, "content"), false);
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: deepMeow.file,
+      duration_secs: deepMeow.duration, waveform: deepMeow.waveform }]);
+    assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
+    assert.equal(payload.message_reference.message_id, current.id);
+    const audio = body.get("files[0]"); assert.ok(audio instanceof Blob);
+    assert.equal(audio.type, "audio/ogg");
+    assert.deepEqual(Buffer.from(await audio.arrayBuffer()), await readFile("public/discord/gerald/deep-meow.ogg"));
+    assert.equal(await handleDiscordMention(current, gerald), "duplicate");
+    assert.equal(replies().length, 1); assert.equal(modelCalls().length, 0);
     assert.equal(reactions().length, 0); assert.equal(deletions().length, 0);
     assert.ok(calls.every(({ init }) => init?.method === "POST" || init?.method === "PATCH"));
   });

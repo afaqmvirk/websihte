@@ -1,9 +1,60 @@
 import assert from "node:assert/strict";
+import { mkdtemp, readFile, rmdir } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 import { describe, it } from "node:test";
-import { generateGeraldReply } from "./discord-bot-gerald";
+import { generateGeraldAnswer, generateGeraldReply, shouldGeraldDeepMeow } from "./discord-bot-gerald";
 import { getKrabMoneyPhoto, KRAB_MONEY_PHOTOS } from "./discord-bot-krab";
 
 describe("fixed overlord replies", () => {
+  it("selects the deep meow repeatably for about one in five messages", () => {
+    let voices = 0;
+    for (let index = 0; index < 10_000; index++) {
+      const id = String(1560000000000000000n + BigInt(index));
+      const selected = shouldGeraldDeepMeow(id);
+      assert.equal(shouldGeraldDeepMeow(id), selected);
+      if (selected) voices++;
+    }
+    assert.ok(voices > 1_500 && voices < 2_500);
+  });
+
+  it("loads the downloaded meow with valid voice metadata and keeps ordinary text replies", async () => {
+    const id = Array.from({ length: 100 }, (_, index) => String(1560000000000000000n + BigInt(index)))
+      .find(shouldGeraldDeepMeow);
+    assert.ok(id);
+    const answer = await generateGeraldAnswer(id);
+    assert.equal(answer.text, "");
+    assert.ok(answer.voice);
+    assert.equal(answer.voice.filename, "deep-meow.ogg");
+    assert.equal(answer.voice.contentType, "audio/ogg");
+    assert.ok(answer.voice.duration > 3 && answer.voice.duration < 4);
+    const bytes = Buffer.from(answer.voice.bytes);
+    assert.equal(bytes.subarray(0, 4).toString(), "OggS");
+    assert.ok(bytes.includes(Buffer.from("OpusHead")));
+    assert.deepEqual(bytes, await readFile("public/discord/gerald/deep-meow.ogg"));
+    const waveform = Buffer.from(answer.voice.waveform, "base64");
+    assert.ok(waveform.length > 10 && waveform.length <= 256);
+    assert.ok(waveform.some((sample) => sample > 0));
+    const textId = "1560000000000000002";
+    assert.equal(shouldGeraldDeepMeow(textId), false);
+    assert.deepEqual(await generateGeraldAnswer(textId), { text: generateGeraldReply(textId) });
+  });
+
+  it("falls back to text if the bundled meow is unavailable", async () => {
+    const originalDirectory = process.cwd();
+    const temporary = await mkdtemp(join(tmpdir(), "gerald-missing-clip-"));
+    const id = Array.from({ length: 100 }, (_, index) => String(1560000000000000000n + BigInt(index)))
+      .find(shouldGeraldDeepMeow);
+    assert.ok(id);
+    try {
+      process.chdir(temporary);
+      assert.deepEqual(await generateGeraldAnswer(id), { text: generateGeraldReply(id) });
+    } finally {
+      process.chdir(originalDirectory);
+      await rmdir(temporary);
+    }
+  });
+
   it("gives Gerald varied, repeatable sequences containing only his three meows", () => {
     const lengths = Array(32).fill(0) as number[];
     const words = new Set<string>();

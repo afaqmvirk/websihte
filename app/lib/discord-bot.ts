@@ -3,7 +3,7 @@ import { getApplicationStorageConfig } from "@/lib/application-storage";
 import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/discord-bot-context";
 import { getDiscordBotSystemPrompt, isDiscordAiBotPersona, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
 import { generateKrabAnswer } from "@/lib/discord-bot-krab";
-import { generateGeraldReply } from "@/lib/discord-bot-gerald";
+import { generateGeraldAnswer } from "@/lib/discord-bot-gerald";
 import { loadSqudClarinet, SQUD_CLARINET_SONGS, type DiscordVoiceClip } from "@/lib/discord-bot-clarinet";
 import { CLARINET_SCORE_PROPERTIES, CLARINET_MELODY_REFERENCES, parseClarinetScore, type ClarinetScore } from "@/lib/discord-bot-clarinet-score";
 import { createClarinetPerformance } from "@/lib/discord-bot-clarinet-render";
@@ -48,6 +48,7 @@ type DiscordBotReply = {
   text: string; reaction?: string; deleteReason?: DeleteReason;
   mentionUserIds?: string[]; imagePrompt?: string; gifUrl?: string; skipped?: boolean;
   image?: DiscordGeneratedImage;
+  voice?: DiscordVoiceClip;
   clarinet?: boolean;
   clarinetSong?: string;
   clarinetScore?: ClarinetScore;
@@ -626,7 +627,7 @@ async function answerMention(
     claimed = true;
     let answer: DiscordBotReply;
     if (config.persona === "krab") answer = await generateKrabAnswer(message.id);
-    else if (config.persona === "gerald") answer = { text: generateGeraldReply(message.id) };
+    else if (config.persona === "gerald") answer = await generateGeraldAnswer(message.id);
     else if (!question) answer = { text: "uhhhh iunno" };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
@@ -652,7 +653,7 @@ async function answerMention(
       answer = { text: "cant remove that here bro" };
     }
     let image: DiscordGeneratedImage | undefined = answer.image;
-    let voice: DiscordVoiceClip | undefined;
+    let voice = answer.voice;
     if (answer.clarinet && config.persona === "squd") {
       try { voice = answer.clarinetScore ? await createClarinetPerformance(answer.clarinetScore, message.id, answer.clarinetSong) : await loadSqudClarinet(message.id, answer.clarinetSong); }
       catch { answer = { text: "even the clarinet is tired of this" }; }
