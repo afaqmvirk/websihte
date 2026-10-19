@@ -174,8 +174,10 @@ cannot change it. Like Krab, he uses no OpenAI, history, tools, or pings and kee
 the one-second typing pause, shared admission limits, and silent failure behavior.
 
 Squd is a fifth account, `overlord squd`, using the shared text model and concise
-lowercase writing style. His personality is irritable, cynical, artistic, and
-very adversarial toward everyone who interrupts him. The cartoon character's
+lowercase writing style. His personality is mean, rude, cynical, artistic, and
+deliberately unhelpful toward everyone who interrupts him, including sincere
+ordinary requests. His prompt omits Bob and Rick's helpful persona and scripted
+support responses. The cartoon character's
 name appears only in a drawing reference, not in his personality instructions.
 Set `DISCORD_SQUD_BOT_TOKEN`, `DISCORD_SQUD_APPLICATION_ID`, and
 `DISCORD_SQUD_ENABLED=true`. Enable Message Content and grant the normal reply
@@ -183,12 +185,29 @@ permissions plus Attach Files and Send Voice Messages. He answers tags and the
 standalone lowercase name `squd`.
 
 Squd can choose `send_clarinet` to answer with an instrumental voice message
-instead of text. A message-ID hash selects one of 32 original deterministic
-clarinet MIDI melodies, stored alongside pre-rendered mono 48 kHz Opus/OGG audio
+instead of text. A message-ID hash selects one of 32 deterministic bad clarinet
+renditions of eight familiar public-domain tunes, stored as MIDI alongside
+pre-rendered mono 48 kHz Opus/OGG audio
 and waveform metadata in `public/discord/squd/`. The message uses Discord's native
 voice flag and contains one audio attachment with no caption. The `.mid` files
-remain available too; no AI audio service or runtime encoder is needed. Regenerate
-the collection with `node scripts/generate-squd-clarinet.mjs` and a local FFmpeg.
+remain available too; no AI audio service or runtime encoder is needed. The audio
+uses the sampled General MIDI clarinet from [GeneralUser GS 2.0.3 by S. Christian
+Collins](https://www.schristiancollins.com/generaluser.php), with deliberate
+register-break squeaks, uneven breath-like dynamics, vibrato, and pitch wobble.
+The repertoire is Twinkle Twinkle Little Star, Mary Had a Little Lamb, Frere
+Jacques, Ode to Joy, Jingle Bells, London Bridge Is Falling Down, Old MacDonald
+Had a Farm, and Happy Birthday. Each has four takes with missed notes, wrong
+notes, and bad timing while preserving the opening motif. The server picks the
+song; the model cannot promise a specific title. The clips are normalized with
+headroom rather than made louder to sound harsher.
+
+Regenerate with `node scripts/generate-squd-clarinet.mjs`, FluidSynth 2.6.1, and
+FFmpeg. Set `SQUD_CLARINET_SOUNDFONT` to a local `GeneralUser-GS.sf2`, and optionally
+`FLUIDSYNTH_BIN` / `FFMPEG_BIN` to the executables. The generator pins the SoundFont
+SHA-256 `9575028c7a1f589f5770fccc8cff2734566af40cd26ed836944e9a5152688cfe`
+from [upstream revision 684543d](https://github.com/mrbumpy409/GeneralUser-GS/tree/684543d5e5efaef08d02be50dcda8d552478fa60).
+Its license is retained in `scripts/licenses/GeneralUser-GS.txt`. Only rendered
+audio, hand-sequenced MIDI, and metadata are deployed; the SoundFont stays local.
 See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with

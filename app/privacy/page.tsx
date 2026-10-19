@@ -175,9 +175,10 @@ export default function PrivacyPolicyPage() {
               limits apply to their replies.
             </p>
             <p>
-              Overlord squd can also respond with one of 32 fixed original clarinet
-              melodies as a voice message instead of text. A message-ID hash selects
-              the MIDI melody and its pre-rendered audio. No voice recording or
+              Overlord squd can also respond with one of 32 fixed deliberately bad
+              clarinet performances of familiar tunes as a voice message instead
+              of text. A message-ID hash selects the MIDI performance and its
+              pre-rendered audio. No voice recording or
               additional audio-generation service is used for these clips.
             </p>
 
