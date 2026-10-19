@@ -2,7 +2,7 @@ import { createHash } from "node:crypto";
 import { mkdir, readFile, writeFile } from "node:fs/promises";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { compileClarinetExcerpt, writeClarinetCollection } from "./lib/clarinet-library.mjs";
+import { compileClarinetPassage, writeClarinetCollection } from "./lib/clarinet-library.mjs";
 import { decodeOnlineSequence } from "./lib/online-sequencer.mjs";
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), "..");
@@ -36,8 +36,9 @@ for (const row of manifest.entries) {
       if (note.pitch > previous.pitch) { previous.pitch = note.pitch; previous.beats = note.beats; }
     } else onsets.push({ pitch: note.pitch, time: note.time, beats: note.beats });
   }
+  const passages = Array.from({ length: 8 }, (_, index) => compileClarinetPassage(onsets, sequence.tempo, `os_${row.id}:${index}`));
   entries.push({ song: `os_${row.id}`, title: row.title, artists: row.artists, genre: row.genre,
-    aliases: row.aliases, score: compileClarinetExcerpt(onsets, sequence.tempo) });
+    aliases: row.aliases, score: passages[0], passages });
 }
 await writeClarinetCollection(root, { id: "os", source: manifest.source,
   notice: "https://www.stupideas.com/discord/squd/OnlineSequencer-NOTICE.md", count: entries.length }, entries);
@@ -55,9 +56,10 @@ const core = originals.map((tune) => {
   const events = tune.pitches.map((pitch, index) => {
     const note = { pitch, time, beats: tune.beats[index] }; time += note.beats; return note;
   });
+  const score = compileClarinetPassage(events,
+    tune.song === "weezer_buddy_holly" ? 121 : tune.song === "spongebob_nose_flute" ? 158 : 160);
   return { song: `core_${tune.song}`, title: tune.title, artists: ["Original Squd reference"], genre: "Familiar tune",
-    aliases: aliases[tune.song] ?? [], score: compileClarinetExcerpt(events,
-      tune.song === "weezer_buddy_holly" ? 121 : tune.song === "spongebob_nose_flute" ? 158 : 160) };
+    aliases: aliases[tune.song] ?? [], score, passages: [score] };
 });
 await writeClarinetCollection(root, { id: "core", source: "https://www.stupideas.com/discord/squd/catalog.json", count: core.length }, core);
 console.log(`Imported ${entries.length} modern/meme tunes and unified ${core.length} original references.`);

@@ -11,7 +11,8 @@ describe("Luna clarinet rendering", () => {
   it("rejects malformed scores and bounds notes duration pitch and silence", () => {
     assert.deepEqual(parseClarinetScore(score), score);
     for (const invalid of [null, [], { ...score, code: "arbitrary" }, { ...score, tempo_bpm: 0 },
-      { ...score, notes: [] }, { ...score, notes: Array(25).fill(score.notes[0]) },
+      { ...score, notes: [] }, { ...score, notes: Array(129).fill({ pitch: 67, beats: 0.125 }) },
+      { ...score, notes: Array(4).fill({ pitch: 83, beats: 1 }) },
       { ...score, notes: Array(4).fill({ pitch: 900, beats: 1 }) },
       { ...score, notes: Array(4).fill({ pitch: 67, beats: NaN }) },
       { ...score, notes: Array(4).fill({ pitch: null, beats: 1 }) },
@@ -48,5 +49,21 @@ describe("Luna clarinet rendering", () => {
     const clip = await createClarinetPerformance(score, "1560000000000000002", "happy_birthday", unavailable);
     assert.equal(clip.filename, getSqudClarinet("1560000000000000002", "happy_birthday").file);
     await assert.rejects(createClarinetPerformance(score, "1560000000000000002", undefined, unavailable));
+  });
+  it("renders a longer section and caps added mistakes and breath gaps at fifteen seconds", async () => {
+    const long = { tempo_bpm: 128, notes: Array.from({ length: 64 }, (_, index) => ({ pitch: 60 + index % 12, beats: 0.5 })) };
+    assert.deepEqual(parseClarinetScore(long), long);
+    const clip = await renderClarinetScore(long, "1560000000000000018");
+    assert.ok(clip.duration >= 10 && clip.duration <= 15);
+    assert.equal(Buffer.from(clip.waveform, "base64").length, Math.ceil(clip.duration * 10));
+    const bytes = Buffer.from(clip.bytes);
+    let last = 0;
+    for (let offset = 0; offset < bytes.length;) {
+      last = offset;
+      const segments = bytes[offset + 26]; let length = 0;
+      for (let index = 0; index < segments; index++) length += bytes[offset + 27 + index];
+      offset += 27 + segments + length;
+    }
+    assert.equal(Number(bytes.readBigUInt64LE(last + 6)) - 312, Math.round(clip.duration * 48000));
   });
 });

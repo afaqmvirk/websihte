@@ -2,11 +2,12 @@ import { createHash } from "node:crypto";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import { join } from "node:path";
-import { parseClarinetScore, type ClarinetScore } from "./discord-bot-clarinet-score";
+import { parseClarinetScore, MAX_CLARINET_SECONDS, type ClarinetScore } from "./discord-bot-clarinet-score";
 import { loadSqudClarinet, type DiscordVoiceClip } from "./discord-bot-clarinet";
 
 const OpusScript = createRequire(import.meta.url)("opusscript") as typeof import("opusscript");
 const rate = 48_000, frameSize = 960, preSkip = 312;
+const squeakPitch = (pitch: number) => Math.min(86, pitch + 19);
 const samples = new Map<number, Promise<Int16Array>>();
 
 function sample(pitch: number) {
@@ -61,28 +62,30 @@ export async function renderClarinetScore(input: ClarinetScore, messageId: strin
   const seed = createHash("sha256").update(`squd-live-clarinet:${messageId}`).digest();
   let state = seed.readUInt32BE(0);
   const random = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 2 ** 32; };
-  const pitches = [...new Set(score.notes.flatMap((note) => note.pitch === null ? [] : [note.pitch, Math.min(100, note.pitch + 19)]))];
+  const pitches = [...new Set(score.notes.flatMap((note) => note.pitch === null ? [] : [note.pitch, squeakPitch(note.pitch)]))];
   const bank = new Map(await Promise.all(pitches.map(async (pitch) => [pitch, await sample(pitch)] as const)));
   const output: number[] = [];
+  const maximumBody = rate * MAX_CLARINET_SECONDS - rate / 10;
   for (const [index, note] of score.notes.entries()) {
-    const length = Math.round(note.beats * 60 / score.tempo_bpm * rate * (0.94 + random() * 0.1));
+    if (output.length >= maximumBody) break;
+    const length = Math.min(maximumBody - output.length, Math.round(note.beats * 60 / score.tempo_bpm * rate * (0.94 + random() * 0.1)));
     if (note.pitch === null) { output.push(...Array(length).fill(0)); continue; }
-    const body = bank.get(note.pitch)!, squeak = bank.get(Math.min(100, note.pitch + 19))!;
+    const body = bank.get(note.pitch)!, squeak = bank.get(squeakPitch(note.pitch))!;
     const volume = 0.68 + random() * 0.3, cents = (random() - 0.5) * 38;
-    const overblow = index % 5 === 3, wobble = 4.8 + random();
+    const overblow = index % 7 === 5, wobble = 4.8 + random();
     let position = 0;
     for (let frame = 0; frame < length; frame++) {
       position += 2 ** ((cents + 17 * Math.sin(2 * Math.PI * wobble * frame / rate)) / 1200);
       const low = Math.floor(position), fraction = position - low;
       const normal = (body[low] ?? 0) * (1 - fraction) + (body[low + 1] ?? 0) * fraction;
-      const squeakMix = overblow ? Math.max(0, Math.min(1, (frame / rate - 0.045) / 0.01, (0.125 - frame / rate) / 0.01)) : 0;
+      const squeakMix = overblow ? 0.38 * Math.max(0, Math.min(1, (frame / rate - 0.045) / 0.01, (0.125 - frame / rate) / 0.01)) : 0;
       const envelope = Math.max(0, Math.min(1, frame / (rate * 0.004), (length - frame) / (rate * 0.025)));
       output.push((normal * (1 - squeakMix) + (squeak[frame] ?? 0) * squeakMix) * volume * envelope);
     }
-    output.push(...Array(Math.round(rate * (0.02 + random() * 0.025))).fill(0));
+    output.push(...Array(Math.min(maximumBody - output.length, Math.round(rate * (0.02 + random() * 0.025)))).fill(0));
   }
   output.push(...Array(rate / 10).fill(0));
-  if (output.length > rate * 10) throw new Error("Clarinet performance is too long");
+  if (output.length > rate * MAX_CLARINET_SECONDS) throw new Error("Clarinet performance is too long");
   const peak = output.reduce((maximum, value) => Math.max(maximum, Math.abs(value)), 0);
   if (!peak) throw new Error("Silent clarinet performance");
   const rms = Math.sqrt(output.reduce((sum, value) => sum + value * value, 0) / output.length);

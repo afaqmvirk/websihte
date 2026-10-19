@@ -12,6 +12,6 @@ export async function writeSqudCatalog(root) {
       revision: "0eaecb5b1c1be02751f4dca97bb9b25e8408e498", license: "CC-BY-NC-SA-4.0",
       sourceArchive: archive.source, index: archive.pack, catalog: archive.catalog,
       notice: "https://www.stupideas.com/discord/squd/Discover-MIDI-NOTICE.md" }, ...curated.sources],
-    entries: curated.entries.map(({ score, ...entry }) => { void score; return entry; }) };
+    entries: curated.entries.map(({ score, passages, ...entry }) => { void score; void passages; return entry; }) };
   await writeFile(join(root, "public/discord/squd/library.json"), JSON.stringify(metadata, null, 2) + "\n");
 }

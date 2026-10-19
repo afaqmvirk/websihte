@@ -3,7 +3,8 @@ import discover from "./discord-bot-clarinet-discover.json";
 import { createDiscoverArchive, type DiscoverArchiveManifest } from "./discord-bot-clarinet-archive";
 import { loadSongCatalog, type CatalogRow } from "./discord-bot-clarinet-catalog";
 import { clarinetScoreFromMidi } from "./discord-bot-clarinet-midi";
-import { parseClarinetScore, type ClarinetScore } from "./discord-bot-clarinet-score";
+import { clarinetPassageIndex } from "./discord-bot-clarinet-compile.mjs";
+import { parseClarinetScore } from "./discord-bot-clarinet-score";
 
 export const CLARINET_LIBRARY_COUNT = discover.midiCount;
 export const CLARINET_NAMED_FILES = discover.catalog.namedFiles;
@@ -81,7 +82,28 @@ type SongCatalog = { search(terms: string[], title: string): CatalogRow[] };
 type Archive = Pick<ReturnType<typeof createDiscoverArchive>, "has" | "midi">;
 
 export function createClarinetLibrary(catalog: () => Promise<SongCatalog>, archive: Archive) {
-  const scores = new Map<string, ClarinetScore>();
+  const midiFiles = new Map<string, Uint8Array>();
+  const pendingMidi = new Map<string, Promise<Uint8Array>>();
+  let cachedBytes = 0;
+  async function sourceMidi(song: string) {
+    const hit = midiFiles.get(song);
+    if (hit) { midiFiles.delete(song); midiFiles.set(song, hit); return hit; }
+    const existing = pendingMidi.get(song);
+    if (existing) return existing;
+    if (pendingMidi.size >= 32) throw new Error("MIDI cache is busy");
+    const request = archive.midi(song.slice(9)).then((source) => {
+      // Detach the small MIDI from its decompressed archive block before retaining it.
+      const bytes = Uint8Array.from(source);
+      cachedBytes += bytes.byteLength; midiFiles.set(song, bytes);
+      while (midiFiles.size > 128 || cachedBytes > 16 * 1024 * 1024) {
+        const oldest = midiFiles.keys().next().value!;
+        cachedBytes -= midiFiles.get(oldest)!.byteLength; midiFiles.delete(oldest);
+      }
+      return bytes;
+    });
+    pendingMidi.set(song, request);
+    try { return await request; } finally { pendingMidi.delete(song); }
+  }
   async function search(query: string, limit = 8): Promise<ClarinetLibraryEntry[]> {
     let normalized = normalize(query.slice(0, 2000).replace(/<@!?\d+>/g, ""));
     if (!normalized || !Number.isInteger(limit) || limit < 1) return [];
@@ -112,16 +134,13 @@ export function createClarinetLibrary(catalog: () => Promise<SongCatalog>, archi
       }
       return [];
     },
-    async score(song: string) {
+    async score(song: string, performanceSeed?: string) {
       const local = byId.get(song);
-      if (local) return parseClarinetScore(local.score);
+      if (local) return parseClarinetScore(performanceSeed === undefined ? local.score
+        : local.passages[clarinetPassageIndex(`${song}:${performanceSeed}`, local.passages.length)]);
       if (!/^discover_[a-f0-9]{32}$/.test(song)) throw new Error("Unknown clarinet library song");
-      const hit = scores.get(song);
-      if (hit) { scores.delete(song); scores.set(song, hit); return hit; }
-      const score = clarinetScoreFromMidi(await archive.midi(song.slice(9)));
-      scores.set(song, score);
-      if (scores.size > 128) scores.delete(scores.keys().next().value!);
-      return score;
+      const bytes = await sourceMidi(song);
+      return clarinetScoreFromMidi(bytes, performanceSeed === undefined ? undefined : `${song}:${performanceSeed}`);
     },
   };
 }

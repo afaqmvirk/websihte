@@ -225,11 +225,20 @@ audio-generation API. Instrument samples and the portable Opus encoder are bundl
 FluidSynth and FFmpeg are used only when rebuilding assets locally.
 
 The message contains one audio attachment with no caption. Named requests use
-the matching melody reference. Phrases are capped at eight seconds before performance
-effects and ten seconds after them. Scores use bounded pitches, note counts
-and durations. No generated code is executed. A message-ID
-seed keeps rendering stable on retries while different messages get different
-performance mistakes.
+the matching melody reference. A message-ID seed selects a playable section
+throughout the full melodic track, targeting 10–15 seconds of audio. The selected
+section and playing mistakes stay stable on retries; another message can start
+elsewhere. Short hooks finish naturally without looping or invented notes.
+The MIDI cache retains bounded copies of the source files rather than a single
+compiled opening. The modern references have eight locally compiled sections
+selected with the same message seed and shared section compiler.
+
+Scores allow at most 128 notes/rests and fifteen seconds. The renderer caps the
+complete audio, including timing mistakes and breath gaps, at fifteen seconds.
+High melodies transpose by octaves into concert MIDI 55–82; brief overblows are
+mixed gently and capped at MIDI 86. This keeps the clarinet register more natural
+while retaining wobble, squeaks, and deliberately bad timing. No generated code
+is executed and there is no additional model call or audio API.
 
 Forty saved performances of the ten original familiar tunes remain as a fallback
 for those same songs, stored as MIDI plus pre-rendered audio in `public/discord/squd/`.

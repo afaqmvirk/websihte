@@ -1,7 +1,7 @@
 import { readFile, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { writeSqudCatalog } from "./write-squd-catalog.mjs";
-export { compileClarinetExcerpt } from "../../app/lib/discord-bot-clarinet-compile.mjs";
+export { compileClarinetExcerpt, compileClarinetPassage } from "../../app/lib/discord-bot-clarinet-compile.mjs";
 
 // Both ABC and Online Sequencer imports use this same bounded quarter-note format.
 export async function writeClarinetCollection(root, source, imported) {
