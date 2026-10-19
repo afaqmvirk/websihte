@@ -11,15 +11,19 @@ const artistAliases = [
   [/freddie mercury|freddy mercury|brian may|roger taylor|john deacon/i, "queen"],
   [/benny andersson|benny anderson|bjorn ulvaeus|bjorn valaeus/i, "abba"],
 ] as const;
-const entries = library.entries.map((entry) => {
+type LibraryEntry = (typeof library.entries)[number] & { aliases?: string[] };
+const entries = (library.entries as LibraryEntry[]).map((entry) => {
   const artist = normalize(entry.artists.join(" "));
   const aliases = artistAliases.filter(([pattern]) => pattern.test(artist)).map(([, alias]) => alias);
-  return { entry, title: normalize(entry.title), titleWords: [...new Set(words(entry.title))],
-    artists: [...entry.artists.map(normalize), ...aliases.map(normalize)] };
+  return { entry, names: [entry.title, ...(entry.aliases ?? [])].map((name) => ({
+    title: normalize(name), titleWords: [...new Set(words(name))],
+  })), artists: [...entry.artists.map(normalize), ...aliases.map(normalize)] };
 });
 const byId = new Map(library.entries.map((entry) => [entry.song, entry]));
 const titleFrequency = new Map<string, number>();
-for (const { titleWords } of entries) for (const word of titleWords) titleFrequency.set(word, (titleFrequency.get(word) ?? 0) + 1);
+for (const { names } of entries) for (const word of new Set(names.flatMap(({ titleWords }) => titleWords))) {
+  titleFrequency.set(word, (titleFrequency.get(word) ?? 0) + 1);
+}
 
 function almostEqual(a: string, b: string) {
   if (a === b) return true;
@@ -38,24 +42,27 @@ export function searchClarinetLibrary(query: string, limit = 8) {
   const normalized = normalize(query.slice(0, 2_000)), tokens = words(normalized);
   if (!normalized || !Number.isInteger(limit) || limit < 1) return [];
   const phrase = ` ${normalized} `;
-  const ranked = entries.map(({ entry, title, titleWords, artists }) => {
-    const exact = phrase.includes(` ${title} `);
-    const compact = title.replaceAll(" ", "");
-    const joined = compact.length >= 6 && tokens.some((token) => token === compact);
-    const matched = titleWords.filter((word) => tokens.some((token) => almostEqual(token, word))).length;
-    const coverage = matched / Math.max(1, titleWords.length);
-    const queryCoverage = tokens.filter((token) => titleWords.some((word) => almostEqual(token, word))).length / Math.max(1, tokens.length);
-    const uniquePartial = tokens.length === 1 && tokens[0].length >= 4
-      && titleWords.includes(tokens[0]) && titleFrequency.get(tokens[0]) === 1;
-    const titleScore = (coverage === 1 && queryCoverage >= 0.6) || uniquePartial ? coverage * 35 + matched : 0;
+  const ranked = entries.map(({ entry, names, artists }) => {
+    const titleScore = Math.max(...names.map(({ title, titleWords }) => {
+      const exact = phrase.includes(` ${title} `);
+      const compact = title.replaceAll(" ", "");
+      const joined = compact.length >= 6 && tokens.some((token) => token === compact);
+      const matched = titleWords.filter((word) => tokens.some((token) => almostEqual(token, word))).length;
+      const coverage = matched / Math.max(1, titleWords.length);
+      const queryCoverage = tokens.filter((token) => titleWords.some((word) => almostEqual(token, word))).length / Math.max(1, tokens.length);
+      const uniquePartial = tokens.length === 1 && tokens[0].length >= 4
+        && titleWords.includes(tokens[0]) && titleFrequency.get(tokens[0]) === 1;
+      const fuzzy = (coverage === 1 && queryCoverage >= 0.6) || uniquePartial ? coverage * 35 + matched : 0;
+      return (exact || joined ? 100 + title.length : 0) + fuzzy;
+    }));
     const artistScore = artists.some((artist) => phrase.includes(` ${artist} `)) ? 25 : 0;
-    return { entry, score: (exact || joined ? 100 + title.length : 0) + titleScore + artistScore };
+    return { entry, score: titleScore + artistScore };
   }).filter(({ score }) => score > 0).sort((a, b) => b.score - a.score || a.entry.song.localeCompare(b.entry.song));
   return ranked.slice(0, Math.min(8, limit)).map(({ entry }) => entry);
 }
 
-const popular = ["Take On Me", "Bohemian Rhapsody", "Dancing Queen", "Here Comes the Sun",
-  "Hey Jude", "Careless Whisper", "Dream a Little Dream of Me", "Over the Rainbow"];
+const popular = ["Take On Me", "Bohemian Rhapsody", "APT.", "Espresso",
+  "Megalovania", "Nyan Cat", "Crab Rave", "weezer lick"];
 
 export function selectClarinetLibrarySongs(question: string, history: string[] = []) {
   const current = searchClarinetLibrary(question);
