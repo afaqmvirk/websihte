@@ -189,17 +189,25 @@ Set `DISCORD_SQUD_BOT_TOKEN`, `DISCORD_SQUD_APPLICATION_ID`, and
 permissions plus Attach Files and Send Voice Messages. He answers tags and the
 standalone lowercase name `squd`.
 
-Squd can choose `send_clarinet` to answer with an instrumental voice message
-instead of text. Luna writes 4–24 notes and a tempo in the existing text-model
-tool call. A bounded server renderer plays the new phrase with sampled clarinet
+Squd can choose `send_clarinet` or `play_clarinet_reference` to answer with an
+instrumental voice message instead of text. Local title/artist search selects at
+most eight candidates from 1,000 scored songs in
+[WikiMT-X](https://huggingface.co/datasets/sander-wood/wikimt-x), covering mainly
+20th-century pop, rock, jazz, country, folk, and standards. Luna selects a matching
+song ID; the server reads its compiled melody instead of asking the model to guess
+the notes. Requests can include spelling variants and common band names such as
+Beatles, Queen, and ABBA. The public title catalog is
+[`public/discord/squd/library.json`](public/discord/squd/library.json).
+For other tunes or improvisations, Luna writes 4–24 notes and a tempo in the
+existing text-model tool call. A bounded server renderer plays the phrase with sampled clarinet
 notes, adds pitch wobble, squeaks and bad timing, and encodes a mono 48 kHz
 Opus/OGG voice message with waveform metadata. There is no extra model call or
 audio-generation API. Instrument samples and the portable Opus encoder are bundled;
 FluidSynth and FFmpeg are used only when rebuilding assets locally.
 
 The message contains one audio attachment with no caption. Named requests use
-the matching melody reference; arbitrary short tunes or improvisations can be
-composed too. Generated phrases are capped at eight seconds before performance
+the matching melody reference when available; unlisted tunes are model guesses
+and may be inaccurate. Generated phrases are capped at eight seconds before performance
 effects and ten seconds after them. Scores use bounded pitches, note counts
 and durations. No generated code is executed. A message-ID
 seed keeps rendering stable on retries while different messages get different
@@ -230,6 +238,17 @@ Rebuild the individual-note bank with `node scripts/generate-squd-clarinet-sampl
 using the same tools and SoundFont. The generated melody references live in
 `app/lib/discord-bot-clarinet-tunes.json`; the sampled notes and license are in
 `public/discord/squd/samples/`.
+
+Rebuild the extended collection with `node scripts/import-squd-melodies.mjs`.
+The importer uses pinned `abcjs` only during preprocessing; it resolves key
+signatures, accidentals, ties, tuplets, repeats, and octave clefs, then retains
+only a short opening melody of at most 24 notes/rests and seven seconds. Leading
+silence is removed, long holds are shortened, and pitches move by octaves into the
+clarinet range. Source scores, lyrics, captions, and recordings are not bundled.
+The source revision and checksum are pinned; no remote score lookup or extra model
+request happens during a reply. The collection's CC BY-NC 4.0 terms, source,
+credits, and changes are retained in
+[`public/discord/squd/WikiMT-X-NOTICE.md`](public/discord/squd/WikiMT-X-NOTICE.md).
 See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
