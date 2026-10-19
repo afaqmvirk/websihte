@@ -25,7 +25,7 @@ export async function generateDiscordImage(prompt: string, userId: string, perso
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
       model: "gpt-image-2.5-flare",
-      prompt: `Character references, only for characters requested in the image; do not add unrequested characters:\n${DISCORD_BOT_APPEARANCES.bob}.\n${DISCORD_BOT_APPEARANCES.rick}.\nThe drawing bot is overlord ${persona}. Afaq, also called afork on Discord, is a separate human whose appearance is unknown.\n\nRequested image:\n${prompt.trim()}`,
+      prompt: `Character references, only for characters requested in the image; do not add unrequested characters:\n${Object.values(DISCORD_BOT_APPEARANCES).join(".\n")}.\nThe drawing bot is overlord ${persona}. Afaq, also called afork on Discord, is a separate human whose appearance is unknown.\n\nRequested image:\n${prompt.trim()}`,
       n: 1, quality: "low",
       size: "1024x640", output_format: "jpeg", output_compression: 60, moderation: "auto",
       safety_identifier: createHash("sha256").update(`discord:${userId}`).digest("hex"),

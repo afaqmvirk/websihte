@@ -5,9 +5,12 @@ import { generateKrabReply } from "./discord-bot-krab";
 import { getKrabMoneyPhoto, KRAB_MONEY_PHOTOS } from "./discord-bot-krab";
 import { generateGeraldReply } from "./discord-bot-gerald";
 import { readFile } from "node:fs/promises";
+import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
+import { getSqudClarinet } from "./discord-bot-clarinet";
 
 const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "DISCORD_RICK_ENABLED", "DISCORD_RICK_BOT_TOKEN", "DISCORD_RICK_APPLICATION_ID", "DISCORD_KRAB_ENABLED", "DISCORD_KRAB_BOT_TOKEN", "DISCORD_KRAB_APPLICATION_ID", "DISCORD_BOT_IMAGES_ENABLED", "DISCORD_BOT_IMAGE_DAILY_LIMIT", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
 envNames.push("DISCORD_GERALD_ENABLED", "DISCORD_GERALD_BOT_TOKEN", "DISCORD_GERALD_APPLICATION_ID");
+envNames.push("DISCORD_SQUD_ENABLED", "DISCORD_SQUD_BOT_TOKEN", "DISCORD_SQUD_APPLICATION_ID");
 const originalEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 const originalFetch = globalThis.fetch;
 const originalRandom = Math.random;
@@ -18,6 +21,7 @@ const botId = "1560000000000000001";
 const rickId = "1560000000000000088";
 const krabId = "1560000000000000099";
 const geraldId = "1560000000000000097";
+const squdId = "1560000000000000096";
 const modelUrl = "https://api.openai.com/v1/chat/completions";
 let calls: { url: string; init?: RequestInit }[];
 let seen: Set<string>;
@@ -64,6 +68,10 @@ function enableGerald() {
   Object.assign(process.env, { DISCORD_GERALD_ENABLED: "true", DISCORD_GERALD_BOT_TOKEN: "synthetic-gerald-token".repeat(4), DISCORD_GERALD_APPLICATION_ID: geraldId });
   const gerald = getDiscordBotConfig("gerald"); assert.ok(gerald); return gerald;
 }
+function enableSqud() {
+  Object.assign(process.env, { DISCORD_SQUD_ENABLED: "true", DISCORD_SQUD_BOT_TOKEN: "synthetic-squd-token".repeat(4), DISCORD_SQUD_APPLICATION_ID: squdId });
+  const squd = getDiscordBotConfig("squd"); assert.ok(squd); return squd;
+}
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -108,6 +116,47 @@ afterEach(() => {
 });
 
 describe("sih-inator mention bot", () => {
+  it("gives Squd his adversarial personality with the drawing reference isolated", async () => {
+    const squd = enableSqud();
+    assert.equal(await handleDiscordMention(message({ mentionedUserIds: [squdId] }), squd), "answered");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    const system = getDiscordBotSystemPrompt("squd");
+    assert.match(system, /^you are overlord squd/);
+    assert.match(system, /very very adversarial/);
+    assert.match(system, /everyone is a nuisance including the human who pings you/);
+    assert.doesNotMatch(system.split("drawing yourself reference only:")[0], /squidward/i);
+    assert.match(system.split("drawing yourself reference only:")[1], /Squidward Tentacles/);
+    assert.ok(request.tools.some((tool: { function: { name: string } }) => tool.function.name === "send_clarinet"));
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => tool.function.name === "search_server_members"));
+    delete process.env.OPENAI_API_KEY;
+    assert.equal(getDiscordBotConfig("squd"), null);
+  });
+  it("sends a selected clarinet as a caption-free native Discord voice message", async () => {
+    const squd = enableSqud();
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", {}) : null;
+    const current = message({ mentionedUserIds: [squdId] });
+    assert.equal(await handleDiscordMention(current, squd), "answered");
+    const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+    const payload = JSON.parse(String(body.get("payload_json")));
+    const clip = getSqudClarinet(current.id);
+    assert.equal(payload.flags, 1 << 13);
+    assert.equal(Object.hasOwn(payload, "content"), false);
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: clip.file, duration_secs: clip.duration, waveform: clip.waveform }]);
+    assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
+    const audio = body.get("files[0]"); assert.ok(audio instanceof Blob);
+    assert.equal(audio.type, "audio/ogg");
+    assert.deepEqual(Buffer.from(await audio.arrayBuffer()), await readFile(`public/discord/squd/${clip.file}`));
+    assert.equal(await handleDiscordMention(current, squd), "duplicate");
+    assert.equal(replies().length, 1);
+  });
+  it("rejects clarinet actions for other bots and arbitrary clarinet arguments", async () => {
+    const squd = enableSqud();
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", {}) : null;
+    assert.equal(await handleDiscordMention(message(), config()), "failed");
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", { file: "arbitrary.mid", reply: "hey" }) : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", mentionedUserIds: [squdId] }), squd), "failed");
+    assert.ok(replies().every(({ init }) => typeof init?.body === "string"));
+  });
   it("recognizes each bot's exact lowercase names as individual words", () => {
     const rick = enableRick();
     for (const [bot, accepted, rejected] of [

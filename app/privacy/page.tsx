@@ -125,14 +125,14 @@ export default function PrivacyPolicyPage() {
 
             <h3>when you interact with our Discord bots</h3>
             <p>
-              If you tag sih-inator (overlord bob) or overlord rick, we send your question and
+              If you tag sih-inator (overlord bob), overlord rick, or overlord squd, we send your question and
               up to 25 recent messages from the same Discord channel or thread,
               plus up to 10 earlier messages from you across server channels the
               bot can access, to OpenAI to generate a reply.
             </p>
             <p>
               The bots also check messages in server channels they can access for
-              the standalone, case-sensitive names bob or spongebob, and rick or patrick.
+              the standalone, case-sensitive names bob or spongebob, rick or patrick, and squd.
               When one appears, we may send that message and up to 25 recent messages
               from the same channel or thread to OpenAI to decide whether it clearly
               refers to the bot and whether to reply. The bot can stay silent. These
@@ -173,6 +173,12 @@ export default function PrivacyPolicyPage() {
               the same response. Neither bot sends messages to OpenAI or fetches
               conversation history. The same private metadata tracking and usage
               limits apply to their replies.
+            </p>
+            <p>
+              Overlord squd can also respond with one of 32 fixed original clarinet
+              melodies as a voice message instead of text. A message-ID hash selects
+              the MIDI melody and its pre-rendered audio. No voice recording or
+              additional audio-generation service is used for these clips.
             </p>
 
             <h3>when you email us</h3>

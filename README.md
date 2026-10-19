@@ -100,13 +100,13 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
-## Overlord Bob, Rick, Krab, and Gerald Discord bots
+## Overlord Bob, Rick, Krab, Gerald, and Squd Discord bots
 
 The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. All four respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
+bot. All five respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
 also invite Bob with the standalone, case-sensitive words `bob` or `spongebob`,
 and Rick with `rick` or `patrick`. The model uses current-channel context to
 decide whether the name clearly refers to this bot; it can silently skip passing
@@ -122,7 +122,7 @@ including the first human-triggered reply. Human messages can start a new exchan
 It requests Guilds, GuildMessages, and MessageContent Gateway intents. Enable each application's
 Message Content setting in Discord so name triggers and REST history receive unmentioned messages;
 Enable Bob's Server Members setting for directory listings; Rick and Krab can
-leave it disabled. Presence can stay disabled for all four. The Gateway still
+leave it disabled. Presence can stay disabled for all five. The Gateway still
 does not request member events or cache the directory. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
@@ -173,11 +173,29 @@ sequences favoured. The message ID seeds the sequence so duplicate deliveries
 cannot change it. Like Krab, he uses no OpenAI, history, tools, or pings and keeps
 the one-second typing pause, shared admission limits, and silent failure behavior.
 
+Squd is a fifth account, `overlord squd`, using the shared text model and concise
+lowercase writing style. His personality is irritable, cynical, artistic, and
+very adversarial toward everyone who interrupts him. The cartoon character's
+name appears only in a drawing reference, not in his personality instructions.
+Set `DISCORD_SQUD_BOT_TOKEN`, `DISCORD_SQUD_APPLICATION_ID`, and
+`DISCORD_SQUD_ENABLED=true`. Enable Message Content and grant the normal reply
+permissions plus Attach Files and Send Voice Messages. He answers tags and the
+standalone lowercase name `squd`.
+
+Squd can choose `send_clarinet` to answer with an instrumental voice message
+instead of text. A message-ID hash selects one of 32 original deterministic
+clarinet MIDI melodies, stored alongside pre-rendered mono 48 kHz Opus/OGG audio
+and waveform metadata in `public/discord/squd/`. The message uses Discord's native
+voice flag and contains one audio attachment with no caption. The `.mid` files
+remain available too; no AI audio service or runtime encoder is needed. Regenerate
+the collection with `node scripts/generate-squd-clarinet.mjs` and a local FFmpeg.
+See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
+
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
 tokens. Defaults allow 10,000 requests per UTC day, 310,000 per UTC month, and one
 per person per bot every two seconds. Daily and monthly allowances are shared
-across all four bots. Follow-ups wait in order until the previous reply
+across all five bots. Follow-ups wait in order until the previous reply
 finishes and the cooldown expires, without a cooldown notice. A shared processing
 claim keeps overlapping listeners from answering the same person out of order;
 stale processing claims stop blocking new work after three minutes. Discord's typing
@@ -311,7 +329,8 @@ Run `bun test app/lib/discord-bot.test.ts` for bot checks and
 `bun test app/api/applications/route.test.ts` for the application flow.
 Apply `20261018040823_add_overlord_rick_and_image_tools.sql`, then
 `20261018045313_add_overlord_krab.sql`, then
-`20261019040834_add_overlord_gerald.sql` before enabling Gerald.
+`20261019040834_add_overlord_gerald.sql` before enabling Gerald, then
+`20261019041711_add_overlord_squd.sql` before enabling Squd.
 `supabase/tests/discord-overlords.sql` checks the database claims and
 limits inside a transaction that rolls back its synthetic records. During a
 deployment, an existing ten-minute listener keeps its old configuration until
