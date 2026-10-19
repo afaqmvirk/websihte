@@ -189,23 +189,35 @@ Set `DISCORD_SQUD_BOT_TOKEN`, `DISCORD_SQUD_APPLICATION_ID`, and
 permissions plus Attach Files and Send Voice Messages. He answers tags and the
 standalone lowercase name `squd`.
 
-Squd can choose `play_clarinet_reference` to answer with an
-instrumental voice message instead of text. Local title/artist search selects at
-most eight candidates from 1,028 scored tunes: 1,000 from
-[WikiMT-X](https://huggingface.co/datasets/sander-wood/wikimt-x), covering mainly
-20th-century pop, rock, jazz, country, folk, and standards; 18 modern pop and meme
-tunes from [Online Sequencer](https://onlinesequencer.net); and the ten original
-familiar references. The additions include APT., Espresso, As It Was, Enemy,
-Light Switch, Kill Bill, Positions, Creepin', Cupid, I'm Good (Blue), Cruel Summer,
-Golden, Among Us Drip, If I Had a Chicken, Nyan Cat, We Are Number One,
-Megalovania, and Crab Rave. Luna selects a matching
-song ID; the server reads its compiled melody instead of asking the model to guess
-the notes. Requests can include spelling variants and common band names such as
-Beatles, Queen, and ABBA, plus aliases such as amogus, happy bday, and weezer lick.
-The public title catalog is
+Squd uses the full [Discover MIDI archive](https://huggingface.co/datasets/projectlosangeles/Discover-MIDI-Dataset)
+through `play_clarinet_reference`: **6,747,346 indexed MIDI files**. The archive's
+own identified metadata supplies **586,297 named files** and **152,057 distinct
+normalized title labels**. These counts include arrangements, versions, and
+unnamed files; they are not counts of distinct compositions. Unnamed files can be
+requested with an exact 32-character MD5 ID. A read-only query endpoint is available
+at `/api/discord/clarinet-library?q=never%20gonna%20give%20you%20up`.
+
+The full 29.4 GB archive remains on Hugging Face. A free public GitHub release
+hosts a 273 MB compressed seek index and a 39.8 MB compressed SQLite FTS catalog.
+On first use a warm function downloads and verifies the catalog into ephemeral
+`/tmp` storage (83.5 MB decoded); later requests search that read-only cache.
+Queries and Discord messages are not sent to the archive hosts. The server fetches
+small index/dictionary ranges and a bounded compressed source range for the chosen
+file, restores the MIDI using Node zlib, verifies its MD5, and extracts a scored
+melodic part. No full archive, native executable, SQLite binary, or paid object
+storage is added to the Vercel function bundle. Node's built-in SQLite is used in
+production; Bun's built-in SQLite supports local tests.
+
+At most eight matching title/artist candidates go to the existing Luna call.
+The model selects one ID and cannot write notes. The 18 recent pop/meme hooks
+and ten original familiar references remain exact local fallbacks, including
+APT., Espresso, Golden, Megalovania, Among Us Drip, the Weezer lick, and happy bday.
+They use the same selection tool and renderer. Catalog labels are untrusted
+metadata and can be incomplete or inaccurate. Missing, unavailable, oversized,
+or unplayable scores produce a brief refusal; Squd never substitutes a different
+tune. The public source/count/download manifest and curated references are in
 [`public/discord/squd/library.json`](public/discord/squd/library.json).
-If the requested song has no matching score, Squd refuses briefly in character.
-The model cannot supply guessed notes or substitute a random song.
+
 A bounded server renderer plays the score with sampled clarinet
 notes, adds pitch wobble, squeaks and bad timing, and encodes a mono 48 kHz
 Opus/OGG voice message with waveform metadata. There is no extra model call or
@@ -245,24 +257,35 @@ using the same tools and SoundFont. The generated melody references live in
 `app/lib/discord-bot-clarinet-tunes.json`; the sampled notes and license are in
 `public/discord/squd/samples/`.
 
-Rebuild the extended collection with `node scripts/import-squd-melodies.mjs`.
-The importer uses pinned `abcjs` only during preprocessing; it resolves key
-signatures, accidentals, ties, tuplets, repeats, and octave clefs, then retains
-only a short opening melody of at most 24 notes/rests and seven seconds. Leading
-silence is removed, long holds are shortened, and pitches move by octaves into the
-clarinet range. Source scores, lyrics, captions, and recordings are not bundled.
-The source revision and checksum are pinned; no remote score lookup or extra model
-request happens during a reply. The WikiMT-X collection's CC BY-NC 4.0 terms, source,
-credits, and changes are retained in
-[`public/discord/squd/WikiMT-X-NOTICE.md`](public/discord/squd/WikiMT-X-NOTICE.md).
-Import the modern/meme additions and original references with
-`node scripts/import-squd-modern.mjs`. The pinned source manifest selects melody
-tracks and recognizable hooks from each arrangement. Both importers use the same
-bounded score compiler, local catalog, Luna selection tool, and voice renderer.
-There are no runtime score requests, additional model calls, paid APIs, or
-subscriptions. Arranger credits, source links, and changes are retained in
+Rebuild the remote indexes locally with zlib, a C compiler, Python's standard
+library, and Node. Set `SQUD_DISCOVER_INDEX` to an ignored output directory, then:
+
+```sh
+# Windows: add .exe to the output and set SQUD_DISCOVER_INDEXER accordingly.
+cc scripts/index-squd-discover.c -O2 -Wall -Wextra -lz -o "$SQUD_DISCOVER_INDEX/indexer"
+export SQUD_DISCOVER_INDEXER="$SQUD_DISCOVER_INDEX/indexer"
+node scripts/build-squd-discover-index.mjs
+python scripts/build-squd-discover-catalog.py
+node scripts/package-squd-discover-index.mjs
+```
+
+The first step streams the pinned archive once without saving a full archive
+copy, checks its full SHA-256, and records MIDI offsets plus byte-aligned gzip
+checkpoints. The next steps validate named metadata against the file index,
+build SQLite FTS, and package independently checked byte ranges. Upload
+`discover-index.bin` and `catalog.sqlite.gz` to the exact release URLs in the
+manifest before deploying. A changed source requires a new immutable revision,
+release tag, and generated manifest. Source attribution, licence, pinned checksums,
+metadata limits, and changes are retained in
+[`public/discord/squd/Discover-MIDI-NOTICE.md`](public/discord/squd/Discover-MIDI-NOTICE.md).
+
+Rebuild the retained modern hooks with `node scripts/import-squd-modern.mjs`.
+The pinned manifest selects melody tracks and recognizable hooks, then uses the
+same bounded score compiler. Arranger credits, source links, and changes are in
 [`public/discord/squd/OnlineSequencer-NOTICE.md`](public/discord/squd/OnlineSequencer-NOTICE.md)
 and [`public/discord/squd/online-sequencer-sources.json`](public/discord/squd/online-sequencer-sources.json).
+There are no additional model calls, paid APIs, storage products, or subscriptions.
+Normal existing Vercel compute and OpenAI usage still apply.
 See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
