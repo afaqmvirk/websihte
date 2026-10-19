@@ -1,10 +1,11 @@
 import { Client, Events, GatewayIntentBits, Options, PermissionFlagsBits } from "discord.js";
 import { getDiscordMessageTrigger, handleDiscordMention, type DiscordBotConfig, type DiscordMention } from "@/lib/discord-bot";
+import { selectDiscordServerEmojis } from "@/lib/discord-bot-emojis";
 
 export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 600_000) {
   const client = new Client({
     // Message Content is needed to spot unpinged names; messages are still not cached.
-    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent],
+    intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent, GatewayIntentBits.GuildExpressions],
     makeCache: Options.cacheWithLimits({ MessageManager: 0 }),
     allowedMentions: { parse: [], repliedUser: false },
   });
@@ -20,10 +21,17 @@ export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 6
       authorId: message.author.id, content: message.content, authorIsBot: message.author.bot,
       mentionedUserIds: [...message.mentions.users.keys()],
       mentionedUsers: [...message.mentions.users.values()].map((user) => ({ id: user.id, name: user.globalName || user.username })),
-      authorName: message.author.globalName || message.author.username,
+      authorName: message.member?.displayName || message.author.globalName || message.author.username,
+      authorUsername: message.author.username,
       authorIsWebhook: !!message.webhookId, referencedMessageId: message.reference?.messageId,
     };
     if (!getDiscordMessageTrigger(incoming, config)) return;
+    incoming.serverEmojis = selectDiscordServerEmojis(
+      [...message.guild.emojis.cache.values()].map((emoji) => ({
+        id: emoji.id, name: emoji.name, animated: emoji.animated, available: emoji.available,
+        roleIds: [...emoji.roles.cache.keys()],
+      })), new Set(message.guild.members.me?.roles.cache.keys()), message.content,
+    );
     incoming.canDelete = message.channel.permissionsFor(message.client.user)?.has(PermissionFlagsBits.ManageMessages) ?? false;
     const work = handleDiscordMention(incoming, config);
     pending.add(work);

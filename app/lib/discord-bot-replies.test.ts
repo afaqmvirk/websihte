@@ -23,6 +23,12 @@ describe("Discord reply messages", () => {
     const code = "```js\nconst Hello = 1;\n  console.log(Hello);\n```";
     assert.deepEqual(splitDiscordReply(`here you go\n${code}\nthat should do it`), ["here you go", code, "that should do it"]);
   });
+  it("keeps custom emoji markup intact when wrapping adjacent text or emoji", () => {
+    const emojis = "<:CatStare:1560000000000000111><a:HappyDance:1560000000000000112>";
+    const parts = splitDiscordReply("x".repeat(1_890) + emojis);
+    assert.deepEqual(parts, ["x".repeat(1_890), emojis]);
+    assert.equal(splitDiscordReply("< less than <tag>").join(""), "< less than <tag>");
+  });
   it("closes and reopens an oversized code block while preserving its language", () => {
     const code = "x".repeat(3_000);
     const parts = splitDiscordReply(`\`\`\`js\n${code}\n\`\`\``);

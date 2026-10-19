@@ -42,10 +42,10 @@ export function splitDiscordReply(text: string) {
     if (current.trim() && messages.length < MAX_DISCORD_REPLY_MESSAGES) messages.push(current.trim());
     current = "";
   }
-  // Treat code, links, and words as units; only ordinary line breaks start a
+  // Treat code, links, custom emojis, and words as units; only ordinary line breaks start a
   // new message. Keep remaining short lines together once the fifth is reached.
   const tokens = text.replace(/\r\n?/g, "\n")
-    .match(/```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s<>()]+|\n|[^\S\n]+|[^\s`]+|`/g) ?? [];
+    .match(/```[\s\S]*?```|`[^`\n]+`|https?:\/\/[^\s<>()]+|<a?:\w{1,32}:\d{17,20}>|\n|[^\S\n]+|[^\s`<]+|[<`]/g) ?? [];
   for (const token of tokens) {
     if (messages.length === MAX_DISCORD_REPLY_MESSAGES) break;
     if (token === "\n") {
