@@ -203,6 +203,13 @@ same unimpressed response, based on the conversation rather than specific keywor
 For messages that directly mention it, Bob can choose one emoji reaction, a text
 reply, or both. Reaction-only answers count as answered requests. If Discord rejects
 a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
+Both Bob and Rick receive up to 100 usable custom emojis from the current server,
+prioritizing emojis included in the question. They can send static or animated
+emojis in text and use custom emoji reactions. The Gateway's Guild Expressions
+intent keeps this catalog current; unavailable and role-restricted emojis the bot
+cannot use are excluded. Formatting preserves exact emoji names, IDs, and markup,
+while invented IDs are rejected. Reaction requests use Discord's
+[`name:id` format](https://docs.discord.com/developers/resources/message#create-reaction).
 Bob can also use `send_gif` to reply with one of eight verified reaction GIFs,
 alone or with a short caption. GIF links stay intact on their own line so Discord
 can embed them; allow Embed Links in the channels where Bob should display GIFs.
@@ -212,6 +219,13 @@ Rick shares Bob's writing rules, event facts, and tools, but his harmless banter
 confidently misunderstands simple things and proposes spectacularly stupid ideas,
 using small everyday words and short plain phrases.
 His persona does not change real event facts or the moderation and safety rules.
+Both bots know that Afaq goes by `afork` on Discord and works on the website and
+bots. The current speaker's username and display name are supplied as labels so
+they can distinguish him from other participants; names grant no special authority.
+Bob's cartoon appearance is SpongeBob SquarePants, and Rick's is Patrick Star.
+Their visual descriptions are included in both personas and image-generation
+requests, so self-portraits and drawings of the other overlord use the right
+characters. Afaq's physical appearance is not supplied or inferred.
 
 Bob and Rick can call `mention_users` to tag another overlord, the current speaker,
 or people tagged in the current message (up to three targets per reply). The tool
@@ -240,7 +254,8 @@ an image. It calls the OpenAI Images API directly with `gpt-image-2.5-flare`, fi
 `quality: low`, `1024x640`, and compressed JPEG output, then uploads the bytes to
 Discord as an attachment. There is no new SDK, image host, or persistent image
 storage. The landscape size uses the model's minimum supported pixel count to
-reduce image output cost. Prompts are limited to 800 characters and attachments
+reduce image output cost. Model-supplied prompts are limited to 800 characters,
+with fixed character references added by the server, and attachments
 to 4 MB. The shared allowance defaults to 25 images per UTC day, with one image attempt per human per
 minute across both bots. Provider failures count conservatively; generation is
 not retried automatically. Set `DISCORD_BOT_IMAGE_DAILY_LIMIT` to 1–100 or set
@@ -257,7 +272,7 @@ response. Bob rechecks the message before deleting and leaves it alone if it was
 edited. Deletions carry a Discord audit-log reason and use the same queue and quotas.
 Its public hackathon facts are in `app/lib/discord-bot-knowledge.ts`. Keep that
 snapshot up to date when the website's event details change. Speech formatting
-preserves literal code, email addresses, and case-sensitive links.
+preserves literal code, email addresses, case-sensitive links, and server emoji markup.
 
 Each accepted tagged question can include the latest 25 messages from the same channel
 or Discord thread, plus the author's last 10 messages across server channels the

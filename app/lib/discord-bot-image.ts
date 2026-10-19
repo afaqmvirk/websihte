@@ -1,4 +1,5 @@
 import { createHash } from "node:crypto";
+import { DISCORD_BOT_APPEARANCES, type DiscordAiBotPersona } from "@/lib/discord-bot-knowledge";
 
 export const MAX_IMAGE_PROMPT_LENGTH = 800;
 const MAX_IMAGE_BYTES = 4_000_000;
@@ -12,7 +13,7 @@ export function getDiscordImageConfig() {
   return { dailyLimit };
 }
 
-export async function generateDiscordImage(prompt: string, userId: string): Promise<DiscordGeneratedImage> {
+export async function generateDiscordImage(prompt: string, userId: string, persona: DiscordAiBotPersona = "bob"): Promise<DiscordGeneratedImage> {
   const key = process.env.OPENAI_API_KEY?.trim();
   if (!key || !getDiscordImageConfig() || !prompt.trim() || prompt.length > MAX_IMAGE_PROMPT_LENGTH) {
     throw new Error("Image generation is unavailable");
@@ -23,7 +24,9 @@ export async function generateDiscordImage(prompt: string, userId: string): Prom
     method: "POST",
     headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
-      model: "gpt-image-2.5-flare", prompt: prompt.trim(), n: 1, quality: "low",
+      model: "gpt-image-2.5-flare",
+      prompt: `Character references, only for characters requested in the image; do not add unrequested characters:\n${DISCORD_BOT_APPEARANCES.bob}.\n${DISCORD_BOT_APPEARANCES.rick}.\nThe drawing bot is overlord ${persona}. Afaq, also called afork on Discord, is a separate human whose appearance is unknown.\n\nRequested image:\n${prompt.trim()}`,
+      n: 1, quality: "low",
       size: "1024x640", output_format: "jpeg", output_compression: 60, moderation: "auto",
       safety_identifier: createHash("sha256").update(`discord:${userId}`).digest("hex"),
     }),

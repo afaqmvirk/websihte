@@ -527,6 +527,24 @@ describe("sih-inator mention bot", () => {
     assert.equal(JSON.parse(String(replies()[1].init?.body)).attachments, undefined);
     assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "answered");
   });
+  it("passes character appearances and the correct drawing bot through to image generation", async () => {
+    const imageBytes = Buffer.from([0xff, 0xd8, 0xff, 0xe0, 0xff, 0xd9]);
+    intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "overlord bob and overlord rick eating pizza", reply: null })
+      : url.endsWith("/rpc/claim_discord_bot_image") ? Response.json("accepted")
+      : url.endsWith("/images/generations") ? Response.json({ data: [{ b64_json: imageBytes.toString("base64") }] }) : null;
+    for (const [index, bot] of [config(), enableRick()].entries()) {
+      const current = message({ id: String(BigInt(message().id) + BigInt(index)),
+        content: `<@${bot.applicationId}> draw yourself and the other overlord eating pizza`, mentionedUserIds: [bot.applicationId] });
+      assert.equal(await handleDiscordMention(current, bot), "answered");
+      const request = JSON.parse(String(calls.filter(({ url }) => url.endsWith("/images/generations"))[index].init?.body));
+      assert.match(request.prompt, /overlord bob is SpongeBob SquarePants.*yellow rectangular sea sponge/);
+      assert.match(request.prompt, /overlord rick is Patrick Star.*pink five-pointed starfish/);
+      assert.ok(request.prompt.includes(`The drawing bot is overlord ${bot.persona}`));
+      assert.match(request.prompt, /do not add unrequested characters/);
+      assert.match(request.prompt, /Afaq, also called afork on Discord, is a separate human whose appearance is unknown/);
+      assert.ok(request.prompt.endsWith("Requested image:\noverlord bob and overlord rick eating pizza"));
+    }
+  });
   it("enforces shared image quotas before spending on generation", async () => {
     for (const [index, limit] of ["daily_limit", "cooldown", "duplicate"].entries()) {
       intercept = (url) => url === modelUrl ? actionResponse("generate_image", { prompt: "a goose", reply: null })
@@ -853,6 +871,54 @@ describe("sih-inator mention bot", () => {
     assert.deepEqual(Object.keys(tool.parameters.properties).sort(), ["emoji", "reply"]);
     assert.ok(tool.parameters.properties.emoji.enum.includes("💀"));
     assert.match(request.messages[0].content, /why dont you do that im not wasting my precious tokens/);
+  });
+  it("lets both overlords send static and animated server emojis without stripping their markup", async () => {
+    const serverEmojis = [
+      { id: "1560000000000000111", name: "CatStare", animated: false },
+      { id: "1560000000000000112", name: "HappyDance", animated: true },
+    ];
+    const markup = "<:CatStare:1560000000000000111> <a:HappyDance:1560000000000000112>";
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: `HERE! ${markup}` } }] }) : null;
+    for (const [index, bot] of [config(), enableRick()].entries()) {
+      const current = message({ id: String(BigInt(message().id) + BigInt(index)), serverEmojis,
+        content: `<@${bot.applicationId}> can u send ${markup}`, mentionedUserIds: [bot.applicationId] });
+      assert.equal(await handleDiscordMention(current, bot), "answered");
+      const reply = JSON.parse(String(replies()[index].init?.body));
+      assert.equal(reply.content, `here ${markup}`);
+      assert.deepEqual(reply.allowed_mentions, { parse: [], replied_user: false });
+      const request = JSON.parse(String(modelCalls()[index].init?.body));
+      assert.ok(request.messages[0].content.includes(markup.split(" ")[0]));
+      assert.ok(request.messages[0].content.includes(markup.split(" ")[1]));
+      assert.ok(request.tools[0].function.parameters.properties.emoji.enum.includes("CatStare:1560000000000000111"));
+    }
+    assert.equal(reactions().length, 0);
+  });
+  it("uses the Discord name:id endpoint format for custom emoji reactions", async () => {
+    const serverEmojis = [{ id: "1560000000000000111", name: "CatStare", animated: true }];
+    intercept = (url) => url === modelUrl ? reactionResponse("CatStare:1560000000000000111") : null;
+    assert.equal(await handleDiscordMention(message({ serverEmojis }), config()), "answered");
+    assert.ok(reactions()[0].url.endsWith(`/reactions/${encodeURIComponent("CatStare:1560000000000000111")}/@me`));
+    assert.equal(replies().length, 0);
+  });
+  it("does not send invented server emoji ids or accept arbitrary custom reactions", async () => {
+    const serverEmojis = [{ id: "1560000000000000111", name: "CatStare", animated: false }];
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "HEY! <:Fake:1560000000000000999>" } }] }) : null;
+    assert.equal(await handleDiscordMention(message({ serverEmojis }), config()), "answered");
+    assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "hey");
+    intercept = (url) => url === modelUrl ? reactionResponse("Fake:1560000000000000999") : null;
+    assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", serverEmojis }), config()), "failed");
+    assert.equal(reactions().length, 0);
+  });
+  it("gives both bots Afaq's Discord alias and the current human's actual speaker labels", async () => {
+    for (const [index, bot] of [config(), enableRick()].entries()) {
+      assert.equal(await handleDiscordMention(message({ id: String(BigInt(message().id) + BigInt(index)),
+        authorName: "Afaq", authorUsername: "afork", mentionedUserIds: [bot.applicationId] }), bot), "answered");
+      const system = JSON.parse(String(modelCalls()[index].init?.body)).messages[0].content;
+      assert.match(system, /afaq is the first name of the human who goes by afork on discord/);
+      assert.match(system, /"username":"afork","displayName":"Afaq"/);
+      assert.match(system, /SpongeBob SquarePants/);
+      assert.match(system, /Patrick Star/);
+    }
   });
   it("offers a GIF tool with a fixed collection and optional caption", async () => {
     await handleDiscordMention(message(), config());
