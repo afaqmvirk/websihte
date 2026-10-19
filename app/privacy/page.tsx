@@ -31,7 +31,7 @@ export default function PrivacyPolicyPage() {
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
-          <time dateTime="2026-10-18">October 18, 2026</time>
+          <time dateTime="2026-10-19">October 19, 2026</time>
         </p>
       </header>
 
@@ -176,12 +176,14 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               Overlord squd can also ask the text model to select a short melody
-              from a locally stored collection of over 1,000 tunes. Songs without
-              a matching score are refused. Our server plays the notes using sampled clarinet and
-              sends as a voice message. The performance adds deliberate mistakes
-              and squeaks. Forty saved performances of ten familiar tunes provide
-              a fallback for named songs. No voice recording or separate
-              audio-generation service is used.
+              reference for an instrumental voice message. Requests without
+              a matching playable score are refused. Our server plays the notes using sampled clarinet and
+              encodes the audio locally; there is no additional audio-generation service.
+              Song titles are searched in a locally cached public catalog. We fetch public
+              catalog files and MIDI byte ranges from GitHub and Hugging Face using file
+              identifiers and byte ranges, without sending your Discord messages or user IDs
+              to those hosts. Selected score bytes and rendered clips are used temporarily
+              to answer the request.
             </p>
 
             <h3>when you email us</h3>
