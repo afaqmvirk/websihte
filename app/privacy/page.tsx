@@ -125,7 +125,7 @@ export default function PrivacyPolicyPage() {
 
             <h3>when you interact with our Discord bots</h3>
             <p>
-              If you tag sih-inator (overlord bob), overlord rick, or overlord squd, we send your question and
+              When sih-inator (overlord bob), overlord rick, or overlord squd generates a reply, we send your question and
               up to 25 recent messages from the same Discord channel or thread,
               plus up to 10 earlier messages from you across server channels the
               bot can access, to OpenAI to generate a reply.
@@ -137,6 +137,11 @@ export default function PrivacyPolicyPage() {
               from the same channel or thread to OpenAI to decide whether it clearly
               refers to the bot and whether to reply. The bot can stay silent. These
               name checks do not include your messages from other channels.
+            </p>
+            <p>
+              When a message summons several bots, only the first one addressed
+              can reply normally. The others add fixed emoji reactions without
+              sending the message or conversation to OpenAI.
             </p>
             <p>
               This context can include

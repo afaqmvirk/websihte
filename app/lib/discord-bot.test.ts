@@ -540,11 +540,11 @@ describe("sih-inator mention bot", () => {
     assert.equal(await handleDiscordMention(current, gerald), "failed");
     assert.equal(replies().length, 0); assert.equal(modelCalls().length, 0);
   });
-  it("lets all three bots answer the same human message with separate claims", async () => {
+  it("lets the first summoned bot reply while later bots react using separate claims", async () => {
     const rick = enableRick(), krab = enableKrab();
     const current = message({ content: `<@${botId}> <@${rickId}> <@${krabId}> money`, mentionedUserIds: [botId, rickId, krabId] });
     assert.deepEqual(await Promise.all([config(), rick, krab].map((bot) => handleDiscordMention(current, bot))), ["answered", "answered", "answered"]);
-    assert.equal(modelCalls().length, 2); assert.equal(replies().length, 3);
+    assert.equal(modelCalls().length, 1); assert.equal(replies().length, 1); assert.equal(reactions().length, 2);
     assert.deepEqual([...seen].sort(), ["bob", "krab", "rick"].map((bot) => `${bot}:${current.id}`));
   });
   it("allows a tracked peer to ping Krab without giving him tools or tagging anyone back", async () => {
@@ -572,12 +572,97 @@ describe("sih-inator mention bot", () => {
     assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${rick.token}`);
     assert.ok(calls.at(-1)?.url.endsWith("&bot_id=eq.rick"));
   });
-  it("allows both bots to answer the same human mention with independent claims", async () => {
+  it("chooses the first visible mention rather than metadata or handler order", async () => {
     const rick = enableRick();
-    const current = message({ content: `<@${botId}> <@${rickId}> argue about soup`, mentionedUserIds: [botId, rickId] });
+    const current = message({ content: `<@!${rickId}> <@${botId}> argue about soup`, mentionedUserIds: [botId, rickId] });
     assert.deepEqual(await Promise.all([handleDiscordMention(current, config()), handleDiscordMention(current, rick)]), ["answered", "answered"]);
-    assert.equal(modelCalls().length, 2);
-    assert.equal(replies().length, 2);
+    assert.equal(modelCalls().length, 1); assert.equal(replies().length, 1); assert.equal(reactions().length, 1);
+    assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${rick.token}`);
+    assert.equal(new Headers(reactions()[0].init?.headers).get("Authorization"), `Bot ${config().token}`);
+  });
+  it("uses the same first-bot rule for all five personas including fixed replies and voice bots", async () => {
+    enableRick(); enableKrab(); enableGerald(); enableSqud();
+    const bots = getDiscordBotConfigs();
+    for (const [index, first] of bots.entries()) {
+      const ordered = [first, ...bots.filter((bot) => bot.persona !== first.persona)];
+      const current = message({ id: `15600000000000002${index.toString().padStart(2, "0")}`,
+        content: ordered.map((bot) => `<@${bot.applicationId}>`).join(" ") + " hi",
+        mentionedUserIds: ordered.toReversed().map((bot) => bot.applicationId) });
+      const replyCount = replies().length, reactionCount = reactions().length, modelCount = modelCalls().length, typingCount = typingCalls().length;
+      assert.deepEqual(await Promise.all(ordered.toReversed().map((bot) => handleDiscordMention(current, bot))), Array(5).fill("answered"));
+      assert.equal(replies().length - replyCount, 1, first.persona);
+      assert.equal(reactions().length - reactionCount, 4, first.persona);
+      assert.equal(modelCalls().length - modelCount, ["bob", "rick", "squd"].includes(first.persona) ? 1 : 0, first.persona);
+      assert.equal(new Headers(replies()[replyCount].init?.headers).get("Authorization"), `Bot ${first.token}`);
+      assert.ok(typingCalls().slice(typingCount).every(({ init }) => new Headers(init?.headers).get("Authorization") === `Bot ${first.token}`));
+    }
+  });
+  it("orders mixed name aliases and tags by their first appearance and ignores repeated summons", async () => {
+    const rick = enableRick();
+    for (const [index, content, mentions, first] of [
+      [0, `spongebob hi <@${rickId}> bob`, [rickId], config()],
+      [1, `patrick hi <@${botId}> rick`, [botId], rick],
+      [2, `<@${rickId}> bob <@${rickId}>`, [rickId], rick],
+      [3, "rick bob rick", [], rick],
+    ] as const) {
+      const current = message({ id: `156000000000000030${index}`, content, mentionedUserIds: [...mentions] });
+      const replyCount = replies().length, reactionCount = reactions().length;
+      assert.deepEqual(await Promise.all([config(), rick].map((bot) => handleDiscordMention(current, bot))), ["answered", "answered"]);
+      assert.equal(replies().length - replyCount, 1); assert.equal(reactions().length - reactionCount, 1);
+      assert.equal(new Headers(replies()[replyCount].init?.headers).get("Authorization"), `Bot ${first.token}`);
+    }
+  });
+  it("does not let inactive or unrelated bot mentions take the speaking slot", async () => {
+    const current = message({ content: `<@${krabId}> <@1560000000000000888> <@${botId}> hi`,
+      mentionedUserIds: [krabId, "1560000000000000888", botId] });
+    assert.equal(await handleDiscordMention(current, config()), "answered");
+    assert.equal(replies().length, 1); assert.equal(reactions().length, 0); assert.equal(modelCalls().length, 1);
+  });
+  it("handles implicit reply mentions consistently while preferring visible summons", async () => {
+    const rick = enableRick();
+    const implicit = message({ content: "hello", mentionedUserIds: [rickId, botId] });
+    assert.deepEqual(await Promise.all([config(), rick].map((bot) => handleDiscordMention(implicit, bot))), ["answered", "answered"]);
+    assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${rick.token}`);
+    const visible = message({ id: "1560000000000000401", content: `<@${botId}> hi`, mentionedUserIds: [rickId, botId] });
+    assert.deepEqual(await Promise.all([config(), rick].map((bot) => handleDiscordMention(visible, bot))), ["answered", "answered"]);
+    assert.equal(new Headers(replies()[1].init?.headers).get("Authorization"), `Bot ${config().token}`);
+  });
+  it("keeps secondary reactions duplicate-safe without typing history model calls or reply pauses", async () => {
+    const rick = enableRick(); let pauses = 0;
+    const current = message({ content: `<@${botId}> <@${rickId}> hi`, mentionedUserIds: [rickId, botId] });
+    const results = await Promise.all([0, 1].map(() => handleDiscordMention(current, rick, async () => { pauses++; })));
+    assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
+    assert.equal(reactions().length, 1); assert.equal(replies().length, 0); assert.equal(modelCalls().length, 0);
+    assert.equal(typingCalls().length, 0); assert.equal(pauses, 0);
+    assert.equal(calls.filter(({ url, init }) => init?.method === "GET" && url.includes("discord.com")).length, 0);
+    const tracking = JSON.parse(String(calls.find(({ init }) => init?.method === "PATCH")?.init?.body));
+    assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, null);
+  });
+  it("never sends secondary fallback text when reactions quotas or storage fail", async () => {
+    const rick = enableRick();
+    const current = message({ content: `<@${botId}> <@${rickId}> hi`, mentionedUserIds: [botId, rickId] });
+    for (const result of ["daily_limit", "monthly_limit", "conversation_limit"]) {
+      intercept = (url) => url.includes("/rpc/") ? Response.json(result) : null;
+      assert.equal(await handleDiscordMention(current, rick), result);
+    }
+    intercept = (url) => url.includes("/rpc/") ? new Response(null, { status: 503 }) : null;
+    assert.equal(await handleDiscordMention(current, rick), "failed");
+    intercept = (url) => url.includes("/reactions/") ? new Response(null, { status: 403 }) : null;
+    assert.equal(await handleDiscordMention(current, rick), "failed");
+    intercept = (url) => { if (url.includes("/reactions/")) throw new Error("unavailable"); return null; };
+    assert.equal(await handleDiscordMention({ ...current, id: "1560000000000000402" }, rick), "failed");
+    assert.equal(replies().length, 0); assert.equal(modelCalls().length, 0); assert.equal(typingCalls().length, 0);
+    assert.ok(calls.filter(({ init }) => init?.method === "PATCH").every(({ init }) => JSON.parse(String(init?.body)).status === "failed"));
+  });
+  it("applies the rule to tracked bot exchanges without letting the author summon itself", async () => {
+    enableRick(); enableSqud();
+    const bots = getDiscordBotConfigs(), rick = bots.find((bot) => bot.persona === "rick")!, squd = bots.find((bot) => bot.persona === "squd")!;
+    const current = message({ authorId: botId, authorIsBot: true, referencedMessageId: "1560000000000000000",
+      content: `<@${botId}> <@${squdId}> <@${rickId}> hi`, mentionedUserIds: [rickId, botId, squdId] });
+    assert.equal(await handleDiscordMention(current, config()), "ignored");
+    assert.deepEqual(await Promise.all([rick, squd].map((bot) => handleDiscordMention(current, bot))), ["answered", "answered"]);
+    assert.equal(replies().length, 1); assert.equal(reactions().length, 1); assert.equal(modelCalls().length, 1);
+    assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${squd.token}`);
   });
   it("answers an authenticated peer with channel context but no image or moderation tools", async () => {
     enableRick();

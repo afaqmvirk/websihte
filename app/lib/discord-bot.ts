@@ -27,6 +27,9 @@ const BOT_NAMES = {
 };
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
+const SUMMON_REACTIONS: Record<DiscordBotPersona, string> = {
+  bob: "👀", rick: "🤔", krab: "💰", gerald: "🐱", squd: "🙄",
+};
 // Fixed, verified GIFs keep the model from inventing media URLs.
 const REACTION_GIFS = {
   confused: "https://media.giphy.com/media/3o7aTskHEUdgCQAXde/giphy.gif",
@@ -123,6 +126,25 @@ export function getDiscordMessageTrigger(message: DiscordMention, config: Discor
   // Names never start or extend a bot-to-bot loop. Only exact lowercase words qualify.
   if (!message.authorIsBot && BOT_NAMES[config.persona].test(message.content)) return "name";
   return null;
+}
+
+function isReactionOnlySummon(message: DiscordMention, config: DiscordBotConfig) {
+  const bots = [config, ...config.peers].filter((bot) => bot.applicationId !== message.authorId);
+  const summoned = bots.map((bot) => {
+    let position = Infinity;
+    if (message.mentionedUserIds.includes(bot.applicationId)) {
+      const tag = new RegExp(`<@!?${bot.applicationId}>`).exec(message.content);
+      // Reply mentions may be implicit. Prefer visible summons, then Discord's mention order.
+      position = tag?.index ?? message.content.length + 1 + message.mentionedUserIds.indexOf(bot.applicationId);
+    }
+    if (!message.authorIsBot) {
+      const name = BOT_NAMES[bot.persona].exec(message.content);
+      if (name) position = Math.min(position, name.index);
+    }
+    return { id: bot.applicationId, position };
+  }).filter((bot) => Number.isFinite(bot.position))
+    .sort((a, b) => a.position - b.position || a.id.localeCompare(b.id));
+  return summoned.length > 1 && summoned[0].id !== config.applicationId;
 }
 
 function questionFromMention(message: DiscordMention, config: DiscordBotConfig) {
@@ -459,7 +481,7 @@ async function postReaction(message: DiscordMention, emoji: string, config: Disc
     });
     return response.ok;
   } catch {
-    // Fall back to text if Discord cannot add the reaction.
+    // Ordinary replies may fall back to text; secondary summons must stay reaction-only.
     return false;
   }
 }
@@ -592,7 +614,7 @@ function startTyping(message: DiscordMention, config: DiscordBotConfig) {
 
 async function answerMention(
   message: DiscordMention, question: string, config: DiscordBotConfig, queued: boolean,
-  optionalResponse: boolean, waitBeforeReply: (milliseconds: number) => Promise<void>,
+  optionalResponse: boolean, reactionOnly: boolean, waitBeforeReply: (milliseconds: number) => Promise<void>,
 ) {
   let claimed = false;
   let stopTyping: (() => void) | undefined;
@@ -606,7 +628,7 @@ async function answerMention(
   try {
     let claim = await claimMention(message, config);
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
-    if (!optionalResponse) stopTyping = startTyping(message, config);
+    if (!optionalResponse && !reactionOnly) stopTyping = startTyping(message, config);
     while (claim === "cooldown") {
       queued = true;
       // The shared claim also waits for this user's previous answer across listeners.
@@ -615,14 +637,14 @@ async function answerMention(
     }
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
     if (claim === "daily_limit") {
-      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
       }
       return claim;
     }
     if (claim === "monthly_limit") {
-      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
       }
@@ -630,6 +652,11 @@ async function answerMention(
     }
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
+    if (reactionOnly) {
+      const reacted = await postReaction(message, SUMMON_REACTIONS[config.persona], config);
+      await recordReply(message.id, null, config, reacted);
+      return reacted ? "answered" : "failed";
+    }
     let answer: DiscordBotReply;
     if (config.persona === "krab") answer = await generateKrabAnswer(message.id);
     else if (config.persona === "gerald") answer = await generateGeraldAnswer(message.id);
@@ -679,7 +706,7 @@ async function answerMention(
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      if (isDiscordAiBotPersona(config.persona) && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
         await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
       }
@@ -697,13 +724,14 @@ export async function handleDiscordMention(
 ) {
   const trigger = getDiscordMessageTrigger(message, config);
   if (!trigger) return "ignored";
+  const reactionOnly = isReactionOnlySummon(message, config);
   const question = questionFromMention(message, config);
-  if (isDiscordAiBotPersona(config.persona) && trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
+  if (!reactionOnly && isDiscordAiBotPersona(config.persona) && trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
   // Preserve each person's message order without holding up other people.
   const key = `${config.persona}:${message.guildId}:${message.authorId}`;
   const previous = userQueues.get(key);
   const work = (previous ?? Promise.resolve()).catch(() => {})
-    .then(() => answerMention(message, question, config, !!previous, trigger === "name", waitBeforeReply));
+    .then(() => answerMention(message, question, config, !!previous, trigger === "name", reactionOnly, waitBeforeReply));
   userQueues.set(key, work);
   try {
     return await work;

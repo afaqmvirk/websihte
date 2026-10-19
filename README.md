@@ -106,7 +106,15 @@ The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. All five respond to direct mentions in `DISCORD_GUILD_ID`. Human messages can
+bot. All five handle direct mentions in `DISCORD_GUILD_ID`. When a message summons
+several active bots, only the first one addressed can send its normal reply.
+Order follows the first visible tag or recognized lowercase name in the message,
+including aliases; implicit reply mentions fall back to Discord's mention order.
+Later bots only add a fixed reaction: Bob 👀, Rick 🤔, Krab 💰, Gerald 🐱, Squd 🙄.
+These secondary reactions use the normal duplicate-safe claims and queues, without
+reading conversation history, calling a model, displaying typing, or sending
+text, photos, voice clips, or error/quota notices. A failed reaction stays silent.
+Human messages can
 also invite Bob with the standalone, case-sensitive words `bob` or `spongebob`,
 and Rick with `rick` or `patrick`. The model uses current-channel context to
 decide whether the name clearly refers to this bot; it can silently skip passing
@@ -342,7 +350,9 @@ Obvious trolling, theatrical threats, exaggerated claims, and roleplay get the
 same unimpressed response, based on the conversation rather than specific keywords.
 For messages that directly mention it, Bob can choose one emoji reaction, a text
 reply, or both. Reaction-only answers count as answered requests. If Discord rejects
-a reaction, Bob falls back to text. Reactions use the same queue and quotas as replies.
+a reaction during a normal reply, Bob falls back to text. Secondary bots summoned
+alongside an earlier bot never use this text fallback. Reactions use the same queue
+and quotas as replies.
 Both Bob and Rick receive up to 100 usable custom emojis from the current server,
 prioritizing emojis included in the question. They can send static or animated
 emojis in text and use custom emoji reactions. The Gateway's Guild Expressions
