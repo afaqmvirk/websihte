@@ -246,7 +246,7 @@ async function requestDiscordBotReply(
         type: "function",
         function: {
           name: "send_clarinet", strict: true,
-          description: "Reply with a short solo clarinet voice message instead of text. The server selects a deterministic original MIDI melody and sends its rendered audio. Use occasionally when a performance fits, or for a clarinet request. No spoken voice, caption, or arbitrary files.",
+          description: "Reply with a terrible solo clarinet rendition of a familiar tune as a voice message instead of text. The server randomly selects a deterministic performance with wrong notes squeaks and bad timing. You cannot choose a specific song. Use occasionally when a performance fits, or for a clarinet request. No spoken voice, caption, or arbitrary files.",
           parameters: { type: "object", properties: {}, additionalProperties: false, required: [] },
         },
       }] : []), ...(canLookupMembers ? [{

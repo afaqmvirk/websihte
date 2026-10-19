@@ -4,7 +4,7 @@ import { describe, it } from "node:test";
 import { getSqudClarinet, loadSqudClarinet } from "./discord-bot-clarinet";
 
 describe("Squd clarinet voice clips", () => {
-  it("selects repeatable clips across all 32 original MIDI melodies", async () => {
+  it("selects repeatable performances across all 32 clips and eight familiar tunes", async () => {
     const selected = new Map<string, string>();
     for (let index = 0; index < 2_000; index++) {
       const id = String(1560000000000000000n + BigInt(index));
@@ -13,8 +13,10 @@ describe("Squd clarinet voice clips", () => {
       selected.set(clip.file, id);
     }
     assert.equal(selected.size, 32);
+    const tunes = new Set<string>();
     for (const [file, id] of selected) {
       const reference = getSqudClarinet(id);
+      tunes.add(reference.title);
       const clip = await loadSqudClarinet(id);
       assert.equal(clip.filename, file); assert.equal(clip.contentType, "audio/ogg");
       assert.ok(clip.duration > 1 && clip.duration < 10);
@@ -28,5 +30,7 @@ describe("Squd clarinet voice clips", () => {
       assert.ok(midi.includes(Buffer.from([0xc0, 71]))); // GM clarinet.
       assert.ok(midi.includes(Buffer.from([0xff, 0x2f, 0]))); // End of track.
     }
+    assert.equal(tunes.size, 8);
+    assert.ok(tunes.has("Jingle Bells") && tunes.has("Ode to Joy"));
   });
 });
