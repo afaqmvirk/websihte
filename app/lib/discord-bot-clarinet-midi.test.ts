@@ -37,4 +37,20 @@ describe("archive MIDI melody extraction", () => {
       assert.throws(() => clarinetScoreFromMidi(bytes));
     }
   });
+  it("chooses repeatable longer sections throughout the melody rather than only its opening", () => {
+    const bytes = file([melody(0, Array.from({ length: 240 }, (_, index) => 55 + Math.floor(index / 8) % 24))]);
+    const passages = Array.from({ length: 24 }, (_, index) => clarinetScoreFromMidi(bytes, `message-${index}`));
+    assert.deepEqual(clarinetScoreFromMidi(bytes, "message-0"), passages[0]);
+    assert.ok(new Set(passages.map((score) => JSON.stringify(score.notes))).size >= 12);
+    assert.ok(passages.some((score) => score.notes[0].pitch! >= 70)); // Beyond the old first-64-note window.
+    for (const score of passages) {
+      const seconds = score.notes.reduce((sum, note) => sum + note.beats, 0) * 60 / score.tempo_bpm;
+      assert.ok(seconds >= 10 && seconds <= 15);
+      assert.ok(score.notes.length >= 4 && score.notes.length <= 128);
+    }
+  });
+  it("moves very high melodies down by octaves while preserving their intervals", () => {
+    const score = clarinetScoreFromMidi(file([melody(0, [84, 86, 88, 89, 91, 93])]));
+    assert.deepEqual(score.notes.map(({ pitch }) => pitch), [72, 74, 76, 77, 79, 81]);
+  });
 });

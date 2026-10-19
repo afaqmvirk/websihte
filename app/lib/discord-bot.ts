@@ -179,6 +179,7 @@ function formatReply(text: string, serverEmojis: DiscordServerEmoji[] = []) {
 type ReplyOptions = {
   persona?: DiscordAiBotPersona; mentionTargets?: DiscordMentionTarget[];
   canGenerateImage?: boolean; currentSpeaker?: string; optionalResponse?: boolean;
+  performanceSeed?: string;
   memberLookup?: (query: string, after: string | null) => Promise<DiscordMemberSearch>;
   serverEmojis?: DiscordServerEmoji[];
   currentUser?: { username?: string; displayName?: string };
@@ -366,7 +367,7 @@ optional unpinged name mention:
         || !librarySongs.some(({ song }) => song === args.song)) throw new Error("Invalid clarinet library request");
       const savedSong = args.song.startsWith("core_") ? args.song.slice(5) : undefined;
       try {
-        return { text: "", clarinet: true, clarinetScore: await getClarinetLibraryScore(args.song),
+        return { text: "", clarinet: true, clarinetScore: await getClarinetLibraryScore(args.song, options.performanceSeed),
           ...(savedSong && SQUD_CLARINET_SONGS.includes(savedSong) ? { clarinetSong: savedSong } : {}) };
       } catch { return { text: "cant play that one go bother someone else" }; }
     } else if (call.function.name === "skip_response" && options.optionalResponse) {
@@ -637,6 +638,7 @@ async function answerMention(
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
       message.canDelete === true && !message.authorIsBot && !optionalResponse, {
         persona: config.persona, mentionTargets: mentionTargets(message, config), canGenerateImage: !message.authorIsBot,
+        performanceSeed: message.id,
         serverEmojis: message.serverEmojis, currentUser: message.authorIsBot ? undefined : { username: message.authorUsername, displayName: message.authorName },
         currentSpeaker: message.authorIsBot ? `overlord_${config.peers.find((peer) => peer.applicationId === message.authorId)!.persona}` : "current_user",
         optionalResponse,

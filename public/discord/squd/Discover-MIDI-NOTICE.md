@@ -28,10 +28,13 @@ contains 586,297 named files and 152,057 distinct normalized title labels. Count
 include different arrangements and versions; they do not mean distinct songs.
 Unnamed files can be retrieved by their exact 32-character MD5 ID.
 
-For playback, select a scored melodic part, omit drums/accompaniment, keep a short
-monophonic phrase, move pitches by octaves into clarinet range, bound durations
-and note counts, and use the existing sampled clarinet renderer with deliberate
-mistakes. No lyrics, original audio, remote scripts, or model-generated notes
+For playback, select a scored melodic part, omit drums/accompaniment, and choose
+a message-seeded section from throughout that track. Target 10–15 seconds;
+short melodies finish naturally. Move pitches by octaves into concert MIDI 55–82,
+bound each score to 128 notes/rests and fifteen seconds, and use the existing
+sampled clarinet renderer with deliberate mistakes and gentler brief overblows
+capped at MIDI 86. Source MIDI is cached without fixing subsequent messages to
+one opening. No lyrics, original audio, remote scripts, or model-generated notes
 are used. Missing, unavailable, oversized, or unplayable scores are refused.
 
 The public derived index and title catalog are available in the

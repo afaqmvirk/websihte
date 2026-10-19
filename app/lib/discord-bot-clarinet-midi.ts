@@ -1,12 +1,12 @@
 import { parseMidi } from "midi-file";
-import { compileClarinetExcerpt } from "./discord-bot-clarinet-compile.mjs";
+import { compileClarinetPassage } from "./discord-bot-clarinet-compile.mjs";
 import { parseClarinetScore } from "./discord-bot-clarinet-score";
 
 export const MAX_CLARINET_MIDI_BYTES = 1_000_000;
 type Note = { pitch: number; start: number; end: number; program: number };
 type Voice = { name: string; channel: number; notes: Note[] };
 
-export function clarinetScoreFromMidi(bytes: Uint8Array) {
+export function clarinetScoreFromMidi(bytes: Uint8Array, performanceSeed?: string) {
   if (bytes.length > MAX_CLARINET_MIDI_BYTES || Buffer.from(bytes.subarray(0, 4)).toString() !== "MThd") throw new Error("Invalid MIDI size or header");
   const midi = parseMidi(bytes), ppq = midi.header.ticksPerBeat;
   if (!ppq || !Number.isInteger(ppq) || ppq < 1 || midi.header.format > 1
@@ -67,14 +67,11 @@ export function clarinetScoreFromMidi(bytes: Uint8Array) {
     return { voice, rank: explicit - accompaniment + wind + median * 0.5 - overlap * 60 - index * 0.1 };
   }).filter(({ voice }) => new Set(voice.notes.map((note) => note.pitch)).size >= 3).sort((a, b) => b.rank - a.rank);
   for (const { voice } of ranked) {
-    for (let start = 0; start < Math.min(64, voice.notes.length - 3); start += 8) {
-      const origin = time(voice.notes[start].start);
-      const events = voice.notes.slice(start, start + 200).filter((note) => time(note.start) - origin < 8).map((note) => ({
-        pitch: note.pitch, time: (time(note.start) - origin) * 160 / 60, beats: (time(note.end) - time(note.start)) * 160 / 60,
-      }));
-      // Convert elapsed seconds to a common beat grid so tempo changes retain their timing.
-      try { return parseClarinetScore(compileClarinetExcerpt(events, 160)); } catch { /* Try the next scored phrase or voice. */ }
-    }
+    // Convert elapsed seconds to quarter-note beats, preserving tempo changes.
+    const events = voice.notes.map((note) => ({ pitch: note.pitch, time: time(note.start) * 160 / 60,
+      beats: (time(note.end) - time(note.start)) * 160 / 60 }));
+    try { return parseClarinetScore(compileClarinetPassage(events, 160, performanceSeed)); }
+    catch { /* Try the next scored melodic voice, without inventing notes. */ }
   }
   throw new Error("No playable melody in MIDI");
 }

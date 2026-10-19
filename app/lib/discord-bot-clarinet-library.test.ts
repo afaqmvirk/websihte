@@ -41,8 +41,11 @@ describe("Squd whole-archive melody library", () => {
     assert.equal(curated.entries.length, 28);
     for (const entry of curated.entries) {
       const score = await getClarinetLibraryScore(entry.song);
-      assert.ok(score.notes.length >= 4 && score.notes.length <= 24);
-      assert.ok(score.notes.reduce((sum, note) => sum + note.beats, 0) * 60 / score.tempo_bpm <= 7);
+      assert.ok(score.notes.length >= 4 && score.notes.length <= 128);
+      assert.ok(score.notes.reduce((sum, note) => sum + note.beats, 0) * 60 / score.tempo_bpm <= 15);
+      for (const passage of entry.passages) {
+        assert.ok(passage.notes.every((note) => note.pitch === null || note.pitch >= 55 && note.pitch <= 82));
+      }
     }
     await assert.rejects(getClarinetLibraryScore("../../arbitrary.mid"));
   });
@@ -94,8 +97,10 @@ describe("Squd whole-archive melody library", () => {
   });
   it("renders every retained modern score through the existing native voice encoder", async () => {
     for (const row of modernSources.entries) {
-      const clip = await renderClarinetScore(await getClarinetLibraryScore(`os_${row.id}`), "1560000000000000002");
-      assert.ok(clip.duration > 1 && clip.duration <= 10, row.title);
+      const score = await getClarinetLibraryScore(`os_${row.id}`);
+      const clip = await renderClarinetScore(score, "1560000000000000002");
+      const sourceSeconds = score.notes.reduce((sum, note) => sum + note.beats, 0) * 60 / score.tempo_bpm;
+      assert.ok(clip.duration >= Math.min(10, sourceSeconds * 0.94) && clip.duration <= 15, row.title);
       const bytes = Buffer.from(clip.bytes), decoder = new OpusScript(48000, 1, OpusScript.Application.AUDIO);
       let samples = 0, nonzero = false;
       try {
@@ -113,5 +118,29 @@ describe("Squd whole-archive melody library", () => {
       } finally { decoder.delete(); }
       assert.ok(samples > 48_000 && nonzero, row.title);
     }
+  });
+  it("varies modern-song sections by message while keeping retries and short riffs intact", async () => {
+    const song = "os_4158329";
+    const scores = await Promise.all(Array.from({ length: 16 }, (_, index) => getClarinetLibraryScore(song, `message-${index}`)));
+    assert.deepEqual(await getClarinetLibraryScore(song, "message-0"), scores[0]);
+    assert.ok(new Set(scores.map((score) => JSON.stringify(score))).size > 1);
+    assert.deepEqual(await getClarinetLibraryScore("core_weezer_buddy_holly", "message-0"),
+      await getClarinetLibraryScore("core_weezer_buddy_holly", "message-1"));
+  });
+  it("caches source MIDI without freezing every later message to one section", async () => {
+    let downloads = 0;
+    const bytes = Buffer.from(writeMidi({ header: { format: 0, numTracks: 1, ticksPerBeat: 480 }, tracks: [[
+      ...Array.from({ length: 240 }, (_, index) => 55 + Math.floor(index / 8) % 24).flatMap((noteNumber) => [
+        { deltaTime: 0, type: "noteOn" as const, channel: 0, noteNumber, velocity: 100 },
+        { deltaTime: 480, type: "noteOff" as const, channel: 0, noteNumber, velocity: 0 },
+      ]), { deltaTime: 0, type: "endOfTrack" },
+    ]] }));
+    const library = createClarinetLibrary(async () => ({ search: () => rows }), { ...archive, midi: async () => { downloads++; return bytes; } });
+    const scores = await Promise.all(Array.from({ length: 8 }, (_, index) => library.score(`discover_${hash}`, `message-${index}`)));
+    assert.ok(new Set(scores.map((score) => JSON.stringify(score))).size > 1);
+    assert.deepEqual(await library.score(`discover_${hash}`, "message-0"), scores[0]);
+    assert.equal(downloads, 1);
+    await library.score(`discover_${hash}`, "another-message");
+    assert.equal(downloads, 1);
   });
 });
