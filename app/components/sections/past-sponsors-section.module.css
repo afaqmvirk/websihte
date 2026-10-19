@@ -1,0 +1,174 @@
+.section {
+  position: relative;
+  z-index: 0;
+  padding: 64px 0 clamp(180px, 18vw, 260px);
+  color: #a3a3a3;
+}
+
+.heading {
+  margin-bottom: 36px;
+  text-align: right;
+}
+
+.filters {
+  position: absolute;
+  pointer-events: none;
+}
+
+.heading h2 {
+  margin: 0;
+  font-family: var(--font-arial-narrow);
+  font-size: clamp(22px, 3vw, 36px);
+  font-weight: 400;
+  letter-spacing: -0.035em;
+  line-height: 1.15;
+}
+
+.viewport {
+  overflow-x: clip;
+  overscroll-behavior-x: contain;
+  mask-image: linear-gradient(to right, transparent, #000 4%, #000 96%, transparent);
+}
+
+.track {
+  display: flex;
+  width: max-content;
+  animation: sponsors-scroll 115s linear infinite;
+}
+
+.viewport:hover .track,
+.viewport:focus-within .track {
+  animation-play-state: paused;
+}
+
+.list {
+  display: flex;
+  flex-shrink: 0;
+  gap: 40px;
+  align-items: center;
+  margin: 0;
+  padding: 4px 40px 8px 0;
+  list-style: none;
+}
+
+.sponsor {
+  display: block;
+  padding: 4px 0;
+  border-radius: 4px;
+  color: inherit;
+  text-align: center;
+  text-decoration: none;
+}
+
+.artwork {
+  position: relative;
+  display: block;
+  width: var(--sponsor-width);
+  border-radius: 4px;
+}
+
+.logo {
+  display: block;
+  width: 100%;
+  height: auto;
+  max-width: none;
+  object-fit: contain;
+  transition: filter 200ms, opacity 200ms;
+}
+
+.monochromeLogo {
+  filter: url("#past-sponsors-monochrome");
+  opacity: 0.64;
+}
+
+.lightArtwork .monochromeLogo {
+  filter: grayscale(1);
+}
+
+.preserveDetail .monochromeLogo {
+  filter: grayscale(1) brightness(1.25);
+  opacity: 0.6;
+}
+
+.colorLogo {
+  opacity: 0;
+}
+
+.monochromeOnly .colorLogo {
+  filter: url("#past-sponsors-monochrome");
+}
+
+.sponsor:hover .monochromeLogo,
+.sponsor:focus-visible .monochromeLogo {
+  opacity: 0;
+}
+
+.sponsor:hover .colorLogo,
+.sponsor:focus-visible .colorLogo {
+  opacity: 1;
+}
+
+.sponsor:focus-visible {
+  outline: 2px solid #fff;
+  outline-offset: 3px;
+}
+
+.copyright {
+  margin-top: 48px;
+  font-family: var(--font-arial);
+  font-size: 12px;
+  line-height: 1.5;
+  text-align: right;
+}
+
+.viewport:has(:focus-visible) .track {
+  animation: none;
+}
+
+.viewport:has(:focus-visible) {
+  overflow-x: auto;
+}
+
+@keyframes sponsors-scroll {
+  to {
+    transform: translateX(-50%);
+  }
+}
+
+@media (max-width: 768px) {
+  .section {
+    padding: 48px 0 160px;
+  }
+
+  .heading {
+    margin-bottom: 28px;
+  }
+
+  .list {
+    gap: 28px;
+    padding-right: 28px;
+  }
+
+  .artwork {
+    width: calc(var(--sponsor-width) * 0.86);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .viewport {
+    overflow-x: auto;
+  }
+
+  .track {
+    animation: none;
+  }
+
+  .list[aria-hidden="true"] {
+    display: none;
+  }
+
+  .logo,
+  .artwork {
+    transition: none;
+  }
+}

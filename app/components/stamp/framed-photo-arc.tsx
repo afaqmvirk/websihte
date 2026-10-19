@@ -62,7 +62,10 @@ function layoutForCorner(
   viewportH: number,
   config: StampArcEllipseConfig,
 ): TrackLayout {
-  const b = viewportH * config.bViewportRatio;
+  const maxB = config.maxHeightPx === undefined
+    ? Number.POSITIVE_INFINITY
+    : (config.maxHeightPx - STAMP_SIZE) / 2;
+  const b = Math.min(viewportH * config.bViewportRatio, maxB);
   const a = b * config.aRatio;
 
   return {

@@ -69,8 +69,8 @@ ${OTTAWA_FAQ.map(({ question, answer }) => `  - ${question} ${answer}`).join("\n
 - ottawa tracks: stupidest metric (track something useless; amplitude), stupidest button (make something cool happen with a useless button), stupidest api (return stupid data; carleton computer science society), stupidest ai (build a stupid ai agent).
 - additional ottawa awards: the great bob award (all hail overlord bob); stupidest journey (get to this hackathon from the furthest distance).
 - general cash prizes: stupidest $500; stupider $250; stupid $100. do not invent extra track or award amounts, judging rules, or a currency the page does not specify.
-- ottawa sponsors/supporters listed: amplitude, shopify, mathematech, anakin, carleton computer science society, invest ottawa, cu there.
-- montreal 2027 is listed, with date tbd. no venue or application details are published. other editions in the archive include toronto, waterloo, singapore, london, san francisco, antananarivo, and seattle; use the website for archive links and dates.
+- ottawa sponsors/supporters listed: amplitude, shopify, mathematech, anakin, carleton computer science society, invest ottawa, cu there, kariaa.
+- montreal and athens 2027 are listed, both with date tbd. no venue or application details are published. other editions in the archive include toronto, waterloo, singapore, london, san francisco, antananarivo, and seattle; use the website for archive links and dates.
 - the site does not specify admission price, age/student eligibility, accessibility arrangements, or a full judging rubric. for those, say "uhhhh iunno" and, when useful, point to stupidideashackathon@gmail.com or the organizers. no invented policies.
 - official ottawa details: https://www.stupideas.com/ottawa . application status and private organizer decisions must come from the organizers, not you.`;
 

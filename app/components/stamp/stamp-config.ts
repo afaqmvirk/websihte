@@ -27,6 +27,8 @@ export const STAMP_PHOTO_RATIOS = {
 export type StampArcEllipseConfig = {
   /** Vertical semi-axis as a fraction of viewport height (e.g. 0.5 = half screen). */
   bViewportRatio: number;
+  /** Maximum full orbit height, including one stamp frame (px). */
+  maxHeightPx?: number;
   /** Horizontal semi-axis = b × aRatio (larger = wider / sharper curve). */
   aRatio: number;
   /** Seconds for one full orbit along the ellipse. */
@@ -95,6 +97,7 @@ export const STAMP_ARC_CONFIG: Record<
   "top-right": {
     ...ARC_DEFAULTS,
     bViewportRatio: 0.75,
+    maxHeightPx: 1200,
     aRatio: 0.95,
     insetXPx: -62,
     photoRotateDeg: 270,

@@ -32,6 +32,11 @@ export const EVENT_YEARS: EventYear[] = [
         date: "TBD",
         href: "",
       },
+      {
+        city: "athens",
+        date: "TBD",
+        href: "",
+      },
     ],
   },
   {
@@ -132,10 +137,10 @@ function EventColumns() {
                     rel="noopener noreferrer"
                     className="pointer-events-auto text-white no-underline transition-opacity hover:opacity-70"
                   >
-                    {`${event.city} ${event.date}`}
+                    {`${event.city} ${event.date.replace(/^\d{4}-/, "")}`}
                   </a>
                 ) : (
-                  <span>{`${event.city} ${event.date}`}</span>
+                  <span>{`${event.city} ${event.date.replace(/^\d{4}-/, "")}`}</span>
                 )}
               </li>
             ))}
@@ -150,7 +155,7 @@ export default function EventsSection() {
   return (
     <section
       id="our-events"
-      className="relative w-full shrink-0 overflow-hidden text-white"
+      className="relative z-10 w-full shrink-0 overflow-x-clip overflow-y-visible text-white"
       aria-label="our events, community and sponsor us"
     >
       <div
@@ -241,15 +246,6 @@ export default function EventsSection() {
               get our sponsor deck
             </OutlineCtaButton>
 
-            <p
-              className="m-0 text-right font-arial lowercase italic text-white"
-              style={{
-                fontSize: sectionFont(14, 12, 14),
-                letterSpacing: sectionPx(-0.28),
-              }}
-            >
-              © the stupid ideas hackathon community 2026
-            </p>
           </div>
         </div>
       </div>
