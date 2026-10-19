@@ -3,6 +3,7 @@
 import Image from "next/image";
 import { EnvelopeProvider } from "@/components/stamp/envelope-context";
 import EventsSection from "@/components/sections/events-section";
+import PastSponsorsSection from "@/components/sections/past-sponsors-section";
 import FramedPhotoArc from "@/components/stamp/framed-photo-arc";
 import { SectionEnvelope } from "@/components/sections/section-envelope";
 import WhoWeAreScrollOverlay from "@/components/sections/who-we-are-scroll-overlay";
@@ -52,6 +53,7 @@ export default function BottomSections() {
         </div>
 
         <EventsSection />
+        <PastSponsorsSection />
       </div>
       <SectionEnvelope />
     </EnvelopeProvider>

@@ -623,6 +623,9 @@ export default function OttawaPage() {
                 <a href="https://cuthere.app/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="CU There">
                   <Image src="/sponsors/cu-there.png" alt="CU There" width={1010} height={496} className={styles.cuThereLogo} />
                 </a>
+                <a href="https://www.kariaa.com/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Kariaa">
+                  <Image src="/sponsors/kariaa.svg" alt="Kariaa" width={884} height={338} className={styles.kariaaLogo} />
+                </a>
               </div>
             </div>
           </section>
