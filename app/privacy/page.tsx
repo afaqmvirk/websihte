@@ -164,11 +164,15 @@ export default function PrivacyPolicyPage() {
             </p>
             <p>
               Overlord krab replies to direct tags and standalone, case-sensitive
-              krab or krabs in human messages. His replies contain only the word
-              money repeated 1–32 times, determined from the message ID with shorter
-              replies weighted more heavily. Krab does not send messages to OpenAI
-              or fetch conversation history. The same private metadata tracking
-              and usage limits apply to his replies.
+              krab or krabs in human messages. His replies contain the word money
+              repeated 1–32 times, or occasionally one of seven fixed money photos.
+              Overlord gerald replies to direct tags and the standalone,
+              case-sensitive name gerald with a random sequence of meow, miau, and
+              mrow, between 1 and 32 words. Both bots favour shorter text replies
+              and determine their response from the message ID, so retries produce
+              the same response. Neither bot sends messages to OpenAI or fetches
+              conversation history. The same private metadata tracking and usage
+              limits apply to their replies.
             </p>
 
             <h3>when you email us</h3>

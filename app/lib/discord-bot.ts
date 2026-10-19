@@ -1,8 +1,9 @@
 import { timingSafeEqual } from "node:crypto";
 import { getApplicationStorageConfig } from "@/lib/application-storage";
 import { getDiscordConversation, type DiscordConversationMessage } from "@/lib/discord-bot-context";
-import { getDiscordBotSystemPrompt, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
-import { generateKrabReply } from "@/lib/discord-bot-krab";
+import { getDiscordBotSystemPrompt, isDiscordAiBotPersona, type DiscordAiBotPersona, type DiscordBotPersona } from "@/lib/discord-bot-knowledge";
+import { generateKrabAnswer } from "@/lib/discord-bot-krab";
+import { generateGeraldReply } from "@/lib/discord-bot-gerald";
 import { MAX_DISCORD_REPLY_LENGTH, MAX_DISCORD_REPLY_MESSAGES, splitDiscordReply } from "@/lib/discord-bot-replies";
 import { findDiscordServerMembers, MAX_MEMBER_QUERY_LENGTH, validDiscordMemberQuery, type DiscordMemberSearch } from "@/lib/discord-bot-members";
 import { generateDiscordImage, getDiscordImageConfig, MAX_IMAGE_PROMPT_LENGTH, type DiscordGeneratedImage } from "@/lib/discord-bot-image";
@@ -12,11 +13,12 @@ const SNOWFLAKE = /^\d{17,20}$/;
 const OPENAI_API = "https://api.openai.com/v1/chat/completions";
 const DISCORD_API = "https://discord.com/api/v10";
 const MAX_QUESTION_LENGTH = 2_000;
-const BOT_PERSONAS = ["bob", "rick", "krab"] as const;
+const BOT_PERSONAS = ["bob", "rick", "krab", "gerald"] as const;
 const BOT_NAMES = {
   bob: /(?<![\p{L}\p{M}\p{N}_])(?:bob|spongebob)(?![\p{L}\p{M}\p{N}_])/u,
   rick: /(?<![\p{L}\p{M}\p{N}_])(?:rick|patrick)(?![\p{L}\p{M}\p{N}_])/u,
   krab: /(?<![\p{L}\p{M}\p{N}_])(?:krab|krabs)(?![\p{L}\p{M}\p{N}_])/u,
+  gerald: /(?<![\p{L}\p{M}\p{N}_])gerald(?![\p{L}\p{M}\p{N}_])/u,
 };
 const userQueues = new Map<string, Promise<unknown>>();
 const REACTION_EMOJI = ["💀", "😭", "😂", "🫡", "👀", "🤨", "🤔", "🔥", "👍", "❤️", "😴", "🙄", "🗿"];
@@ -41,6 +43,7 @@ type DiscordMentionTarget = { id: string; name: string };
 type DiscordBotReply = {
   text: string; reaction?: string; deleteReason?: DeleteReason;
   mentionUserIds?: string[]; imagePrompt?: string; gifUrl?: string; skipped?: boolean;
+  image?: DiscordGeneratedImage;
 };
 
 function botIdentity(persona: DiscordBotPersona) {
@@ -59,8 +62,8 @@ export function getDiscordBotConfig(persona: DiscordBotPersona = "bob") {
   const identities: NonNullable<ReturnType<typeof botIdentity>>[] = [];
   for (const bot of BOT_PERSONAS) {
     const candidate = botIdentity(bot);
-    if (!candidate || (bot !== "krab" && !modelReady)) continue;
-    // First configured account wins, including when three personas are enabled.
+    if (!candidate || (isDiscordAiBotPersona(bot) && !modelReady)) continue;
+    // First configured account wins when multiple personas share credentials.
     if (!identities.some((other) => other.applicationId === candidate.applicationId || other.token === candidate.token)) {
       identities.push(candidate);
     }
@@ -513,7 +516,7 @@ function mentionTargets(message: DiscordMention, config: DiscordBotConfig): Disc
 
 async function drawImage(message: DiscordMention, prompt: string, config: DiscordBotConfig) {
   const images = getDiscordImageConfig();
-  if (!images || message.authorIsBot || config.persona === "krab") return { text: "drawing brain is off rn" };
+  if (!images || message.authorIsBot || !isDiscordAiBotPersona(config.persona)) return { text: "drawing brain is off rn" };
   const response = await fetch(`${config.storage.url}/rest/v1/rpc/claim_discord_bot_image`, {
     method: "POST", headers: { apikey: config.storage.key, "Content-Type": "application/json" },
     body: JSON.stringify({ p_message_id: message.id, p_bot_id: config.persona, p_daily_limit: images.dailyLimit }),
@@ -567,7 +570,7 @@ async function answerMention(
     if (paused) return;
     paused = true;
     stopTyping ??= startTyping(message, config);
-    await waitBeforeReply(config.persona === "krab" ? 1_000 : (1 + Math.floor(Math.random() * 5)) * 1_000);
+    await waitBeforeReply(isDiscordAiBotPersona(config.persona) ? (1 + Math.floor(Math.random() * 5)) * 1_000 : 1_000);
   }
   try {
     let claim = await claimMention(message, config);
@@ -581,14 +584,14 @@ async function answerMention(
     }
     if (claim === "duplicate" || claim === "conversation_limit") return claim;
     if (claim === "daily_limit") {
-      if (config.persona !== "krab" && !message.authorIsBot && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
       }
       return claim;
     }
     if (claim === "monthly_limit") {
-      if (config.persona !== "krab" && !message.authorIsBot && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
       }
@@ -597,7 +600,8 @@ async function answerMention(
     if (claim !== "accepted") throw new Error("Unrecognized bot admission result");
     claimed = true;
     let answer: DiscordBotReply;
-    if (config.persona === "krab") answer = { text: generateKrabReply(message.id) };
+    if (config.persona === "krab") answer = await generateKrabAnswer(message.id);
+    else if (config.persona === "gerald") answer = { text: generateGeraldReply(message.id) };
     else if (!question) answer = { text: "uhhhh iunno" };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
@@ -622,7 +626,7 @@ async function answerMention(
       }
       answer = { text: "cant remove that here bro" };
     }
-    let image: DiscordGeneratedImage | undefined;
+    let image: DiscordGeneratedImage | undefined = answer.image;
     if (answer.imagePrompt) {
       const drawing = await drawImage(message, answer.imagePrompt, config);
       image = drawing.image;
@@ -638,7 +642,7 @@ async function answerMention(
   } catch {
     console.error("Discord bot could not complete a mention", { messageId: message.id });
     if (claimed) {
-      if (config.persona !== "krab" && !optionalResponse) {
+      if (isDiscordAiBotPersona(config.persona) && !optionalResponse) {
         await pauseBeforeReply();
         await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
       }
@@ -657,7 +661,7 @@ export async function handleDiscordMention(
   const trigger = getDiscordMessageTrigger(message, config);
   if (!trigger) return "ignored";
   const question = questionFromMention(message, config);
-  if (config.persona !== "krab" && trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
+  if (isDiscordAiBotPersona(config.persona) && trigger === "name" && (!question || question.length > MAX_QUESTION_LENGTH)) return "ignored";
   // Preserve each person's message order without holding up other people.
   const key = `${config.persona}:${message.guildId}:${message.authorId}`;
   const previous = userQueues.get(key);
