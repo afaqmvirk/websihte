@@ -1,0 +1,333 @@
+{
+  "source": "https://onlinesequencer.net",
+  "entries": [
+    {
+      "id": 4255797,
+      "title": "APT.",
+      "artists": [
+        "ROSE",
+        "Bruno Mars"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/4255797",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=4255797&r=96",
+      "sha256": "655fcf0e5057754cafe6aad9249aa115ace8f94143c14269965a89954abb09ea",
+      "author": "Aspect_bendr",
+      "instrument": 43,
+      "startBeat": 8,
+      "aliases": [
+        "apt",
+        "apateu"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 4158329,
+      "title": "Espresso",
+      "artists": [
+        "Sabrina Carpenter"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/4158329",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=4158329&r=188",
+      "sha256": "abd1e65459926a3b2c6230979b3cb229a9ea41ca51a9ee97046b49a747f54e22",
+      "author": "Aspect_bendr",
+      "instrument": 43,
+      "startBeat": 17,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 2724163,
+      "title": "As It Was",
+      "artists": [
+        "Harry Styles"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/2724163",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2724163&r=42",
+      "sha256": "ea8eaf40bab30ab6780af3dda88dfc92d2bb7988d065dc55d38d6c5e88030ebe",
+      "author": "Aspect_bendr",
+      "instrument": 17,
+      "startBeat": 0,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 2779800,
+      "title": "Enemy",
+      "artists": [
+        "Imagine Dragons",
+        "JID"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/2779800",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2779800&r=14",
+      "sha256": "bdf821a13db7b15b9677aba8f2c19b337ce4a632a3ce0550de811b3f43fda7a0",
+      "author": "Aspect_bendr",
+      "instrument": 33,
+      "startBeat": 11.75,
+      "aliases": [
+        "arcane enemy"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 2888638,
+      "title": "Light Switch",
+      "artists": [
+        "Charlie Puth"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/2888638",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2888638&r=48",
+      "sha256": "09e0caef3c1b15c4a09acc537afdf3e1e2ffcd2cff1d023f2f2640eac8dfb508",
+      "author": "Aspect_bendr",
+      "instrument": 14,
+      "startBeat": 21,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 3137863,
+      "title": "Kill Bill",
+      "artists": [
+        "SZA"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/3137863",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3137863&r=25",
+      "sha256": "e5c3e96f7d99e37d42758f79bfeecc42235a81099dda161c58295396002e2b3d",
+      "author": "Aspect_bendr",
+      "instrument": 14,
+      "startBeat": 19,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 2940689,
+      "title": "Positions",
+      "artists": [
+        "Ariana Grande"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/2940689",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2940689&r=18",
+      "sha256": "a150c791cd47a3aaf2b0b31a9141a1d2d7cc9a4eabd1e8121ada2ce16db6e12a",
+      "author": "Aspect_bendr",
+      "instrument": 43,
+      "startBeat": 16,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 3212699,
+      "title": "Creepin'",
+      "artists": [
+        "Metro Boomin",
+        "The Weeknd",
+        "21 Savage"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/3212699",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3212699&r=14",
+      "sha256": "576b701cd9701eaac3ff42d3f4a4c997e2c0a5b4a41eacefae8896a2601f7cac",
+      "author": "Aspect_bendr",
+      "instrument": 41,
+      "startBeat": 17,
+      "aliases": [
+        "creeping"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 3364744,
+      "title": "Cupid",
+      "artists": [
+        "FIFTY FIFTY"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/3364744",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3364744&r=27",
+      "sha256": "38b443141b41d0ebbcc7cb7a8843d8a0ae648404ed343b104a4734158ca654f8",
+      "author": "Aspect_bendr",
+      "instrument": 8,
+      "startBeat": 0,
+      "aliases": [
+        "cupid twin version"
+      ],
+      "minPitch": 60
+    },
+    {
+      "id": 3076385,
+      "title": "I'm Good (Blue)",
+      "artists": [
+        "David Guetta",
+        "Bebe Rexha"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/3076385",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3076385&r=29",
+      "sha256": "8293fc73764bad6ca11131e424f2052e42479eb1b705c26e4dd45f8e4f017d6d",
+      "author": "Aspect_bendr",
+      "instrument": 43,
+      "startBeat": 0,
+      "aliases": [
+        "im good",
+        "im good blue"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 3035375,
+      "title": "Cruel Summer",
+      "artists": [
+        "Taylor Swift"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/3035375",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3035375&r=18",
+      "sha256": "c560e6414f08a93f04699b2693c3df3ff3cc551db6461f8676f72c98e653e0b7",
+      "author": "Aspect_bendr",
+      "instrument": 8,
+      "startBeat": 16,
+      "aliases": [],
+      "minPitch": 55
+    },
+    {
+      "id": 5111238,
+      "title": "Golden",
+      "artists": [
+        "HUNTR/X"
+      ],
+      "genre": "Pop",
+      "source": "https://onlinesequencer.net/5111238",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=5111238&r=1",
+      "sha256": "30595a63c95ffc676f819c930600c9dde6add0de317ee4888932d5d062dfcecd",
+      "author": "MasonLiang",
+      "instrument": 41,
+      "startBeat": 80,
+      "aliases": [
+        "golden kpop demon hunters",
+        "huntrix",
+        "kpop demon hunters"
+      ],
+      "minPitch": 76
+    },
+    {
+      "id": 2715117,
+      "title": "Among Us Drip",
+      "artists": [
+        "Leonz"
+      ],
+      "genre": "Meme",
+      "source": "https://onlinesequencer.net/2715117",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2715117&r=1",
+      "sha256": "aca948aa65ffc5fddb2fdc91861e29ecc64f217bb11cae755fa461eed5915ae6",
+      "author": "jaypra",
+      "instrument": 16,
+      "startBeat": 0,
+      "aliases": [
+        "amogus",
+        "amongus",
+        "sus",
+        "among us"
+      ],
+      "minPitch": 60
+    },
+    {
+      "id": 2715685,
+      "title": "If I Had a Chicken",
+      "artists": [
+        "Kevin MacLeod"
+      ],
+      "genre": "Meme",
+      "source": "https://onlinesequencer.net/2715685",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2715685&r=4",
+      "sha256": "2b49642c3734e14c4ea5665505555da02b6255bcacc357661766c01424f73f59",
+      "author": "jaypra",
+      "instrument": 43,
+      "startBeat": 0,
+      "aliases": [
+        "chicken song"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 2721435,
+      "title": "Nyan Cat",
+      "artists": [
+        "daniwell"
+      ],
+      "genre": "Meme",
+      "source": "https://onlinesequencer.net/2721435",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2721435&r=23",
+      "sha256": "d21bfd19b5b3f56132d4cc2b6f0633d9b6aad000fa0092b360e25f790c5ef237",
+      "author": "jaypra",
+      "instrument": 14,
+      "startBeat": 0,
+      "aliases": [
+        "nyan",
+        "nyancat"
+      ],
+      "minPitch": 63
+    },
+    {
+      "id": 3040990,
+      "title": "We Are Number One",
+      "artists": [
+        "Mani Svavarsson",
+        "LazyTown"
+      ],
+      "genre": "Meme",
+      "source": "https://onlinesequencer.net/3040990",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=3040990&r=1",
+      "sha256": "0708f5cce7e8e2c86615a17b4306e34155f121797659c8553dea1be4dc22255f",
+      "author": "jaypra",
+      "instrument": 24,
+      "startBeat": 0,
+      "aliases": [
+        "number one",
+        "lazytown"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 151186,
+      "title": "Megalovania",
+      "artists": [
+        "Toby Fox"
+      ],
+      "genre": "Game",
+      "source": "https://onlinesequencer.net/151186",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=151186&r=12",
+      "sha256": "60eab7ca4aa0b4df9b8ede7aad7bc915a0a0b8af6b6f5fb9a71b0a7f4c8e3db4",
+      "author": "Jay2k",
+      "instrument": 10,
+      "startBeat": 0,
+      "aliases": [
+        "sans",
+        "undertale megalovania"
+      ],
+      "minPitch": 55
+    },
+    {
+      "id": 2556561,
+      "title": "Crab Rave",
+      "artists": [
+        "Noisestorm"
+      ],
+      "genre": "Meme",
+      "source": "https://onlinesequencer.net/2556561",
+      "dataUrl": "https://onlinesequencer.net/app/api/get_proto.php?v=2&id=2556561&r=1",
+      "sha256": "9e1292a020346e215d33c04a429b25e69ae1c0f99604b48978c735ae0be73ce2",
+      "author": "khaledkananmidi",
+      "instrument": 0,
+      "startBeat": 64,
+      "aliases": [
+        "crabrave"
+      ],
+      "minPitch": 72
+    }
+  ]
+}

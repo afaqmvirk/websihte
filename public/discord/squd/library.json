@@ -1,9 +1,25 @@
 {
-  "source": "https://huggingface.co/datasets/sander-wood/wikimt-x",
-  "revision": "ebb5a7b65dc0760467916c3287960bc89c6faa23",
-  "sha256": "128b4385e232ec4f1239e68daea1adcf911ba8b37ed1dff58d6476171920e6aa",
-  "license": "CC-BY-NC-4.0",
-  "count": 1000,
+  "count": 1028,
+  "sources": [
+    {
+      "id": "core",
+      "source": "https://www.stupideas.com/discord/squd/catalog.json",
+      "count": 10
+    },
+    {
+      "id": "os",
+      "source": "https://onlinesequencer.net",
+      "notice": "https://www.stupideas.com/discord/squd/OnlineSequencer-NOTICE.md",
+      "count": 18
+    },
+    {
+      "id": "wikimt",
+      "source": "https://huggingface.co/datasets/sander-wood/wikimt-x",
+      "revision": "ebb5a7b65dc0760467916c3287960bc89c6faa23",
+      "sha256": "128b4385e232ec4f1239e68daea1adcf911ba8b37ed1dff58d6476171920e6aa",
+      "license": "CC-BY-NC-4.0"
+    }
+  ],
   "entries": [
     {
       "song": "wikimt_Vj4gbky1QCU",
@@ -8756,6 +8772,311 @@
         "Ray Gilbert"
       ],
       "genre": "Jazz"
+    },
+    {
+      "song": "core_twinkle_twinkle_little_star",
+      "title": "Twinkle Twinkle Little Star",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_mary_had_a_little_lamb",
+      "title": "Mary Had a Little Lamb",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_frere_jacques",
+      "title": "Frere Jacques",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_ode_to_joy",
+      "title": "Ode to Joy",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_jingle_bells",
+      "title": "Jingle Bells",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_london_bridge_is_falling_down",
+      "title": "London Bridge Is Falling Down",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_old_macdonald_had_a_farm",
+      "title": "Old MacDonald Had a Farm",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": []
+    },
+    {
+      "song": "core_happy_birthday",
+      "title": "Happy Birthday",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": [
+        "happy bday",
+        "birthday song",
+        "happybirthday"
+      ]
+    },
+    {
+      "song": "core_weezer_buddy_holly",
+      "title": "Weezer Buddy Holly lick",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": [
+        "weezer lick",
+        "weezer riff",
+        "buddy holly"
+      ]
+    },
+    {
+      "song": "core_spongebob_nose_flute",
+      "title": "SpongeBob nose-flute outro",
+      "artists": [
+        "Original Squd reference"
+      ],
+      "genre": "Familiar tune",
+      "aliases": [
+        "spongebob theme",
+        "spongebob opening theme",
+        "spongebob nose flute",
+        "spongebob outro"
+      ]
+    },
+    {
+      "song": "os_4255797",
+      "title": "APT.",
+      "artists": [
+        "ROSE",
+        "Bruno Mars"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "apt",
+        "apateu"
+      ]
+    },
+    {
+      "song": "os_4158329",
+      "title": "Espresso",
+      "artists": [
+        "Sabrina Carpenter"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_2724163",
+      "title": "As It Was",
+      "artists": [
+        "Harry Styles"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_2779800",
+      "title": "Enemy",
+      "artists": [
+        "Imagine Dragons",
+        "JID"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "arcane enemy"
+      ]
+    },
+    {
+      "song": "os_2888638",
+      "title": "Light Switch",
+      "artists": [
+        "Charlie Puth"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_3137863",
+      "title": "Kill Bill",
+      "artists": [
+        "SZA"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_2940689",
+      "title": "Positions",
+      "artists": [
+        "Ariana Grande"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_3212699",
+      "title": "Creepin'",
+      "artists": [
+        "Metro Boomin",
+        "The Weeknd",
+        "21 Savage"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "creeping"
+      ]
+    },
+    {
+      "song": "os_3364744",
+      "title": "Cupid",
+      "artists": [
+        "FIFTY FIFTY"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "cupid twin version"
+      ]
+    },
+    {
+      "song": "os_3076385",
+      "title": "I'm Good (Blue)",
+      "artists": [
+        "David Guetta",
+        "Bebe Rexha"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "im good",
+        "im good blue"
+      ]
+    },
+    {
+      "song": "os_3035375",
+      "title": "Cruel Summer",
+      "artists": [
+        "Taylor Swift"
+      ],
+      "genre": "Pop",
+      "aliases": []
+    },
+    {
+      "song": "os_5111238",
+      "title": "Golden",
+      "artists": [
+        "HUNTR/X"
+      ],
+      "genre": "Pop",
+      "aliases": [
+        "golden kpop demon hunters",
+        "huntrix",
+        "kpop demon hunters"
+      ]
+    },
+    {
+      "song": "os_2715117",
+      "title": "Among Us Drip",
+      "artists": [
+        "Leonz"
+      ],
+      "genre": "Meme",
+      "aliases": [
+        "amogus",
+        "amongus",
+        "sus",
+        "among us"
+      ]
+    },
+    {
+      "song": "os_2715685",
+      "title": "If I Had a Chicken",
+      "artists": [
+        "Kevin MacLeod"
+      ],
+      "genre": "Meme",
+      "aliases": [
+        "chicken song"
+      ]
+    },
+    {
+      "song": "os_2721435",
+      "title": "Nyan Cat",
+      "artists": [
+        "daniwell"
+      ],
+      "genre": "Meme",
+      "aliases": [
+        "nyan",
+        "nyancat"
+      ]
+    },
+    {
+      "song": "os_3040990",
+      "title": "We Are Number One",
+      "artists": [
+        "Mani Svavarsson",
+        "LazyTown"
+      ],
+      "genre": "Meme",
+      "aliases": [
+        "number one",
+        "lazytown"
+      ]
+    },
+    {
+      "song": "os_151186",
+      "title": "Megalovania",
+      "artists": [
+        "Toby Fox"
+      ],
+      "genre": "Game",
+      "aliases": [
+        "sans",
+        "undertale megalovania"
+      ]
+    },
+    {
+      "song": "os_2556561",
+      "title": "Crab Rave",
+      "artists": [
+        "Noisestorm"
+      ],
+      "genre": "Meme",
+      "aliases": [
+        "crabrave"
+      ]
     }
   ]
 }

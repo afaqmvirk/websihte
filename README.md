@@ -189,33 +189,39 @@ Set `DISCORD_SQUD_BOT_TOKEN`, `DISCORD_SQUD_APPLICATION_ID`, and
 permissions plus Attach Files and Send Voice Messages. He answers tags and the
 standalone lowercase name `squd`.
 
-Squd can choose `send_clarinet` or `play_clarinet_reference` to answer with an
+Squd can choose `play_clarinet_reference` to answer with an
 instrumental voice message instead of text. Local title/artist search selects at
-most eight candidates from 1,000 scored songs in
+most eight candidates from 1,028 scored tunes: 1,000 from
 [WikiMT-X](https://huggingface.co/datasets/sander-wood/wikimt-x), covering mainly
-20th-century pop, rock, jazz, country, folk, and standards. Luna selects a matching
+20th-century pop, rock, jazz, country, folk, and standards; 18 modern pop and meme
+tunes from [Online Sequencer](https://onlinesequencer.net); and the ten original
+familiar references. The additions include APT., Espresso, As It Was, Enemy,
+Light Switch, Kill Bill, Positions, Creepin', Cupid, I'm Good (Blue), Cruel Summer,
+Golden, Among Us Drip, If I Had a Chicken, Nyan Cat, We Are Number One,
+Megalovania, and Crab Rave. Luna selects a matching
 song ID; the server reads its compiled melody instead of asking the model to guess
 the notes. Requests can include spelling variants and common band names such as
-Beatles, Queen, and ABBA. The public title catalog is
+Beatles, Queen, and ABBA, plus aliases such as amogus, happy bday, and weezer lick.
+The public title catalog is
 [`public/discord/squd/library.json`](public/discord/squd/library.json).
-For other tunes or improvisations, Luna writes 4–24 notes and a tempo in the
-existing text-model tool call. A bounded server renderer plays the phrase with sampled clarinet
+If the requested song has no matching score, Squd refuses briefly in character.
+The model cannot supply guessed notes or substitute a random song.
+A bounded server renderer plays the score with sampled clarinet
 notes, adds pitch wobble, squeaks and bad timing, and encodes a mono 48 kHz
 Opus/OGG voice message with waveform metadata. There is no extra model call or
 audio-generation API. Instrument samples and the portable Opus encoder are bundled;
 FluidSynth and FFmpeg are used only when rebuilding assets locally.
 
 The message contains one audio attachment with no caption. Named requests use
-the matching melody reference when available; unlisted tunes are model guesses
-and may be inaccurate. Generated phrases are capped at eight seconds before performance
+the matching melody reference. Phrases are capped at eight seconds before performance
 effects and ten seconds after them. Scores use bounded pitches, note counts
 and durations. No generated code is executed. A message-ID
 seed keeps rendering stable on retries while different messages get different
 performance mistakes.
 
-Forty saved performances of ten familiar tunes remain as a fallback for named
-songs, stored as MIDI plus pre-rendered audio in `public/discord/squd/`. If an
-unlisted performance fails, Squd sends a short failure reply instead of a random
+Forty saved performances of the ten original familiar tunes remain as a fallback
+for those same songs, stored as MIDI plus pre-rendered audio in `public/discord/squd/`.
+If a performance without a saved version fails, Squd sends a short failure reply instead of a random
 different song. The audio uses the sampled General MIDI clarinet from
 [GeneralUser GS 2.0.3 by S. Christian
 Collins](https://www.schristiancollins.com/generaluser.php), with deliberate
@@ -246,14 +252,22 @@ only a short opening melody of at most 24 notes/rests and seven seconds. Leading
 silence is removed, long holds are shortened, and pitches move by octaves into the
 clarinet range. Source scores, lyrics, captions, and recordings are not bundled.
 The source revision and checksum are pinned; no remote score lookup or extra model
-request happens during a reply. The collection's CC BY-NC 4.0 terms, source,
+request happens during a reply. The WikiMT-X collection's CC BY-NC 4.0 terms, source,
 credits, and changes are retained in
 [`public/discord/squd/WikiMT-X-NOTICE.md`](public/discord/squd/WikiMT-X-NOTICE.md).
+Import the modern/meme additions and original references with
+`node scripts/import-squd-modern.mjs`. The pinned source manifest selects melody
+tracks and recognizable hooks from each arrangement. Both importers use the same
+bounded score compiler, local catalog, Luna selection tool, and voice renderer.
+There are no runtime score requests, additional model calls, paid APIs, or
+subscriptions. Arranger credits, source links, and changes are retained in
+[`public/discord/squd/OnlineSequencer-NOTICE.md`](public/discord/squd/OnlineSequencer-NOTICE.md)
+and [`public/discord/squd/online-sequencer-sources.json`](public/discord/squd/online-sequencer-sources.json).
 See [Discord voice messages](https://docs.discord.com/developers/resources/message#voice-messages).
 
 The default model is `gpt-6-luna`, called directly through the OpenAI API with
 the server-only key. Questions are limited to 2,000 characters and 512 output
-tokens (1,024 for Squd's note sequences). Defaults allow 10,000 requests per UTC
+tokens (1,024 for Squd). Defaults allow 10,000 requests per UTC
 day, 310,000 per UTC month, and one
 per person per bot every two seconds. Daily and monthly allowances are shared
 across all five bots. Follow-ups wait in order until the previous reply

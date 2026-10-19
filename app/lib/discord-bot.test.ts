@@ -9,6 +9,7 @@ import { readFile } from "node:fs/promises";
 import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
 import { renderClarinetScore } from "./discord-bot-clarinet-render";
 import { getClarinetLibraryScore, searchClarinetLibrary } from "./discord-bot-clarinet-library";
+import modernSources from "../../scripts/squd-modern-sources.json";
 const clarinetScore = { tempo_bpm: 160, notes: [67, 69, 71, 72].map((pitch) => ({ pitch, beats: 1 })) };
 const clarinetArgs = (song: string | null = null) => ({ song, ...clarinetScore });
 
@@ -130,19 +131,20 @@ describe("sih-inator mention bot", () => {
     assert.match(system, /everyone is a nuisance including the human who pings you/);
     assert.doesNotMatch(system.split("drawing yourself reference only:")[0], /squidward/i);
     assert.match(system.split("drawing yourself reference only:")[1], /Squidward Tentacles/);
-    assert.ok(request.tools.some((tool: { function: { name: string } }) => tool.function.name === "send_clarinet"));
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => /clarinet/.test(tool.function.name)));
     assert.ok(!request.tools.some((tool: { function: { name: string } }) => tool.function.name === "search_server_members"));
     delete process.env.OPENAI_API_KEY;
     assert.equal(getDiscordBotConfig("squd"), null);
   });
   it("sends a selected clarinet as a caption-free native Discord voice message", async () => {
     const squd = enableSqud();
-    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs()) : null;
-    const current = message({ mentionedUserIds: [squdId] });
+    const song = "core_happy_birthday";
+    intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song }) : null;
+    const current = message({ mentionedUserIds: [squdId], content: `<@${squdId}> play happy bday` });
     assert.equal(await handleDiscordMention(current, squd), "answered");
     const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
     const payload = JSON.parse(String(body.get("payload_json")));
-    const clip = await renderClarinetScore(clarinetScore, current.id);
+    const clip = await renderClarinetScore(getClarinetLibraryScore(song), current.id);
     assert.equal(payload.flags, 1 << 13);
     assert.equal(Object.hasOwn(payload, "content"), false);
     assert.deepEqual(payload.attachments, [{ id: 0, filename: clip.filename, duration_secs: clip.duration, waveform: clip.waveform }]);
@@ -161,13 +163,44 @@ describe("sih-inator mention bot", () => {
     assert.equal(await handleDiscordMention(message({ id: "1560000000000000006", mentionedUserIds: [squdId] }), squd), "failed");
     assert.ok(replies().every(({ init }) => typeof init?.body === "string"));
   });
-  it("passes a named tune and Luna's new notes through the clarinet action", async () => {
-    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs("weezer_buddy_holly")) : null;
+  it("uses the trusted original tune and retains only its matching saved fallback", async () => {
+    const song = "core_weezer_buddy_holly";
+    intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song }) : null;
     const answer = await generateDiscordBotReply("play the weezer lick", "gpt-6-luna", [], false, { persona: "squd" });
     assert.equal(answer.clarinetSong, "weezer_buddy_holly");
-    assert.deepEqual(answer.clarinetScore, clarinetScore);
-    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", { ...clarinetArgs(), song: "arbitrary_song" }) : null;
-    await assert.rejects(generateDiscordBotReply("play something", "gpt-6-luna", [], false, { persona: "squd" }));
+    assert.deepEqual(answer.clarinetScore, getClarinetLibraryScore(song));
+    intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song, ...clarinetScore }) : null;
+    await assert.rejects(generateDiscordBotReply("play the weezer lick", "gpt-6-luna", [], false, { persona: "squd" }));
+  });
+  it("uses the same single model call and score tool for every modern import", async () => {
+    for (const row of modernSources.entries) {
+      const song = `os_${row.id}`;
+      intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song }) : null;
+      const count = calls.length;
+      const answer = await generateDiscordBotReply(`play ${row.title}`, "gpt-6-luna", [], false, { persona: "squd" });
+      assert.deepEqual(answer.clarinetScore, getClarinetLibraryScore(song));
+      assert.equal(answer.clarinetSong, undefined);
+      assert.equal(calls.length, count + 1);
+      assert.equal(calls.at(-1)?.url, modelUrl);
+      const request = JSON.parse(String(calls.at(-1)?.init?.body));
+      assert.equal(request.model, "gpt-6-luna");
+      assert.ok(!request.tools.some((tool: { function: { name: string } }) => tool.function.name === "send_clarinet"));
+    }
+  });
+  it("refuses unknown music without exposing a guessing tool or using an earlier song", async () => {
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "i dont know that one go bother someone else" } }] }) : null;
+    const answer = await generateDiscordBotReply("play an unreleased song called zqxv", "gpt-6-luna",
+      [{ role: "user", content: "play happy birthday" }], false, { persona: "squd" });
+    assert.equal(answer.text, "i dont know that one go bother someone else");
+    assert.equal(answer.clarinet, undefined);
+    assert.equal(calls.length, 1);
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.match(request.messages[0].content, /if you do not have the requested song.*just refuse/);
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => /clarinet/.test(tool.function.name)));
+    intercept = (url) => url === modelUrl ? actionResponse("send_clarinet", clarinetArgs()) : null;
+    await assert.rejects(generateDiscordBotReply("play an unreleased song called zqxv", "gpt-6-luna", [], false, { persona: "squd" }));
+    intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song: "core_happy_birthday" }) : null;
+    await assert.rejects(generateDiscordBotReply("play an unreleased song called zqxv", "gpt-6-luna", [], false, { persona: "squd" }));
   });
   it("lets Luna select a scored song without writing guessed notes or making another request", async () => {
     const song = searchClarinetLibrary("Take On Me")[0].song;
