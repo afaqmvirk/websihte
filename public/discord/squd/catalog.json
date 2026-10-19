@@ -1,5 +1,6 @@
 [
   {
+    "song": "twinkle_twinkle_little_star",
     "title": "Twinkle Twinkle Little Star",
     "file": "clarinet-01.ogg",
     "midi": "clarinet-01.mid",
@@ -7,6 +8,7 @@
     "waveform": "RFxbQl9cW1i4tLizd42Njnm/xsaFrLKzfqddW1tbW1p2pKOGkZaWh15sbF+tiYQ3AwABRlFRT3Suq6urq6urYQYA"
   },
   {
+    "song": "mary_had_a_little_lamb",
     "title": "Mary Had a Little Lamb",
     "file": "clarinet-02.ogg",
     "midi": "clarinet-02.mid",
@@ -14,6 +16,7 @@
     "waveform": "VGppTGBhYVaQhIhfgYKBZ5mdnGR/fmWlqqipqKh9ZWlpZHesq6tvhoaGhoZ7l52ogpeYmJdvh4iIh4iIXwgAAA=="
   },
   {
+    "song": "frere_jacques",
     "title": "Frere Jacques",
     "file": "clarinet-03.ogg",
     "midi": "clarinet-03.mid",
@@ -21,6 +24,7 @@
     "waveform": "V3Z0cUNXVlZsuLiqWW5tbUZpZ12DnZ2Nj4pubEtoZmZXkpOUjXKIhm+6s7q5urq5nYSRkZFznp+Za4GAgICAgIBEBAA="
   },
   {
+    "song": "ode_to_joy",
     "title": "Ode to Joy",
     "file": "clarinet-04.ogg",
     "midi": "clarinet-04.mid",
@@ -28,6 +32,7 @@
     "waveform": "ZH5+Z3V7e2i9wryYr7KybH5/dpWur69+q3FmVGlpT5+gn4x8j45nrHJtVnp7e1VjYWBhc8aTuWVfYGBgMgMA"
   },
   {
+    "song": "jingle_bells",
     "title": "Jingle Bells",
     "file": "clarinet-05.ogg",
     "midi": "clarinet-05.mid",
@@ -35,6 +40,7 @@
     "waveform": "Zn+Af2iamJeLsad8eHh4dJnR0dF3eHh4YmRsbGxsbGxsaMdqXm99fWuInp2dlYSrgc15c3Nzc3Nzc3NzclYJAAA="
   },
   {
+    "song": "london_bridge_is_falling_down",
     "title": "London Bridge Is Falling Down",
     "file": "clarinet-06.ogg",
     "midi": "clarinet-06.mid",
@@ -42,6 +48,7 @@
     "waveform": "VmdnZ1qxzqDVo6V/YmRkT25tbVmFh4dv0JudnJycnJyDwcHBksLCvTMDAAAAAAApzHBmXnGFhmtxfH5+fn5+cRMBAA=="
   },
   {
+    "song": "old_macdonald_had_a_farm",
     "title": "Old MacDonald Had a Farm",
     "file": "clarinet-07.ogg",
     "midi": "clarinet-07.mid",
@@ -49,6 +56,7 @@
     "waveform": "aX19aJydf7ltWVWho55shoVnZGVkd5qhoqOjjszU04oKAAOOpKadtJ2PZW1ubm5ubm5ubW5saSICAA=="
   },
   {
+    "song": "happy_birthday",
     "title": "Happy Birthday",
     "file": "clarinet-08.ogg",
     "midi": "clarinet-08.mid",
@@ -56,6 +64,7 @@
     "waveform": "XW9rWl7Zy86sgYSEao+UlGd6fn5+fn5+e693V091eWqOm5xz0GVfT4CEhISEcxEBAA=="
   },
   {
+    "song": "twinkle_twinkle_little_star",
     "title": "Twinkle Twinkle Little Star",
     "file": "clarinet-09.ogg",
     "midi": "clarinet-09.mid",
@@ -63,6 +72,7 @@
     "waveform": "fqaliISWl2ueWlR7ioyElLK0VGJmarRweHl5baanjISHiIRaZWZ9s5iZaYaFgGh8fGOQkI+Pj3sRAQA="
   },
   {
+    "song": "mary_had_a_little_lamb",
     "title": "Mary Had a Little Lamb",
     "file": "clarinet-10.ogg",
     "midi": "clarinet-10.mid",
@@ -70,6 +80,7 @@
     "waveform": "X3JyVnJ0c2+Ur31s0NPTyGx6enpVe3x8XMlzd3h3d2Kao6ObUm9wcFZ1dHR0dG2ZqX1/YY+Zm5NnhouKioqKioUgAgA="
   },
   {
+    "song": "frere_jacques",
     "title": "Frere Jacques",
     "file": "clarinet-11.ogg",
     "midi": "clarinet-11.mid",
@@ -77,6 +88,7 @@
     "waveform": "TGNiYk5tbWejp551pKOjf6mmp3Rzc16wZmRidnZdc3RjWlpairSeoJ+gn21kZF1VYmJibbS8u7y8u4sNAQA="
   },
   {
+    "song": "ode_to_joy",
     "title": "Ode to Joy",
     "file": "clarinet-12.ogg",
     "midi": "clarinet-12.mid",
@@ -84,6 +96,7 @@
     "waveform": "W25ubk1bWkuqgHpekZiZea20tG9YWE3Bl5t7h4mKcaqqkZ2yrpSwpZibr7CpWFxcXFxYFQGHkoGAgIGAMAMA"
   },
   {
+    "song": "jingle_bells",
     "title": "Jingle Bells",
     "file": "clarinet-13.ogg",
     "midi": "clarinet-13.mid",
@@ -91,6 +104,7 @@
     "waveform": "cYmJYouOjmqfh4mJiYmJgGl5eWBcXl5dXnx8fHx8fHWVqo93cH+CZZSTk5OUcZh0o5GYmJeXmJiYmJiXlZORZggAAA=="
   },
   {
+    "song": "london_bridge_is_falling_down",
     "title": "London Bridge Is Falling Down",
     "file": "clarinet-14.ogg",
     "midi": "clarinet-14.mid",
@@ -98,6 +112,7 @@
     "waveform": "eJqenoW+kqduWJuioGN7e1VrameeoYaOjY1skZCQYG5tXXN5eXl5aJZ9bVxaXV1Sm7K2tralHgIA"
   },
   {
+    "song": "old_macdonald_had_a_farm",
     "title": "Old MacDonald Had a Farm",
     "file": "clarinet-15.ogg",
     "midi": "clarinet-15.mid",
@@ -105,6 +120,7 @@
     "waveform": "SV1gWWuGiophqYaIU2dnV4iUlIxXcXJqf6CgnZ2dnXaQlJSOiq2wolNhYlihvLq+gn6Dg4SDg4ODhIODgTUDAA=="
   },
   {
+    "song": "happy_birthday",
     "title": "Happy Birthday",
     "file": "clarinet-16.ogg",
     "midi": "clarinet-16.mid",
@@ -112,6 +128,7 @@
     "waveform": "X3l9a3TLlpKFZHV2c5KWfKe2tre3tHq+tWZhaW1tYoScoYbYbWZKVFVVVVVVPAUAAA=="
   },
   {
+    "song": "twinkle_twinkle_little_star",
     "title": "Twinkle Twinkle Little Star",
     "file": "clarinet-17.ogg",
     "midi": "clarinet-17.mid",
@@ -119,6 +136,7 @@
     "waveform": "f6qoj3+SkpCHr2RScX+AeV10d2Wvt6atpqyqqqqqqoBaW1tVkJJ6o7CxfLpyaFNwcGhqhoWFS2NiYmJiYmJbEgEA"
   },
   {
+    "song": "mary_had_a_little_lamb",
     "title": "Mary Had a Little Lamb",
     "file": "clarinet-18.ogg",
     "midi": "clarinet-18.mid",
@@ -126,6 +144,7 @@
     "waveform": "gaGhd46RkX6Ye4B1l5ZmhIRkjI2Obqudk5OSk2eFhoZeh4x7hpiYmJiXmIiffHNknKidUV5fX19fXz0EAA=="
   },
   {
+    "song": "frere_jacques",
     "title": "Frere Jacques",
     "file": "clarinet-19.ogg",
     "midi": "clarinet-19.mid",
@@ -133,6 +152,7 @@
     "waveform": "UW1saWuXlpZ+opGFepqZj3CVlHKkqamGrWVeXERgXldmenpwdIiIccqwrK2sraFYZmZlLgIAIJ+jo6Ojo6OXHgIA"
   },
   {
+    "song": "ode_to_joy",
     "title": "Ode to Joy",
     "file": "clarinet-20.ogg",
     "midi": "clarinet-20.mid",
@@ -140,6 +160,7 @@
     "waveform": "jbGwsGhjYF6GtX+CcpyblH6Qj4tYa2pqVq6Gf3iBra2YY3Nza2KDglaub2ogAgAAgaurq6uBso+mjo+Qj49XBgA="
   },
   {
+    "song": "jingle_bells",
     "title": "Jingle Bells",
     "file": "clarinet-21.ogg",
     "midi": "clarinet-21.mid",
@@ -147,6 +168,7 @@
     "waveform": "VWtraXOop460qaenqKdxX19fYZ+egIeQkJCQjpa9q4F8fXxoi5ubm3N3ZZ90bG1tbW1tbW1taRoBAA=="
   },
   {
+    "song": "london_bridge_is_falling_down",
     "title": "London Bridge Is Falling Down",
     "file": "clarinet-22.ogg",
     "midi": "clarinet-22.mid",
@@ -154,6 +176,7 @@
     "waveform": "c4mJiYRcdWm1c2ZQYmJakpKSimJ3dmC8oZaYmJhfamphWGhoWo2fn5+fnp+Ui6SCgWakqqt2jYyMjIyMjGMIAAA="
   },
   {
+    "song": "old_macdonald_had_a_farm",
     "title": "Old MacDonald Had a Farm",
     "file": "clarinet-23.ogg",
     "midi": "clarinet-23.mid",
@@ -161,6 +184,7 @@
     "waveform": "kaysgFtVVFJ6mlhUP1JUVFCHrauPl6CedoldXFxdXVxVW25xV6y0tGx9gmquk4+GpaSlpKWkpKSkpKKQGAEA"
   },
   {
+    "song": "happy_birthday",
     "title": "Happy Birthday",
     "file": "clarinet-24.ogg",
     "midi": "clarinet-24.mid",
@@ -168,6 +192,7 @@
     "waveform": "QE1EYU2unZiZVVFQT0ZdX19NnqalpaalpaV5t5WjUUagr7N8hISAg7teXEuVmpqampqaixcBAA=="
   },
   {
+    "song": "twinkle_twinkle_little_star",
     "title": "Twinkle Twinkle Little Star",
     "file": "clarinet-25.ogg",
     "midi": "clarinet-25.mid",
@@ -175,6 +200,7 @@
     "waveform": "h7GwqE9fX0vfvLqwepecdqOoqILF0NDQjs2Li4uLi4uHepaWdoiLi2txdXV0tWtjS1xbW0Vma2tIBQAAAAAAAAAAAAA="
   },
   {
+    "song": "mary_had_a_little_lamb",
     "title": "Mary Had a Little Lamb",
     "file": "clarinet-26.ogg",
     "midi": "clarinet-26.mid",
@@ -182,6 +208,7 @@
     "waveform": "UGBhUX5+ZZ53dExcW1pLYWBVpqehh4tUUVFRUVBWeXl3UGhoWI2goKGgoaCfkJ6OdrS6qZ27wcHBwcFNBAA="
   },
   {
+    "song": "frere_jacques",
     "title": "Frere Jacques",
     "file": "clarinet-27.ogg",
     "midi": "clarinet-27.mid",
@@ -189,6 +216,7 @@
     "waveform": "WHRzX7rBwZni08SKpKOVqMHAl2psbIjPhlpvb0YFAABaZWOsrIqPj452n56ebXVzbhoBAAAAAAAAAAA="
   },
   {
+    "song": "ode_to_joy",
     "title": "Ode to Joy",
     "file": "clarinet-28.ogg",
     "midi": "clarinet-28.mid",
@@ -196,6 +224,7 @@
     "waveform": "b4WFgL+/v5LRoZdphIiIXn+DZ3Nzc2TXuqGboZ1SZWVOeHl5ZtytmqS/vpd6cHBwbXufTAQAAAAAAAAAAAA="
   },
   {
+    "song": "jingle_bells",
     "title": "Jingle Bells",
     "file": "clarinet-29.ogg",
     "midi": "clarinet-29.mid",
@@ -203,6 +232,7 @@
     "waveform": "YXR0ZoSSk4a7pqyrqquqqICTk5JrampqTF5dXl5dVr3DvYJ7gIFqqLW2tbWMjIWSiWJgYF9gYF9gYF9eXUIGAAA="
   },
   {
+    "song": "london_bridge_is_falling_down",
     "title": "London Bridge Is Falling Down",
     "file": "clarinet-30.ogg",
     "midi": "clarinet-30.mid",
@@ -210,6 +240,7 @@
     "waveform": "S2BjY2NjTItvt4ySh3mIiGZPUFBLd3d3ZreqvcHCwcLBeGtraz8EAAAllpmZmZmZmZlxqouKi3OfnpltjJGRkZGRkWMIAAA="
   },
   {
+    "song": "old_macdonald_had_a_farm",
     "title": "Old MacDonald Had a Farm",
     "file": "clarinet-31.ogg",
     "midi": "clarinet-31.mid",
@@ -217,10 +248,75 @@
     "waveform": "SFxgXVx5fW+klpBtTk5GX2hoVWtsaHRqU1VVVVVGeHxkkpiYfKarq4iod3K0u7q7uru6u7u7uXcJAA=="
   },
   {
+    "song": "happy_birthday",
     "title": "Happy Birthday",
     "file": "clarinet-32.ogg",
     "midi": "clarinet-32.mid",
     "duration": 4.818375,
     "waveform": "ZICDf4XNuJaaq6V0ioxobHd3d3d3VsGIc3pfb3Jau8TGmO11b1VcX19fX19fSggAAA=="
+  },
+  {
+    "song": "weezer_buddy_holly",
+    "title": "Weezer Buddy Holly lick",
+    "file": "clarinet-33.ogg",
+    "midi": "clarinet-33.mid",
+    "duration": 2.9771875,
+    "waveform": "otuneX5beH2PyMmH535Tclh3hllkY1h0dnZ2KQIA"
+  },
+  {
+    "song": "spongebob_nose_flute",
+    "title": "SpongeBob nose-flute outro",
+    "file": "clarinet-34.ogg",
+    "midi": "clarinet-34.mid",
+    "duration": 1.8431666666666666,
+    "waveform": "Tmewr6JhutJqald3bpicjRkBAA=="
+  },
+  {
+    "song": "weezer_buddy_holly",
+    "title": "Weezer Buddy Holly lick",
+    "file": "clarinet-35.ogg",
+    "midi": "clarinet-35.mid",
+    "duration": 2.8678333333333335,
+    "waveform": "bZJzbm9hjI2BvqWovnWYuWuOfl1mYYyPj4skAgA="
+  },
+  {
+    "song": "spongebob_nose_flute",
+    "title": "SpongeBob nose-flute outro",
+    "file": "clarinet-36.ogg",
+    "midi": "clarinet-36.mid",
+    "duration": 1.879625,
+    "waveform": "lJCLd3yXvcqQt2tnWHh7ezkDAA=="
+  },
+  {
+    "song": "weezer_buddy_holly",
+    "title": "Weezer Buddy Holly lick",
+    "file": "clarinet-37.ogg",
+    "midi": "clarinet-37.mid",
+    "duration": 2.9547291666666666,
+    "waveform": "lMqkf4hxWm5MbWGxu2KbpHq0rYyjmlZmaGhgEwEA"
+  },
+  {
+    "song": "spongebob_nose_flute",
+    "title": "SpongeBob nose-flute outro",
+    "file": "clarinet-38.ogg",
+    "midi": "clarinet-38.mid",
+    "duration": 1.8985416666666666,
+    "waveform": "mIV0fJS8sPhxdGOfhVhbWzgEAA=="
+  },
+  {
+    "song": "weezer_buddy_holly",
+    "title": "Weezer Buddy Holly lick",
+    "file": "clarinet-39.ogg",
+    "midi": "clarinet-39.mid",
+    "duration": 2.8422708333333335,
+    "waveform": "ga17i41yqIt9kWTpd7PSXnJ0c5RuZmpqalwNAQA="
+  },
+  {
+    "song": "spongebob_nose_flute",
+    "title": "SpongeBob nose-flute outro",
+    "file": "clarinet-40.ogg",
+    "midi": "clarinet-40.mid",
+    "duration": 2.0888125,
+    "waveform": "WGaeXVuijNN3jKtpdmWPpaamWAUA"
   }
 ]
