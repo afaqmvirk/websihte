@@ -739,7 +739,7 @@ async function answerMention(
     }
     if (answer.render) {
       const rendered = await renderFile(message, answer.render, config);
-      answer = rendered.file ? { ...answer, files: [rendered.file, ...(answer.files ?? [])] } : { text: rendered.text ?? "couldnt render that one rn" };
+      answer = rendered.file ? { ...answer, files: [...(rendered.file.preview ? [rendered.file.preview] : []), rendered.file, ...(answer.files ?? [])] } : { text: rendered.text ?? "couldnt render that one rn" };
     }
     await pauseBeforeReply();
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;

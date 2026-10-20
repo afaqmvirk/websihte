@@ -6,6 +6,8 @@ import { getKrabMoneyPhoto, KRAB_MONEY_PHOTOS } from "./discord-bot-krab";
 import { generateGeraldReply, shouldGeraldDeepMeow } from "./discord-bot-gerald";
 import deepMeow from "../../public/discord/gerald/deep-meow.json";
 import { readFile } from "node:fs/promises";
+import { Readable } from "node:stream";
+import { Sandbox } from "@vercel/sandbox";
 import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
 import type { ManimScene } from "./discord-bot-creation";
 import { renderClarinetScore } from "./discord-bot-clarinet-render";
@@ -216,6 +218,38 @@ describe("sih-inator mention bot", () => {
     assert.equal(await rendered.text(), pdf); assert.equal(await source.text(), latexSource);
     assert.equal(await handleDiscordMention(current, plank), "duplicate");
     assert.equal(calls.filter(({ url }) => url === `${rendererUrl}/render/latex`).length, 1);
+  });
+  it("puts a Vercel LaTeX PNG first so Discord displays the image alongside its PDF and exact source", async () => {
+    const sand = enableCreator("sand");
+    process.env.DISCORD_RENDERER_IMAGE = `discord-renderer@sha256:${"a".repeat(64)}`;
+    const png = Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]);
+    const pdf = Buffer.from("%PDF-1.7\nrendered-fixture");
+    let stopped = 0;
+    const create = Sandbox.create;
+    Sandbox.create = (async () => ({
+      writeFiles: async () => {},
+      asUser: () => ({ runCommand: async () => ({ exitCode: 0 }) }),
+      readFile: async ({ path }: { path: string }) => Readable.from([path.endsWith(".png") ? png : pdf]),
+      stop: async () => { stopped++; },
+    } as unknown as Sandbox)) as typeof Sandbox.create;
+    try {
+      intercept = (url) => url === modelUrl ? actionResponse("render_latex", { source: latexSource, reply: null })
+        : url.endsWith("/rpc/claim_discord_bot_render") ? Response.json("accepted") : null;
+      assert.equal(await handleDiscordMention(message({ content: `<@${sandId}> show the latex as an image`, mentionedUserIds: [sandId] }), sand), "answered");
+      const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+      const payload = JSON.parse(String(body.get("payload_json")));
+      assert.deepEqual(payload.attachments, [
+        { id: 0, filename: "overlord-document.png" }, { id: 1, filename: "overlord-document.pdf" }, { id: 2, filename: "overlord-document.tex" },
+      ]);
+      const image = body.get("files[0]"), document = body.get("files[1]"), source = body.get("files[2]");
+      assert.ok(image instanceof Blob && document instanceof Blob && source instanceof Blob);
+      assert.equal(image.type, "image/png");
+      assert.deepEqual(Buffer.from(await image.arrayBuffer()), png);
+      assert.deepEqual(Buffer.from(await document.arrayBuffer()), pdf);
+      assert.equal(await source.text(), latexSource);
+      assert.equal(payload.flags, undefined);
+      assert.equal(stopped, 1);
+    } finally { Sandbox.create = create; }
   });
   it("uploads a playable Manim MP4 as a regular attachment", async () => {
     const sand = enableCreator("sand"); enableRenderer();
