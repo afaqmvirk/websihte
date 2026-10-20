@@ -586,7 +586,7 @@
 }
 
 .sponsorTierTwo {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: repeat(3, minmax(0, 1fr));
 }
 
 .sponsorTierThree {
@@ -657,6 +657,11 @@
 
 .mthmLogo {
   width: min(94%, 360px);
+  height: auto;
+}
+
+.lovableLogo {
+  width: min(86%, 270px);
   height: auto;
 }
 
