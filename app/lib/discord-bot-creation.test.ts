@@ -10,12 +10,24 @@ const originalFetch = globalThis.fetch;
 const env = { ...process.env };
 afterEach(() => {
   globalThis.fetch = originalFetch;
-  for (const name of ["DISCORD_RENDERER_URL", "DISCORD_RENDERER_TOKEN", "DISCORD_BOT_RENDER_DAILY_LIMIT"]) {
+  for (const name of ["DISCORD_RENDERER_IMAGE", "DISCORD_RENDERER_URL", "DISCORD_RENDERER_TOKEN", "DISCORD_BOT_RENDER_DAILY_LIMIT"]) {
     if (env[name] === undefined) delete process.env[name]; else process.env[name] = env[name];
   }
 });
 
 describe("Discord file and render protocol", () => {
+  it("accepts only immutable project-local sandbox images and keeps render limits", () => {
+    const image = `discord-renderer@sha256:${"a".repeat(64)}`;
+    process.env.DISCORD_RENDERER_IMAGE = image;
+    assert.deepEqual(getDiscordRendererConfig(), { backend: "sandbox", image, dailyLimit: 25 });
+    for (const value of ["discord-renderer:latest", "https://outside.example/image", `other-team/project/${image}`, "discord-renderer@sha256:short"]) {
+      process.env.DISCORD_RENDERER_IMAGE = value;
+      assert.equal(getDiscordRendererConfig(), null);
+    }
+    process.env.DISCORD_RENDERER_IMAGE = image;
+    process.env.DISCORD_BOT_RENDER_DAILY_LIMIT = "101";
+    assert.equal(getDiscordRendererConfig(), null);
+  });
   it("rejects generated execution capabilities, unknown fields, bad references and oversized scenes", () => {
     assert.deepEqual(validateManimScene(scene), scene);
     for (const change of [

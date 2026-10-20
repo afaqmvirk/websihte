@@ -1,8 +1,54 @@
 # Discord document and animation renderer
 
 Sand and Plank send SVG and `.tex` source directly from the Vercel bot. Rendered
-PDFs and Manim MP4s use this small service on a **separate Linux Docker host**.
-Vercel does not provide the Docker daemon, Cairo/Pango, and TeX runtime this needs.
+PDFs and Manim MP4s run in **Vercel Sandbox**, using a private Docker image in
+Vercel Container Registry (VCR). No separate server is required. Vercel supports
+custom container images for Sandbox: https://vercel.com/docs/sandbox/concepts/images.
+
+## Vercel setup
+
+Create a private VCR repository in the linked website project, then build and
+push this directory as a `linux/amd64` image. You can use a local Docker engine:
+
+```sh
+vercel vcr create discord-renderer
+vercel vcr build docker services/discord-renderer discord-renderer:release --push
+```
+
+Alternatively use `scripts/build-discord-renderer.mjs` to build and push inside
+a temporary Vercel Sandbox, without installing Docker locally:
+
+```sh
+vercel env pull .env.sandbox.local --environment development
+node --env-file=.env.sandbox.local scripts/build-discord-renderer.mjs vcr.vercel.com/TEAM/PROJECT/discord-renderer
+```
+
+Use the digest printed by the build, rather than a mutable tag. Configure the
+website's server-only environment and redeploy:
+
+```dotenv
+DISCORD_RENDERER_IMAGE=discord-renderer@sha256:<64-character image digest>
+DISCORD_BOT_RENDER_DAILY_LIMIT=25
+```
+
+The SDK uses the project's automatically supplied Vercel OIDC identity. No bot,
+OpenAI or renderer token enters the sandbox. Each job starts a fresh microVM
+with no network access, ports, drives, or filesystem persistence. It runs the
+fixed worker as user `renderer`, with one vCPU / 2 GiB VM memory, a 90-second VM
+deadline and an 80-second command deadline. The worker also limits address space
+to 1.5 GiB, CPU time to 65 seconds, file size to 8 MB and processes to 96. The VM
+stops in `finally`; the deadline handles interrupted callers. Output is downloaded
+through the file API, keeping source and media out of command logs. The image
+contains only the worker and its dependencies, never project credentials.
+
+Sandbox and registry usage are metered on Vercel. Jobs run only on explicit
+human requests, with the shared daily allowance and per-person cooldown below.
+No renderer instance stays online between jobs.
+
+## Optional self-hosted alternative
+
+The original authenticated gateway can also run on an existing Linux Docker
+host. Leave `DISCORD_RENDERER_IMAGE` empty to select it.
 
 Build the worker image from this directory:
 
@@ -31,7 +77,7 @@ protocol in `validation.py` and returns `video/mp4`. Both require bearer auth.
 The bot attaches the original `.tex` alongside a rendered PDF. It sends an MP4
 as a normal video attachment rather than a voice message or link.
 
-Each job gets a fresh unprivileged container with no credentials, host mounts,
+With the self-hosted gateway, each job gets a fresh unprivileged container with no credentials, host mounts,
 network, writable root, or Linux capabilities. `/tmp` is a size-limited tmpfs.
 The job has one CPU, 768 MiB memory, 96 processes, and an 80-second deadline;
 the container is removed even after a timeout. LaTeX disables shell escape.

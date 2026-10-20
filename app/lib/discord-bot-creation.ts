@@ -1,5 +1,6 @@
 import type { DiscordAiBotPersona } from "./discord-bot-knowledge";
 import { DOMParser } from "@xmldom/xmldom";
+import { renderDiscordSandbox } from "./discord-renderer-sandbox";
 
 export type DiscordFile = { bytes: Uint8Array; filename: string; contentType: string };
 export type ManimObject = {
@@ -155,39 +156,52 @@ export function parseDiscordCreation(name: string, value: unknown, rendererAvail
 export function getDiscordRendererConfig() {
   const token = process.env.DISCORD_RENDERER_TOKEN?.trim();
   const dailyLimit = Number(process.env.DISCORD_BOT_RENDER_DAILY_LIMIT || 25);
+  if (!Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 100) return null;
+  const image = process.env.DISCORD_RENDERER_IMAGE?.trim();
+  if (image) {
+    // Only immutable images in this Vercel project's private registry qualify.
+    if (!/^[a-z0-9]+(?:[._-][a-z0-9]+)*@sha256:[a-f0-9]{64}$/.test(image)) return null;
+    return { backend: "sandbox" as const, image, dailyLimit };
+  }
   try {
     const url = new URL(process.env.DISCORD_RENDERER_URL || "");
-    if (!token || token.length < 32 || /\s/.test(token) || !Number.isInteger(dailyLimit) || dailyLimit < 1 || dailyLimit > 100
+    if (!token || token.length < 32 || /\s/.test(token)
       || url.username || url.password || url.search || url.hash
       || (url.protocol !== "https:" && !(process.env.NODE_ENV !== "production" && url.protocol === "http:" && ["localhost", "127.0.0.1"].includes(url.hostname)))) return null;
-    return { url: url.href.replace(/\/$/, ""), token, dailyLimit };
+    return { backend: "http" as const, url: url.href.replace(/\/$/, ""), token, dailyLimit };
   } catch { return null; }
 }
 
 export async function renderDiscordFile(request: DiscordRenderRequest): Promise<DiscordFile> {
   const config = getDiscordRendererConfig();
   if (!config) throw new Error("Renderer is unavailable");
-  const response = await fetch(`${config.url}/render/${request.kind}`, {
-    method: "POST", headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
-    body: JSON.stringify(request.kind === "latex" ? { source: request.source } : request.scene),
-    cache: "no-store", redirect: "error", signal: AbortSignal.timeout(90_000),
-  });
   const contentType = request.kind === "latex" ? "application/pdf" : "video/mp4";
-  if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== contentType || !response.body
-    || Number(response.headers.get("content-length")) > MAX_RENDER_BYTES) throw new Error("Renderer could not produce this file");
-  const chunks: Uint8Array[] = [];
-  let size = 0;
-  const reader = response.body.getReader();
-  try {
-    for (;;) {
-      const chunk = await reader.read();
-      if (chunk.done) break;
-      size += chunk.value.byteLength;
-      if (size > MAX_RENDER_BYTES) throw new Error("Rendered file is too large");
-      chunks.push(chunk.value);
-    }
-  } finally { await reader.cancel().catch(() => {}); }
-  const bytes = Buffer.concat(chunks);
+  let bytes: Buffer;
+  if (config.backend === "sandbox") {
+    bytes = await renderDiscordSandbox(request, config.image);
+  } else {
+    const response = await fetch(`${config.url}/render/${request.kind}`, {
+      method: "POST", headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
+      body: JSON.stringify(request.kind === "latex" ? { source: request.source } : request.scene),
+      cache: "no-store", redirect: "error", signal: AbortSignal.timeout(90_000),
+    });
+    if (!response.ok || response.headers.get("content-type")?.split(";")[0] !== contentType || !response.body
+      || Number(response.headers.get("content-length")) > MAX_RENDER_BYTES) throw new Error("Renderer could not produce this file");
+    const chunks: Uint8Array[] = [];
+    let size = 0;
+    const reader = response.body.getReader();
+    try {
+      for (;;) {
+        const chunk = await reader.read();
+        if (chunk.done) break;
+        size += chunk.value.byteLength;
+        if (size > MAX_RENDER_BYTES) throw new Error("Rendered file is too large");
+        chunks.push(chunk.value);
+      }
+    } finally { await reader.cancel().catch(() => {}); }
+    bytes = Buffer.concat(chunks);
+  }
+  if (bytes.length > MAX_RENDER_BYTES) throw new Error("Rendered file is too large");
   if (request.kind === "latex" ? !bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))
     : bytes.length < 12 || !bytes.subarray(4, 8).equals(Buffer.from("ftyp"))) throw new Error("Invalid rendered file");
   return { bytes, contentType, filename: request.kind === "latex" ? "overlord-document.pdf" : "overlord-animation.mp4" };
