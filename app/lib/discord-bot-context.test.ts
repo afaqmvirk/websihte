@@ -77,26 +77,36 @@ describe("bounded Discord conversation context",()=>{
     assert.deepEqual(selectDiscordConversation(null,null,current,botId,now),[]);
     assert.deepEqual(selectDiscordConversation([null,{},entry(1,{content:null})],[],current,botId,now),[]);
   });
-  it("keeps all four overlords distinct and excludes unrelated bots",()=>{
+  it("keeps all seven overlords distinct and excludes unrelated bots",()=>{
     const rickId = "1560000000000000088";
     const krabId = "1560000000000000099";
     const geraldId = "1560000000000000097";
+    const squdId = "1560000000000000096", sandId = "1560000000000000094", plankId = "1560000000000000093";
     const history = selectDiscordConversation([
       entry(1,{author:{id:botId,bot:true},content:`hello <@${rickId}>`}),
       entry(2,{author:{id:rickId,bot:true},content:`hi <@${botId}>`}),
       entry(3,{author:{id:otherId,bot:true},content:"unrelated bot"}),
       entry(4,{author:{id:krabId,bot:true},content:"money money"}),
       entry(5,{author:{id:geraldId,bot:true},content:"mrow meow miau"}),
+      entry(6,{author:{id:squdId,bot:true},content:"go away"}),
+      entry(7,{author:{id:sandId,bot:true},content:`hello <@${plankId}>`}),
+      entry(8,{author:{id:plankId,bot:true},content:`no <@${sandId}>`}),
     ],[],current,rickId,now,{persona:"rick",peers:[
       {applicationId:botId,persona:"bob",name:"overlord bob"},
       {applicationId:krabId,persona:"krab",name:"overlord krab"},
       {applicationId:geraldId,persona:"gerald",name:"overlord gerald"},
+      {applicationId:squdId,persona:"squd",name:"overlord squd"},
+      {applicationId:sandId,persona:"sand",name:"overlord sand"},
+      {applicationId:plankId,persona:"plank",name:"overlord plank"},
     ]});
     assert.deepEqual(history,[
       {role:"user",name:"overlord_bob",content:"hello overlord rick"},
       {role:"assistant",name:"overlord_rick",content:"hi overlord bob"},
       {role:"user",name:"overlord_krab",content:"money money"},
       {role:"user",name:"overlord_gerald",content:"mrow meow miau"},
+      {role:"user",name:"overlord_squd",content:"go away"},
+      {role:"user",name:"overlord_sand",content:"hello overlord plank"},
+      {role:"user",name:"overlord_plank",content:"no overlord sand"},
     ]);
   });
 });
