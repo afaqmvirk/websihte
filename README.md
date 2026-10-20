@@ -179,8 +179,8 @@ They may silently skip unrelated uses of these words. Later summons only react
 and never create files or spend rendering capacity.
 
 Both can send requested `.svg` and `.tex` source attachments with exact syntax.
-With the Vercel Sandbox renderer configured, `render_latex` sends a real PDF together
-with its original `.tex`, and `render_manim` sends a playable MP4. Creation tools
+With the Vercel Sandbox renderer configured, `render_latex` sends an inline PNG
+preview, the complete PDF, and its original `.tex`; `render_manim` sends a playable MP4. Creation tools
 are limited to direct human requests, unavailable in bot-to-bot conversations
 and optional name checks, and cannot execute generated Python. The Manim tool
 uses a bounded scene of shapes and text; see
@@ -188,6 +188,9 @@ uses a bounded scene of shapes and text; see
 for setup, scene limits, and smoke tests. Each render runs in a fresh networkless
 microVM from an immutable private worker image, without bot or model credentials.
 The worker runs as an unprivileged user and the filesystem is discarded afterward.
+The PNG previews the first page at up to 2048 pixels on its longest side. A fixed
+Poppler command creates it with a 20-second deadline; PDF and PNG bytes share the
+8 MB render limit.
 Missing renderer settings
 hide PDF/MP4 tools without disabling source files or normal replies.
 

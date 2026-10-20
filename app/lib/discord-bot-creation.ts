@@ -3,6 +3,7 @@ import { DOMParser } from "@xmldom/xmldom";
 import { renderDiscordSandbox } from "./discord-renderer-sandbox";
 
 export type DiscordFile = { bytes: Uint8Array; filename: string; contentType: string };
+export type DiscordRenderedFile = DiscordFile & { preview?: DiscordFile };
 export type ManimObject = {
   id: string; kind: string; text: string | null; color: string; x: number; y: number; scale: number;
 };
@@ -56,7 +57,7 @@ export function getDiscordCreationTools(rendererAvailable: boolean) {
     }, required: ["format", "source", "reply"] },
   } }, ...(rendererAvailable ? [{ type: "function", function: {
     name: "render_latex", strict: true,
-    description: "Compile a requested complete standalone LaTeX document and send its rendered PDF plus .tex source. Only for an explicit current human request. No shell escape, external files or network resources. Up to 6 pages.",
+    description: `Compile a requested complete standalone LaTeX document and send ${getDiscordRendererConfig()?.backend === "sandbox" ? "an inline PNG preview of its first page, the complete rendered PDF, and the .tex source" : "its rendered PDF plus .tex source"}. Use this for LaTeX-as-an-image requests. Only for an explicit current human request. No shell escape, external files or network resources. Up to 6 pages.`,
     parameters: { type: "object", additionalProperties: false, properties: { source, reply: caption }, required: ["source", "reply"] },
   } }, { type: "function", function: {
     name: "render_manim", strict: true,
@@ -172,13 +173,19 @@ export function getDiscordRendererConfig() {
   } catch { return null; }
 }
 
-export async function renderDiscordFile(request: DiscordRenderRequest): Promise<DiscordFile> {
+export async function renderDiscordFile(request: DiscordRenderRequest): Promise<DiscordRenderedFile> {
   const config = getDiscordRendererConfig();
   if (!config) throw new Error("Renderer is unavailable");
   const contentType = request.kind === "latex" ? "application/pdf" : "video/mp4";
   let bytes: Buffer;
+  let preview: DiscordFile | undefined;
   if (config.backend === "sandbox") {
-    bytes = await renderDiscordSandbox(request, config.image);
+    const rendered = await renderDiscordSandbox(request, config.image);
+    bytes = rendered.bytes;
+    if (rendered.preview) {
+      if (!rendered.preview.subarray(0, 8).equals(Buffer.from([137, 80, 78, 71, 13, 10, 26, 10]))) throw new Error("Invalid LaTeX preview");
+      preview = { bytes: rendered.preview, contentType: "image/png", filename: "overlord-document.png" };
+    }
   } else {
     const response = await fetch(`${config.url}/render/${request.kind}`, {
       method: "POST", headers: { Authorization: `Bearer ${config.token}`, "Content-Type": "application/json" },
@@ -204,5 +211,5 @@ export async function renderDiscordFile(request: DiscordRenderRequest): Promise<
   if (bytes.length > MAX_RENDER_BYTES) throw new Error("Rendered file is too large");
   if (request.kind === "latex" ? !bytes.subarray(0, 5).equals(Buffer.from("%PDF-"))
     : bytes.length < 12 || !bytes.subarray(4, 8).equals(Buffer.from("ftyp"))) throw new Error("Invalid rendered file");
-  return { bytes, contentType, filename: request.kind === "latex" ? "overlord-document.pdf" : "overlord-animation.mp4" };
+  return { bytes, contentType, filename: request.kind === "latex" ? "overlord-document.pdf" : "overlord-animation.mp4", ...(preview ? { preview } : {}) };
 }
