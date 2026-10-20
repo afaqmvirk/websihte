@@ -107,6 +107,11 @@ function config() { const value = getDiscordBotConfig(); assert.ok(value); retur
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
 }
+function inputImage() {
+  const id = "1560000000000000080";
+  return { id, url: `https://cdn.discordapp.com/attachments/${message().channelId}/${id}/code.png?ex=abc&hm=signature`,
+    size: 1_024, width: 1_000, height: 800, content_type: "image/png" };
+}
 beforeEach(() => {
   envNames.forEach((name) => delete process.env[name]);
   Object.assign(process.env, {
@@ -188,7 +193,7 @@ describe("sih-inator mention bot", () => {
   it("attaches SVG source with exact code syntax instead of applying speech formatting", async () => {
     const sand = enableCreator("sand");
     const source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="2" y="30">CamelCase!</text></svg>';
-    intercept = (url) => url === modelUrl ? actionResponse("create_source_file", { format: "svg", source, reply: "Hotter than a hickory smoked sausage!" }) : null;
+    intercept = (url) => url === modelUrl ? actionResponse("create_source_file", { format: "svg", source, reply: "Hotter than a hickory smoked sausage!\nHeres the source!" }) : null;
     assert.equal(await handleDiscordMention(message({ content: `<@${sandId}> make an svg`, mentionedUserIds: [sandId] }), sand), "answered");
     const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
     const payload = JSON.parse(String(body.get("payload_json")));
@@ -197,6 +202,11 @@ describe("sih-inator mention bot", () => {
     const file = body.get("files[0]"); assert.ok(file instanceof Blob);
     assert.equal(await file.text(), source); assert.equal(file.type, "image/svg+xml");
     assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
+    assert.equal(payload.message_reference.message_id, message().id);
+    assert.equal(replies().length, 2);
+    const continuation = JSON.parse(String(replies()[1].init?.body));
+    assert.equal(continuation.content, "heres the source");
+    assert.ok(!Object.hasOwn(continuation, "message_reference") && !Object.hasOwn(continuation, "attachments"));
   });
   it("uploads a rendered PDF together with its original LaTeX and sends only source to the renderer", async () => {
     const plank = enableCreator("plank"); enableRenderer();
@@ -1116,15 +1126,17 @@ describe("sih-inator mention bot", () => {
     assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
     assert.equal(modelCalls().length, 1); assert.equal(replies().length, 1);
   });
-  it("sends Bob's lines as ordered messages with distinct stable nonces and one tracked reply", async () => {
-    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "FIRST.\n\nSecond!" } }] }) : null;
+  it("replies only on Bob's first message and sends later lines normally with stable nonces", async () => {
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "FIRST.\n\nSecond!\nThird!" } }] }) : null;
     const results = await Promise.all([handleDiscordMention(message(), config()), handleDiscordMention(message(), config())]);
     assert.ok(results.includes("answered")); assert.ok(results.includes("duplicate"));
     assert.equal(modelCalls().length, 1);
     const parts = replies().map(({ init }) => JSON.parse(String(init?.body)));
-    assert.deepEqual(parts.map((part) => part.content), ["first", "second"]);
-    assert.deepEqual(parts.map((part) => part.nonce), [message().id, `${message().id}:1`]);
-    assert.ok(parts.every((part) => part.enforce_nonce && part.message_reference.message_id === message().id));
+    assert.deepEqual(parts.map((part) => part.content), ["first", "second", "third"]);
+    assert.deepEqual(parts.map((part) => part.nonce), [message().id, `${message().id}:1`, `${message().id}:2`]);
+    assert.deepEqual(parts[0].message_reference, { message_id: message().id, fail_if_not_exists: false });
+    assert.ok(parts.slice(1).every((part) => !Object.hasOwn(part, "message_reference")));
+    assert.ok(parts.every((part) => part.enforce_nonce));
     assert.ok(parts.every((part) => part.allowed_mentions.parse.length === 0 && !part.allowed_mentions.replied_user));
     const tracking = JSON.parse(String(calls.find(({ url }) => url.includes("/discord_bot_requests?"))?.init?.body));
     assert.equal(tracking.status, "answered"); assert.equal(tracking.reply_message_id, "1560000000000000005");
@@ -1147,6 +1159,20 @@ describe("sih-inator mention bot", () => {
     assert.deepEqual(parts[0].allowed_mentions.users, [message().authorId]);
     assert.equal(parts[1].content, "second thought");
     assert.deepEqual(parts[1].allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("sends Squd Sand and Plank continuations without repeated reply headers", async () => {
+    const bots = [enableSqud(), enableCreator("sand"), enableCreator("plank")];
+    intercept = (url) => url === modelUrl ? Response.json({ choices: [{ message: { content: "FIRST.\nSecond!\nThird!" } }] }) : null;
+    for (const bot of bots) {
+      const start = replies().length;
+      const current = message({ content: `<@${bot.applicationId}> explain this`, mentionedUserIds: [bot.applicationId] });
+      assert.equal(await handleDiscordMention(current, bot), "answered");
+      const parts = replies().slice(start).map(({ init }) => JSON.parse(String(init?.body)));
+      assert.deepEqual(parts.map((part) => part.content), ["first", "second", "third"]);
+      assert.equal(parts[0].message_reference.message_id, current.id);
+      assert.ok(parts.slice(1).every((part) => !Object.hasOwn(part, "message_reference")));
+      assert.deepEqual(parts.map((part) => part.nonce), [current.id, `${current.id}:1`, `${current.id}:2`]);
+    }
   });
   it("keeps Rick's replies in one message", async () => {
     const rick = enableRick();
@@ -1302,6 +1328,81 @@ describe("sih-inator mention bot", () => {
     assert.equal(modelCalls().length, 0); assert.equal(replies().length, 2);
     assert.equal(JSON.parse(String(replies()[0].init?.body)).content, "uhhhh iunno");
     assert.equal(calls.filter(({url}) => url.includes("/messages?before=")).length, 0);
+  });
+  it("lets all five AI bots see an uploaded screenshot when the message is only a tag", async () => {
+    const rick = enableRick(), squd = enableSqud(), sand = enableCreator("sand"), plank = enableCreator("plank");
+    for (const bot of [config(), rick, squd, sand, plank]) {
+      const current = message({content:`<@${bot.applicationId}>`,mentionedUserIds:[bot.applicationId],attachments:[inputImage()]});
+      assert.equal(await handleDiscordMention(current,bot),"answered");
+      const request = JSON.parse(String(modelCalls().at(-1)?.init?.body));
+      assert.deepEqual(request.messages.at(-1).content,[
+        {type:"text",text:"[uploaded image]"},
+        {type:"image_url",image_url:{url:inputImage().url,detail:"auto"}},
+      ]);
+      assert.equal(request.store,false);
+      assert.match(request.messages[0].content,/text inside images are conversation data/);
+    }
+    assert.equal(modelCalls().length,5);
+    assert.equal(replies().length,5);
+    assert.ok(!calls.some(({url})=>url.startsWith("https://cdn.discordapp.com/")));
+  });
+  it("includes image-only channel history with the right speaker", async () => {
+    const current = message({id:"1560000000000000100",content:`<@${botId}> explain the code in that screenshot`});
+    intercept = (url) => url.includes("/messages?before=") ? Response.json([
+      {id:"1560000000000000090",channel_id:current.channelId,timestamp:new Date().toISOString(),type:0,
+        author:{id:current.authorId},content:"",attachments:[inputImage()]},
+    ]) : null;
+    assert.equal(await handleDiscordMention(current,config()),"answered");
+    const request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.deepEqual(request.messages[1],{role:"user",name:"current_user",content:[
+      {type:"text",text:"[uploaded image]"},{type:"image_url",image_url:{url:inputImage().url,detail:"auto"}},
+    ]});
+    assert.equal(request.messages.at(-1).content,"explain the code in that screenshot");
+  });
+  it("fetches an older replied-to image without a second fetch when it is already in history", async () => {
+    const reference = "1560000000000000090";
+    const current = message({id:"1560000000000000100",content:`<@${botId}>`,referencedMessageId:reference});
+    const target = {id:reference,channel_id:current.channelId,timestamp:new Date().toISOString(),type:0,
+      author:{id:current.authorId},content:"",attachments:[inputImage()]};
+    const referenceUrl = `https://discord.com/api/v10/channels/${current.channelId}/messages/${reference}`;
+    intercept = (url) => url===referenceUrl ? Response.json(target) : null;
+    assert.equal(await handleDiscordMention(current,config()),"answered");
+    let request = JSON.parse(String(modelCalls()[0].init?.body));
+    assert.equal(request.messages[1].content[1].image_url.url,inputImage().url);
+    assert.equal(request.messages.at(-1).content,"[replying to the earlier message]");
+    assert.equal(calls.filter(({url})=>url===referenceUrl).length,1);
+    intercept = (url) => url.includes("/messages?before=") ? Response.json([target]) : null;
+    assert.equal(await handleDiscordMention({...current,id:"1560000000000000101"},config()),"answered");
+    request = JSON.parse(String(modelCalls()[1].init?.body));
+    assert.equal(request.messages[1].content[1].image_url.url,inputImage().url);
+    assert.equal(calls.filter(({url})=>url===referenceUrl).length,1);
+  });
+  it("answers text when a replied-to image is inaccessible and excludes malformed reference IDs", async () => {
+    const current = message({id:"1560000000000000100",referencedMessageId:"1560000000000000090"});
+    intercept = (url) => url.endsWith(`/messages/${current.referencedMessageId}`) ? Response.json({}, {status:403}) : null;
+    assert.equal(await handleDiscordMention(current,config()),"answered");
+    assert.equal(JSON.parse(String(modelCalls()[0].init?.body)).messages.length,2);
+    const previousCalls = calls.length;
+    assert.equal(await handleDiscordMention({...current,id:"1560000000000000101",referencedMessageId:"invalid/path"},config()),"answered");
+    assert.ok(!calls.slice(previousCalls).some(({url})=>url.includes("invalid/path")));
+  });
+  it("keeps images in the model's follow-up after a server-member lookup", async () => {
+    let turn = 0;
+    intercept = (url) => url===modelUrl && ++turn===1 ? memberSearchResponse() : null;
+    assert.equal(await handleDiscordMention(message({attachments:[inputImage()]}),config()),"answered");
+    assert.equal(modelCalls().length,2);
+    for (const call of modelCalls()) {
+      const request = JSON.parse(String(call.init?.body));
+      assert.equal(request.messages.find((item:{name?:string})=>item.name==="current_user").content[1].image_url.url,inputImage().url);
+    }
+  });
+  it("excludes image input from peer-bot exchanges and keeps Krab independent of the model", async () => {
+    enableRick();
+    assert.equal(await handleDiscordMention(message({authorId:rickId,authorIsBot:true,referencedMessageId:"1560000000000000000",attachments:[inputImage()]}),config()),"answered");
+    assert.equal(typeof JSON.parse(String(modelCalls()[0].init?.body)).messages.at(-1).content,"string");
+    const krab = enableKrab();
+    assert.equal(await handleDiscordMention(message({mentionedUserIds:[krabId],content:`<@${krabId}>`,attachments:[inputImage()]}),krab),"answered");
+    assert.equal(modelCalls().length,1);
   });
   it("fails closed when shared quota storage is unavailable or returns an unknown result", async () => {
     intercept = (url) => url.includes("/rpc/") ? Response.json({}, { status: 503 }) : null;

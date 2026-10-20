@@ -54,12 +54,18 @@ describe("bounded Discord conversation context",()=>{
       entry(100,{author:{id:userId},content:"but electricity is free"}),
       entry(101,{author:{id:userId},content:"a later question"}),
       entry(110,{author:{id:botId,bot:true},type:19,content:"probably not",message_reference:{message_id:entry(90).id}}),
-      entry(111,{author:{id:botId,bot:true},type:19,content:"answering the current question already",message_reference:{message_id:current.id}}),
-      entry(112,{author:{id:botId,bot:true},content:"unrelated new message"}),
-      entry(113,{author:{id:botId,bot:true},type:19,message_reference:{message_id:"invalid"}}),
+      entry(111,{author:{id:botId,bot:true},content:"electricity still costs money",nonce:`${entry(90).id}:1`}),
+      entry(112,{author:{id:botId,bot:true},content:"and hardware isnt free",nonce:`${entry(90).id}:2`}),
+      entry(113,{author:{id:botId,bot:true},type:19,content:"answering the current question already",message_reference:{message_id:current.id}}),
+      entry(114,{author:{id:botId,bot:true},content:"continuing the current answer",nonce:`${current.id}:1`}),
+      entry(115,{author:{id:botId,bot:true},content:"unrelated new message"}),
+      entry(116,{author:{id:botId,bot:true},type:19,message_reference:{message_id:"invalid"}}),
+      entry(117,{author:{id:botId,bot:true},nonce:`${entry(90).id}:invalid`}),
+      entry(118,{author:{id:otherId},nonce:`${entry(90).id}:1`}),
     ],[],current,botId,now);
     assert.deepEqual(history.map(({role,content})=>[role,content]),[
       ["user","should i mine crypto"], ["assistant","probably not"],
+      ["assistant","electricity still costs money"], ["assistant","and hardware isnt free"],
     ]);
   });
   it("bounds UTF-8 context and clips long messages without breaking characters",()=>{
@@ -76,6 +82,38 @@ describe("bounded Discord conversation context",()=>{
   it("handles missing history and deleted or unreadable messages",()=>{
     assert.deepEqual(selectDiscordConversation(null,null,current,botId,now),[]);
     assert.deepEqual(selectDiscordConversation([null,{},entry(1,{content:null})],[],current,botId,now),[]);
+  });
+  it("keeps image-only human channel messages without sharing cross-channel or bot images",()=>{
+    const id = "1560000000000000090";
+    const upload = { id, url:`https://cdn.discordapp.com/attachments/${channelId}/${id}/code.png`,
+      size:1024,width:1000,height:800,content_type:"image/png" };
+    const history = selectDiscordConversation([
+      entry(1,{author:{id:userId},content:"",attachments:[upload]}),
+      entry(2,{author:{id:botId,bot:true},content:"my answer",attachments:[upload]}),
+      entry(3,{content:"",attachments:[{...upload,content_type:"application/pdf"}]}),
+    ],[entry(4,{channel_id:"1560000000000000099",author:{id:userId},content:"other channel",attachments:[upload]})],current,botId,now);
+    assert.deepEqual(history[0],{role:"user",name:"current_user",content:"[uploaded image]",images:[upload.url]});
+    assert.ok(!history[1].images && !history[2].images);
+    assert.ok(Buffer.byteLength(JSON.stringify(history),"utf8")<=48000);
+    const peerHistory = selectDiscordConversation([entry(1,{content:"",attachments:[upload]})],[],{...current,authorIsBot:true},botId,now);
+    assert.deepEqual(peerHistory,[]);
+  });
+  it("reserves a channel slot and image budget for an older directly replied-to screenshot",()=>{
+    const reference = entry(1,{content:"old screenshot"});
+    const upload = (number:number) => {
+      const id = String(1560000000000000200n+BigInt(number));
+      return {id,url:`https://cdn.discordapp.com/attachments/${channelId}/${id}/code.png`,size:1024,width:100,height:100};
+    };
+    const data = [reference,...Array.from({length:30},(_,i)=>entry(i+30,{attachments:[upload(i)]}))];
+    const history = selectDiscordConversation(data.map((item)=>item.id===reference.id?{...item,attachments:[upload(99)]}:item),[],
+      {...current,referencedMessageId:reference.id},botId,now);
+    assert.equal(history.length,25);
+    assert.deepEqual(history[0].images,[upload(99).url]);
+    assert.equal(history.flatMap((item)=>item.images??[]).length,4);
+    const withCurrentUpload = selectDiscordConversation(data.map((item)=>item.id===reference.id?{...item,attachments:[upload(99)]}:item),[],
+      {...current,referencedMessageId:reference.id,attachments:[upload(100)]},botId,now);
+    assert.deepEqual(withCurrentUpload[0].images,[upload(99).url]);
+    assert.equal(withCurrentUpload.flatMap((item)=>item.images??[]).length,3);
   });
   it("keeps all seven overlords distinct and excludes unrelated bots",()=>{
     const rickId = "1560000000000000088";

@@ -370,12 +370,13 @@ Both bots keep typing for an extra random one to five seconds after preparing a
 response, including reactions and GIFs. An optional name mention starts typing only
 after the model chooses to join in. The extra pause also preserves each person's
 reply order.
-Bob can split an answer into up to five ordered messages: ordinary line breaks
+Bob, Squd, Sand, and Plank can split an answer into up to five ordered messages: ordinary line breaks
 start a new message, and longer lines wrap at word boundaries within 1,900 characters.
 Code blocks stay together where possible; oversized blocks are split with their
 fences preserved. Remaining short lines share the fifth message. The 512-token
 output limit still applies. Only the first message can ping selected users or
-carry an image attachment. Each part uses a distinct stable Discord nonce for
+carry files or an image attachment. Only the first message has a reply header;
+continuations are ordinary channel messages. Each part uses a distinct stable Discord nonce for
 retries. The request stays queued until all parts finish, and a failed part stops
 later sends and records failure while retaining the first reply ID for tracking.
 The queue lives in the active listener, so a process crash can still lose waiting
@@ -482,7 +483,17 @@ are included once. Messages are ordered oldest to newest, the final question is
 the main request, and the prompt favours recent relevant messages over old ones.
 Other-channel messages are labelled as background. Each history message is clipped
 to 512 UTF-8 bytes; the complete context has a 48,000-byte ceiling including speaker
-labels. Unrelated bots, webhooks, application notifications, attachments, and other
+labels. Bob, Rick, Squd, Sand, and Plank can read up to four uploaded PNG, JPEG,
+or WebP images per answer (8 MB each) from the current message and human messages
+in the same channel context. A directly replied-to message outside the recent
+window takes one of the 25 channel slots. Current uploads take priority, then
+the replied-to message, then recent channel images. Image-only tags work too.
+Only validated Discord attachment URLs are sent to OpenAI, with automatic image
+detail and signed queries preserved. Other file types, arbitrary image links,
+cross-channel images, and bot-to-bot image input are excluded. Images are not
+saved in the website database. See the
+[OpenAI vision guide](https://developers.openai.com/api/docs/guides/images-vision).
+Unrelated bots, webhooks, application notifications, and other
 authors' messages from other channels are excluded. If one history source fails,
 the other still works; if both fail, the bot answers the current question alone.
 Unpinged name checks use only current-channel history. Message text is not saved to the site database or logged.

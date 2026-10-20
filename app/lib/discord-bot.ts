@@ -11,6 +11,7 @@ import { CLARINET_LIBRARY_COUNT, selectClarinetLibrarySongs, getClarinetLibraryS
 import { MAX_DISCORD_REPLY_LENGTH, MAX_DISCORD_REPLY_MESSAGES, splitDiscordReply } from "@/lib/discord-bot-replies";
 import { findDiscordServerMembers, MAX_MEMBER_QUERY_LENGTH, validDiscordMemberQuery, type DiscordMemberSearch } from "@/lib/discord-bot-members";
 import { generateDiscordImage, getDiscordImageConfig, MAX_IMAGE_PROMPT_LENGTH, type DiscordGeneratedImage } from "@/lib/discord-bot-image";
+import { discordMessagesWithImages, getDiscordImageUrls, type DiscordImageAttachment } from "@/lib/discord-bot-vision";
 import { discordEmojiMarkup, discordEmojiReaction, selectDiscordServerEmojis, type DiscordServerEmoji } from "@/lib/discord-bot-emojis";
 import { getDiscordCreationTools, getDiscordRendererConfig, isDiscordCreator, parseDiscordCreation, renderDiscordFile, type DiscordFile, type DiscordRenderRequest } from "@/lib/discord-bot-creation";
 
@@ -115,6 +116,7 @@ export type DiscordMention = {
   canDelete?: boolean; authorIsWebhook?: boolean; referencedMessageId?: string;
   authorName?: string; authorUsername?: string; mentionedUsers?: DiscordMentionTarget[];
   serverEmojis?: DiscordServerEmoji[];
+  attachments?: DiscordImageAttachment[];
 };
 
 export function isDiscordCronAuthorized(request: Request) {
@@ -213,6 +215,7 @@ type ReplyOptions = {
   canCreateFiles?: boolean;
   performanceSeed?: string;
   memberLookup?: (query: string, after: string | null) => Promise<DiscordMemberSearch>;
+  images?: string[];
   serverEmojis?: DiscordServerEmoji[];
   currentUser?: { username?: string; displayName?: string };
 };
@@ -355,8 +358,10 @@ optional unpinged name mention:
 - nobody tagged you. the current message contains one of your names: ${AI_BOT_NAMES[options.persona ?? "bob"]}. first carefully decide whether the current message and channel context clearly refer to you, the discord bot. make this routing decision carefully even if your character is stupid.
 - use skip_response when the name refers to a cartoon, another person, a quote, code, or an unrelated topic, or when it is only mentioned in passing. uncertainty means skip_response. a bare call of your name can address you when the channel context supports it.
 - you may also use skip_response when people are talking about you but you have nothing worth adding. you do not need to answer every name mention. when you join in, keep it short and relevant. never announce that you decided to skip.` : ""}` },
-        ...history,
-        { role: "user", name: options.currentSpeaker ?? "current_user", content: question },
+        ...discordMessagesWithImages([
+          ...history,
+          { role: "user", name: options.currentSpeaker ?? "current_user", content: question, images: options.images },
+        ]),
         ...lookup.messages,
       ],
     }),
@@ -445,7 +450,7 @@ optional unpinged name mention:
   }
   // Only the deliberate mention tool can create live mention syntax.
   const mentions = mentionUserIds?.map((id) => `<@${id}>`).join(" ") || "";
-  const textLimit = MAX_DISCORD_REPLY_LENGTH * ((options.persona ?? "bob") === "bob" ? MAX_DISCORD_REPLY_MESSAGES : 1);
+  const textLimit = MAX_DISCORD_REPLY_LENGTH * (options.persona === "rick" ? 1 : MAX_DISCORD_REPLY_MESSAGES);
   let text = formatReply(content.replace(/<@!?\d{17,20}>/g, ""), serverEmojis)
     .slice(0, textLimit - (gifUrl ? gifUrl.length + 1 : 0) - (mentions ? mentions.length + 1 : 0))
     .replace(/[\uD800-\uDBFF]$/, "").trimEnd();
@@ -511,7 +516,7 @@ async function postReply(
   const payload = JSON.stringify({
     ...(options.voice ? { flags: 1 << 13 } : { content: formatReply(content, message.serverEmojis) }),
     allowed_mentions: { parse: [], replied_user: false, ...(options.mentionUserIds?.length ? { users: options.mentionUserIds } : {}) },
-    message_reference: { message_id: message.id, fail_if_not_exists: false },
+    ...(!options.part ? { message_reference: { message_id: message.id, fail_if_not_exists: false } } : {}),
     nonce: options.part ? `${message.id}:${options.part}` : message.id, enforce_nonce: true,
     ...(attachments.length ? { attachments: attachments.map((attachment, id) => ({ id, filename: attachment.filename,
       ...(options.voice ? { duration_secs: options.voice.duration, waveform: options.voice.waveform } : {}),
@@ -552,7 +557,7 @@ async function postAnswer(
   message: DiscordMention, content: string, config: DiscordBotConfig,
   options: { mentionUserIds?: string[]; image?: DiscordGeneratedImage; gifUrl?: string; voice?: DiscordVoiceClip; files?: DiscordFile[] },
 ) {
-  const parts = config.persona === "bob" ? splitDiscordReply(content) : (content ? [content] : []);
+  const parts = isDiscordAiBotPersona(config.persona) && config.persona !== "rick" ? splitDiscordReply(content) : (content ? [content] : []);
   // The message cap may trim a very long caption; never drop its selected GIF.
   if (options.gifUrl && !parts.at(-1)?.endsWith(options.gifUrl)) {
     if (parts.length === MAX_DISCORD_REPLY_MESSAGES) parts[parts.length - 1] = options.gifUrl;
@@ -697,19 +702,20 @@ async function answerMention(
       await recordReply(message.id, null, config, reacted);
       return reacted ? "answered" : "failed";
     }
+    const images = message.authorIsBot ? [] : getDiscordImageUrls(message.attachments, message.channelId);
     let answer: DiscordBotReply;
     if (config.persona === "krab") answer = await generateKrabAnswer(message.id);
     else if (config.persona === "gerald") answer = await generateGeraldAnswer(message.id);
-    else if (!question) answer = { text: fallback };
+    else if (!question && !images.length && !message.referencedMessageId) answer = { text: fallback };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
-    else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
+    else answer = await generateDiscordBotReply(question || (images.length ? "[uploaded image]" : "[replying to the earlier message]"), config.model, await getDiscordConversation(message, config, queued, optionalResponse),
       message.canDelete === true && !message.authorIsBot && !optionalResponse, {
         persona: config.persona, mentionTargets: mentionTargets(message, config), canGenerateImage: !message.authorIsBot,
         canCreateFiles: !message.authorIsBot && !optionalResponse,
         performanceSeed: message.id,
         serverEmojis: message.serverEmojis, currentUser: message.authorIsBot ? undefined : { username: message.authorUsername, displayName: message.authorName },
         currentSpeaker: message.authorIsBot ? `overlord_${config.peers.find((peer) => peer.applicationId === message.authorId)!.persona}` : "current_user",
-        optionalResponse,
+        optionalResponse, images,
         memberLookup: config.persona === "bob" && !message.authorIsBot
           ? (query, after) => findDiscordServerMembers(config, query, after) : undefined,
       });
