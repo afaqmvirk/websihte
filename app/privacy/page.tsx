@@ -162,9 +162,17 @@ export default function PrivacyPolicyPage() {
               PDF or MP4
               in Discord. Temporary render files are removed after the job.
               SVG and LaTeX source can also be sent directly as attachments.
+              Bob, Rick, Squd, Sand, and Plank can also send OpenAI up to four
+              uploaded PNG, JPEG, or WebP images per reply, up to 8 MB each,
+              from your current message or human messages in the same channel
+              context. A message you reply to may be fetched outside the recent
+              window and included within the 25-message channel limit. Image
+              attachments use temporary Discord links and are not saved in our
+              website database. Other attachment types and images from other
+              channels are excluded.
               We use temporary speaker labels to distinguish participants. We do
               not include other participants&apos; messages from other channels,
-              private application notifications, or attachments in this context.
+              or private application notifications in this context.
               We keep message, server, and user IDs, timestamps, reply IDs, and
               delivery status, bot identity, conversation depth, image usage, and render usage
               in our private database for duplicate handling and

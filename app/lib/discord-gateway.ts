@@ -24,6 +24,10 @@ export async function runDiscordGateway(config: DiscordBotConfig, durationMs = 6
       authorName: message.member?.displayName || message.author.globalName || message.author.username,
       authorUsername: message.author.username,
       authorIsWebhook: !!message.webhookId, referencedMessageId: message.reference?.messageId,
+      attachments: [...message.attachments.values()].map((attachment) => ({
+        id: attachment.id, url: attachment.url, size: attachment.size,
+        content_type: attachment.contentType, width: attachment.width, height: attachment.height,
+      })),
     };
     if (!getDiscordMessageTrigger(incoming, config)) return;
     incoming.serverEmojis = selectDiscordServerEmojis(
