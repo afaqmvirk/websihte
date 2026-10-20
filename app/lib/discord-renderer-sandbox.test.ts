@@ -8,6 +8,7 @@ const create = Sandbox.create;
 const image = `discord-renderer@sha256:${"a".repeat(64)}`;
 const source = "\\documentclass{article}\\begin{document}$E=mc^2$\\end{document}";
 let options: unknown;
+let inputs: { path: string; content: Buffer; mode: number }[];
 let command: Record<string, unknown> | undefined;
 let username: string | undefined;
 let stops = 0, exitCode = 0;
@@ -16,10 +17,12 @@ let stream: () => Readable | null;
 beforeEach(() => {
   options = command = username = undefined;
   stops = exitCode = 0;
+  inputs = [];
   stream = () => Readable.from([Buffer.from("%PDF-1.7\nexample")]);
   Sandbox.create = (async (value) => {
     options = value;
     return {
+      writeFiles: async (files: typeof inputs) => { inputs = files; },
       asUser: (user: string) => {
         username = user;
         return { runCommand: async (value: Record<string, unknown>) => { command = value; return { exitCode }; } };
@@ -43,15 +46,16 @@ describe("Vercel Discord renderer isolation", () => {
     });
     assert.equal(username, "renderer");
     assert.ok(command);
-    assert.equal(command.cmd, "python");
-    assert.deepEqual(command.args, ["/app/sandbox_worker.py", "latex"]);
+    assert.equal(command.cmd, "sh");
+    assert.deepEqual(command.args, ["-c", 'exec python /app/sandbox_worker.py "$1" < /tmp/request.json', "renderer", "latex"]);
     assert.equal(command.cwd, "/tmp");
     assert.equal(command.timeoutMs, 80_000);
     assert.deepEqual(command.env, { HOME: "/tmp", XDG_CACHE_HOME: "/tmp/cache", OPENBLAS_NUM_THREADS: "1", OMP_NUM_THREADS: "1" });
-    assert.ok(command.stdin instanceof Readable);
-    const parts = [];
-    for await (const part of command.stdin) parts.push(part);
-    assert.deepEqual(JSON.parse(parts.join("")), { source });
+    assert.equal(command.stdin, undefined);
+    assert.equal(inputs.length, 1);
+    assert.equal(inputs[0].path, "/tmp/request.json");
+    assert.equal(inputs[0].mode, 0o644);
+    assert.deepEqual(JSON.parse(inputs[0].content.toString()), { source });
     assert.equal(stops, 1);
   });
   it("discards the sandbox after worker failure, missing output, oversized output and a failed download", async () => {

@@ -1283,6 +1283,23 @@ describe("sih-inator mention bot", () => {
     assert.match(reply.content, /uhhhh iunno.*brain not working/); assert.doesNotMatch(reply.content, /synthetic|token|503/);
     assert.equal(JSON.parse(String(calls.at(-1)?.init?.body)).status, "failed");
   });
+  it("keeps Sand and Plank free of the old fallback in their prompt, empty mentions, errors and quota replies", async () => {
+    let nextId = 300;
+    for (const persona of ["sand", "plank"] as const) {
+      const bot = enableCreator(persona);
+      assert.doesNotMatch(getDiscordBotSystemPrompt(persona), /uh+ iunno/i);
+      for (const scenario of ["empty", "empty_output", "error", "daily_limit", "monthly_limit"] as const) {
+        intercept = (url) => scenario === "error" && url === modelUrl ? Response.json({}, { status: 503 })
+          : scenario === "empty_output" && url === modelUrl ? Response.json({ choices: [{ message: { content: "" } }] })
+          : scenario.endsWith("_limit") && url.endsWith("/rpc/claim_discord_overlord_request") ? Response.json(scenario) : null;
+        const current = message({ id: String(1560000000000000000n + BigInt(nextId++)),
+          content: `<@${bot.applicationId}>${scenario === "empty" ? "" : " hello"}`, mentionedUserIds: [bot.applicationId] });
+        await handleDiscordMention(current, bot);
+      }
+    }
+    assert.equal(replies().length, 10);
+    for (const reply of replies()) assert.doesNotMatch(JSON.parse(String(reply.init?.body)).content, /uh+ iunno/i);
+  });
   it("respects Discord rate limits and reuses the nonce when retrying", async () => {
     intercept = (url, init) => url.endsWith("/messages") && init?.method === "POST" && replies().length === 1 ? Response.json({ retry_after: 0.001 }, { status: 429 }) : null;
     assert.equal(await handleDiscordMention(message(), config()), "answered");

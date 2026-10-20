@@ -652,6 +652,10 @@ async function answerMention(
   message: DiscordMention, question: string, config: DiscordBotConfig, queued: boolean,
   optionalResponse: boolean, reactionOnly: boolean, waitBeforeReply: (milliseconds: number) => Promise<void>,
 ) {
+  const creator = config.persona === "sand" || config.persona === "plank";
+  const fallback = config.persona === "sand" ? "what are we building"
+    : config.persona === "plank" ? "state your business gemma and i are scheming" : "uhhhh iunno";
+  const quotaPrefix = creator ? "" : "uhhhh iunno ";
   let claimed = false;
   let stopTyping: (() => void) | undefined;
   let paused = false;
@@ -675,14 +679,14 @@ async function answerMention(
     if (claim === "daily_limit") {
       if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
-        await postReply(message, `uhhhh iunno ${config.persona}s daily brain budget is gone try tomorrow utc`, config);
+        await postReply(message, `${quotaPrefix}${config.persona}s daily brain budget is gone try tomorrow utc`, config);
       }
       return claim;
     }
     if (claim === "monthly_limit") {
       if (isDiscordAiBotPersona(config.persona) && !message.authorIsBot && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
-        await postReply(message, `uhhhh iunno ${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
+        await postReply(message, `${quotaPrefix}${config.persona}s monthly brain budget is gone ask an organizer or try next month utc`, config);
       }
       return claim;
     }
@@ -696,7 +700,7 @@ async function answerMention(
     let answer: DiscordBotReply;
     if (config.persona === "krab") answer = await generateKrabAnswer(message.id);
     else if (config.persona === "gerald") answer = await generateGeraldAnswer(message.id);
-    else if (!question) answer = { text: "uhhhh iunno" };
+    else if (!question) answer = { text: fallback };
     else if (question.length > MAX_QUESTION_LENGTH) answer = { text: "why dont you do that im not wasting my precious tokens keep it under 2000 characters" };
     else answer = await generateDiscordBotReply(question, config.model, await getDiscordConversation(message, config, queued, optionalResponse),
       message.canDelete === true && !message.authorIsBot && !optionalResponse, {
@@ -739,7 +743,7 @@ async function answerMention(
     }
     await pauseBeforeReply();
     const reacted = answer.reaction ? await postReaction(message, answer.reaction, config) : false;
-    const text = answer.text || (reacted || image || voice || answer.files?.length ? "" : "uhhhh iunno");
+    const text = answer.text || (reacted || image || voice || answer.files?.length ? "" : fallback);
     const { replyId, complete } = await postAnswer(message, text, config, { image, voice, files: answer.files, mentionUserIds: answer.mentionUserIds, gifUrl: answer.gifUrl });
     const answered = complete && (!!replyId || reacted);
     await recordReply(message.id, replyId, config, answered);
@@ -749,7 +753,7 @@ async function answerMention(
     if (claimed) {
       if (isDiscordAiBotPersona(config.persona) && !optionalResponse && !reactionOnly) {
         await pauseBeforeReply();
-        await postReply(message, "uhhhh iunno brain not working try again in a bit", config);
+        await postReply(message, creator ? "something jammed try again in a bit" : "uhhhh iunno brain not working try again in a bit", config);
       }
       await recordReply(message.id, null, config);
     }

@@ -1,5 +1,4 @@
 import { Sandbox } from "@vercel/sandbox";
-import { Readable } from "node:stream";
 import type { DiscordRenderRequest } from "./discord-bot-creation";
 
 const MAX_BYTES = 8_000_000;
@@ -15,10 +14,13 @@ export async function renderDiscordSandbox(request: DiscordRenderRequest, image:
     // drives, source repositories or other participants' files enter the VM.
     const input = JSON.stringify(request.kind === "latex" ? { source: request.source } : request.scene);
     if (Buffer.byteLength(input) > 64_000) throw new Error("Render input is too large");
+    await sandbox.writeFiles([{ path: "/tmp/request.json", content: Buffer.from(input), mode: 0o644 }], { signal });
     const result = await sandbox.asUser("renderer").runCommand({
-      cmd: "python", args: ["/app/sandbox_worker.py", request.kind], cwd: "/tmp",
+      // Fixed redirection avoids a streamed-stdin close race. User source is
+      // file data, never shell text; the only argument is the validated kind.
+      cmd: "sh", args: ["-c", 'exec python /app/sandbox_worker.py "$1" < /tmp/request.json', "renderer", request.kind], cwd: "/tmp",
       env: { HOME: "/tmp", XDG_CACHE_HOME: "/tmp/cache", OPENBLAS_NUM_THREADS: "1", OMP_NUM_THREADS: "1" },
-      stdin: Readable.from([input]), timeoutMs: 80_000, signal,
+      timeoutMs: 80_000, signal,
     });
     if (result.exitCode !== 0) throw new Error("Renderer could not produce this file");
     const stream = await sandbox.readFile({ path: "/tmp/result.bin" }, { signal });
