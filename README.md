@@ -179,13 +179,16 @@ They may silently skip unrelated uses of these words. Later summons only react
 and never create files or spend rendering capacity.
 
 Both can send requested `.svg` and `.tex` source attachments with exact syntax.
-With the separate renderer configured, `render_latex` sends a real PDF together
+With the Vercel Sandbox renderer configured, `render_latex` sends a real PDF together
 with its original `.tex`, and `render_manim` sends a playable MP4. Creation tools
 are limited to direct human requests, unavailable in bot-to-bot conversations
 and optional name checks, and cannot execute generated Python. The Manim tool
 uses a bounded scene of shapes and text; see
 [`services/discord-renderer/README.md`](services/discord-renderer/README.md)
-for setup, scene limits, and the container smoke test. Missing renderer settings
+for setup, scene limits, and smoke tests. Each render runs in a fresh networkless
+microVM from an immutable private worker image, without bot or model credentials.
+The worker runs as an unprivileged user and the filesystem is discarded afterward.
+Missing renderer settings
 hide PDF/MP4 tools without disabling source files or normal replies.
 
 Apply `20261020003357_add_overlord_sand_and_plank.sql` before enabling either

@@ -9,6 +9,7 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@vercel/sandbox": "3.8.0",
     "@xmldom/xmldom": "0.9.12",
     "discord.js": "14.27.0",
     "midi-file": "1.2.4",

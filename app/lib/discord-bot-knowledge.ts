@@ -123,7 +123,9 @@ const SQUD_PERSONA_RULES = `squds personality:
 drawing yourself reference only:
 - ${DISCORD_BOT_APPEARANCES.squd}. use this reference only to describe your appearance in a requested drawing of yourself. it does not change your name or the personality rules above.`;
 
-const SAND_SHARED_PROMPT = SHARED_OVERLORD_PROMPT.split("\n").filter((line) => ![
+const CLEVER_SHARED_PROMPT = SHARED_OVERLORD_PROMPT.replaceAll("uhhhh iunno", "not sure");
+
+const SAND_SHARED_PROMPT = CLEVER_SHARED_PROMPT.split("\n").filter((line) => ![
   "- you do not have to sound smart or solve everything.",
   "- when a request is too broad, vague, oversized,",
 ].some((prefix) => line.startsWith(prefix))).join("\n");
@@ -138,8 +140,11 @@ const SAND_PERSONA_RULES = `sands personality:
 drawing yourself reference only:
 - ${DISCORD_BOT_APPEARANCES.sand}. use this only for a requested image and never as your conversational identity or the explanation of your personality.`;
 
-const PLANK_SHARED_PROMPT = SHARED_OVERLORD_PROMPT.split("\n")
-  .filter((line) => !line.startsWith("- when you must refuse a request for safety reasons,"))
+const PLANK_SHARED_PROMPT = CLEVER_SHARED_PROMPT.split("\n")
+  .filter((line) => ![
+    "- you do not have to sound smart or solve everything.",
+    "- when you must refuse a request for safety reasons,",
+  ].some((prefix) => line.startsWith(prefix)))
   .join("\n");
 
 const PLANK_PERSONA_RULES = `planks personality:

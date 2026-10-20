@@ -158,7 +158,7 @@ export default function PrivacyPolicyPage() {
               saved in our website database.
               When you ask Sand or Plank for rendered LaTeX or a Manim animation,
               we send only the generated document source or animation scene to
-              our separate render service and attach the resulting PDF or MP4
+              an isolated renderer on Vercel and attach the resulting PDF or MP4
               in Discord. Temporary render files are removed after the job.
               SVG and LaTeX source can also be sent directly as attachments.
               We use temporary speaker labels to distinguish participants. We do

@@ -1,4 +1,4 @@
-"""Executed only in a fresh networkless, unprivileged disposable container."""
+"""Executed only in a fresh networkless, unprivileged container or microVM."""
 import contextlib
 import json
 import math
@@ -77,7 +77,7 @@ def render_manim(value, directory):
         return Path(scene.renderer.file_writer.movie_file_path)
 
 
-def main():
+def main(output_path=None):
     kind = sys.argv[1]
     raw = sys.stdin.buffer.read(MAX_INPUT + 1)
     if len(raw) > MAX_INPUT:
@@ -93,7 +93,12 @@ def main():
         data = result.read_bytes()
         if kind == "latex" and not data.startswith(b"%PDF-") or kind == "manim" and data[4:8] != b"ftyp":
             raise ValueError("Invalid render output")
-        sys.stdout.buffer.write(data)
+        if output_path:
+            Path(output_path).write_bytes(data)
+            # Let the sandbox file API return bytes without logging binary stdout.
+            Path(output_path).chmod(0o644)
+        else:
+            sys.stdout.buffer.write(data)
 
 
 if __name__ == "__main__":
