@@ -608,6 +608,9 @@ export default function OttawaPage() {
                 <a href="https://mthm.tech/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="MathemaTech">
                   <Image src="/sponsors/mathematech-logo.png" alt="MathemaTech" width={2000} height={372} className={styles.mthmLogo} />
                 </a>
+                <a href="https://lovable.dev/" target="_blank" rel="noopener noreferrer" className={styles.sponsorCard} aria-label="Lovable">
+                  <Image src="/sponsors/lovable.svg" alt="Lovable" width={950} height={173} className={styles.lovableLogo} />
+                </a>
               </div>
 
               <div className={`${styles.sponsorRow} ${styles.sponsorTierThree}`}>

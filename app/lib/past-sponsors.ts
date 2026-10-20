@@ -171,6 +171,16 @@ export const PAST_SPONSORS: PastSponsor[] = [
     monochromeOnly: true,
   },
   {
+    name: "Lovable",
+    // Official dark-background lockup: https://lovable.dev/brand.
+    src: "/sponsors/lovable-white.svg",
+    width: 950,
+    height: 173,
+    displayWidth: 190,
+    href: "https://lovable.dev/",
+    lightArtwork: true,
+  },
+  {
     name: "Anakin",
     src: "/sponsors/anakin.png",
     width: 954,
