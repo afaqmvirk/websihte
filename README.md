@@ -100,17 +100,17 @@ duplicate on retry; Discord webhooks do not provide an idempotency key.
 Run the application and Discord checks with
 `bun test app/api/applications/route.test.ts`.
 
-## Overlord Bob, Rick, Krab, Gerald, and Squd Discord bots
+## Overlord Bob, Rick, Krab, Gerald, Squd, Sand, and Plank Discord bots
 
 The mention bots run on this site's Vercel Pro project. The protected cron route
 `/api/discord/gateway` opens a ten-minute Discord Gateway connection every nine
 minutes. Connections overlap during handover; private Supabase request claims
 suppress duplicate model calls and replies across instances, separately for each
-bot. All five handle direct mentions in `DISCORD_GUILD_ID`. When a message summons
+bot. All seven handle direct mentions in `DISCORD_GUILD_ID`. When a message summons
 several active bots, only the first one addressed can send its normal reply.
 Order follows the first visible tag or recognized lowercase name in the message,
 including aliases; implicit reply mentions fall back to Discord's mention order.
-Later bots only add a fixed reaction: Bob 👀, Rick 🤔, Krab 💰, Gerald 🐱, Squd 🙄.
+Later bots only add a fixed reaction: Bob 👀, Rick 🤔, Krab 💰, Gerald 🐱, Squd 🙄, Sand 🤠, Plank 😈.
 These secondary reactions use the normal duplicate-safe claims and queues, without
 reading conversation history, calling a model, displaying typing, or sending
 text, photos, voice clips, or error/quota notices. A failed reaction stays silent.
@@ -130,7 +130,7 @@ including the first human-triggered reply. Human messages can start a new exchan
 It requests Guilds, GuildMessages, and MessageContent Gateway intents. Enable each application's
 Message Content setting in Discord so name triggers and REST history receive unmentioned messages;
 Enable Bob's Server Members setting for directory listings; Rick and Krab can
-leave it disabled. Presence can stay disabled for all five. The Gateway still
+leave it disabled. Presence can stay disabled for all seven. The Gateway still
 does not request member events or cache the directory. History is fetched only after an
 accepted mention, rather than cached from every incoming message.
 
@@ -152,6 +152,51 @@ Rick needs his own token and application ID. Each bot can run independently, and
 the gateway route reports the personas it starts. Configuring the same account
 for multiple personas keeps only the first enabled identity (Bob, then Rick, then Krab).
 Grant Bob Attach Files too if he should generate images.
+
+Create and install separate applications named `overlord sand` and `overlord plank`.
+Enable Message Content and grant View Channels, Add Reactions, Embed Links, Send
+Messages, Send Messages in Threads, Read Message History, and Attach Files. Set
+each application's `DISCORD_SAND_BOT_TOKEN` / `DISCORD_SAND_APPLICATION_ID` or
+`DISCORD_PLANK_BOT_TOKEN` / `DISCORD_PLANK_APPLICATION_ID`, then set its respective
+`DISCORD_SAND_ENABLED` or `DISCORD_PLANK_ENABLED` to `true`. They use the shared
+OpenAI model, limits, gateway, context, images, GIFs, and bounded peer exchanges.
+Each stays disabled until its own valid credentials and the shared model/storage
+configuration are present. Duplicate accounts are enabled only once, in the
+order Bob, Rick, Krab, Gerald, Squd, Sand, Plank.
+
+Sand is a clever Texas inventor who frequently uses folksy similes and helps
+people brainstorm unusual, buildable Stupid Ideas Hackathon projects. Plank is
+a calculating, extremely evil schemer obsessed with destroying the world,
+stealing secret API keys, and his AI girlfriend Gemma, for whom he divorced
+Karen. His banter has no fake-key labels or recurring disclaimers. The key
+schemes remain theatrical; he never requests or collects real credentials or
+produces theft code. Both retain short lowercase punctuation-free speech.
+Their source-character names appear only in drawing references.
+
+Direct mentions work as usual. Human messages can also summon Sand using the
+standalone lowercase words `sand` or `sandy`, and Plank using `plank` or `plankton`.
+They may silently skip unrelated uses of these words. Later summons only react
+and never create files or spend rendering capacity.
+
+Both can send requested `.svg` and `.tex` source attachments with exact syntax.
+With the separate renderer configured, `render_latex` sends a real PDF together
+with its original `.tex`, and `render_manim` sends a playable MP4. Creation tools
+are limited to direct human requests, unavailable in bot-to-bot conversations
+and optional name checks, and cannot execute generated Python. The Manim tool
+uses a bounded scene of shapes and text; see
+[`services/discord-renderer/README.md`](services/discord-renderer/README.md)
+for setup, scene limits, and the container smoke test. Missing renderer settings
+hide PDF/MP4 tools without disabling source files or normal replies.
+
+Apply `20261020003357_add_overlord_sand_and_plank.sql` before enabling either
+bot. It extends per-bot claims and image privileges, and adds a separate private
+render allowance shared by Sand and Plank: 25 attempts per UTC day and one per
+human per minute by default. Only active human-root requests can render. Failed
+attempts count; no generated source or files are saved in the website database.
+Redeploy after setting credentials and renderer variables, then allow the old
+ten-minute gateway listeners to hand over. The authenticated gateway response
+lists which accounts actually start; a configured account still needs Discord
+installation and channel permissions before it can answer.
 
 Create and install a third Discord application named `overlord krab`. Enable its
 Message Content setting and grant View Channels, Send Messages, Send Messages in

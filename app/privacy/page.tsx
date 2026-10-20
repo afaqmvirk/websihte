@@ -125,14 +125,14 @@ export default function PrivacyPolicyPage() {
 
             <h3>when you interact with our Discord bots</h3>
             <p>
-              When sih-inator (overlord bob), overlord rick, or overlord squd generates a reply, we send your question and
+              When sih-inator (overlord bob), overlord rick, overlord squd, overlord sand, or overlord plank generates a reply, we send your question and
               up to 25 recent messages from the same Discord channel or thread,
               plus up to 10 earlier messages from you across server channels the
               bot can access, to OpenAI to generate a reply.
             </p>
             <p>
               The bots also check messages in server channels they can access for
-              the standalone, case-sensitive names bob or spongebob, rick or patrick, and squd.
+              the standalone, case-sensitive names bob or spongebob, rick or patrick, squd, sand or sandy, and plank or plankton.
               When one appears, we may send that message and up to 25 recent messages
               from the same channel or thread to OpenAI to decide whether it clearly
               refers to the bot and whether to reply. The bot can stay silent. These
@@ -156,11 +156,16 @@ export default function PrivacyPolicyPage() {
               If you ask for an image, we also send a short image description to
               OpenAI and post the generated image back to Discord. Images are not
               saved in our website database.
+              When you ask Sand or Plank for rendered LaTeX or a Manim animation,
+              we send only the generated document source or animation scene to
+              our separate render service and attach the resulting PDF or MP4
+              in Discord. Temporary render files are removed after the job.
+              SVG and LaTeX source can also be sent directly as attachments.
               We use temporary speaker labels to distinguish participants. We do
               not include other participants&apos; messages from other channels,
               private application notifications, or attachments in this context.
               We keep message, server, and user IDs, timestamps, reply IDs, and
-              delivery status, bot identity, conversation depth, and image usage
+              delivery status, bot identity, conversation depth, image usage, and render usage
               in our private database for duplicate handling and
               usage limits. Metadata older than two days is removed on the next
               request. We also keep a server-level monthly request count until

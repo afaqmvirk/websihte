@@ -42,4 +42,9 @@ yarn-error.log*
 *.tsbuildinfo
 next-env.d.ts
 
+# Local renderer verification
+.venv-renderer/
+.render-*
+__pycache__/
+
 .vercel

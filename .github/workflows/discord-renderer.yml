@@ -1,0 +1,33 @@
+name: Discord renderer
+
+on:
+  pull_request:
+    paths:
+      - services/discord-renderer/**
+      - .github/workflows/discord-renderer.yml
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  render:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+      - name: Test protocol, authentication, and worker cleanup
+        run: python3 -m unittest discover -s services/discord-renderer -p 'test_*.py'
+      - name: Build isolated render worker
+        run: docker build -t stupideas-renderer:local services/discord-renderer
+      - name: Install video probe
+        run: sudo apt-get update && sudo apt-get install -y --no-install-recommends ffmpeg
+      - name: Render and validate real PDF and MP4
+        run: python3 services/discord-renderer/smoke.py --output /tmp/discord-render-smoke
+      - uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: discord-render-smoke
+          path: /tmp/discord-render-smoke
+          retention-days: 3

@@ -7,6 +7,7 @@ import { generateGeraldReply, shouldGeraldDeepMeow } from "./discord-bot-gerald"
 import deepMeow from "../../public/discord/gerald/deep-meow.json";
 import { readFile } from "node:fs/promises";
 import { getDiscordBotSystemPrompt } from "./discord-bot-knowledge";
+import type { ManimScene } from "./discord-bot-creation";
 import { renderClarinetScore } from "./discord-bot-clarinet-render";
 import { getClarinetLibraryScore, searchClarinetLibrary } from "./discord-bot-clarinet-library";
 import modernSources from "../../scripts/squd-modern-sources.json";
@@ -17,6 +18,9 @@ const clarinetArgs = (song: string | null = null) => ({ song, ...clarinetScore }
 const envNames = ["DISCORD_BOT_ENABLED", "DISCORD_BOT_TOKEN", "DISCORD_APPLICATION_ID", "DISCORD_GUILD_ID", "DISCORD_BOT_MODEL", "DISCORD_BOT_DAILY_LIMIT", "DISCORD_BOT_MONTHLY_LIMIT", "DISCORD_BOT_COOLDOWN_SECONDS", "DISCORD_RICK_ENABLED", "DISCORD_RICK_BOT_TOKEN", "DISCORD_RICK_APPLICATION_ID", "DISCORD_KRAB_ENABLED", "DISCORD_KRAB_BOT_TOKEN", "DISCORD_KRAB_APPLICATION_ID", "DISCORD_BOT_IMAGES_ENABLED", "DISCORD_BOT_IMAGE_DAILY_LIMIT", "SUPABASE_URL", "SUPABASE_SECRET_KEY", "OPENAI_API_KEY", "CRON_SECRET"];
 envNames.push("DISCORD_GERALD_ENABLED", "DISCORD_GERALD_BOT_TOKEN", "DISCORD_GERALD_APPLICATION_ID");
 envNames.push("DISCORD_SQUD_ENABLED", "DISCORD_SQUD_BOT_TOKEN", "DISCORD_SQUD_APPLICATION_ID");
+envNames.push("DISCORD_SAND_ENABLED", "DISCORD_SAND_BOT_TOKEN", "DISCORD_SAND_APPLICATION_ID",
+  "DISCORD_PLANK_ENABLED", "DISCORD_PLANK_BOT_TOKEN", "DISCORD_PLANK_APPLICATION_ID",
+  "DISCORD_RENDERER_URL", "DISCORD_RENDERER_TOKEN", "DISCORD_BOT_RENDER_DAILY_LIMIT");
 const originalEnv = Object.fromEntries(envNames.map((name) => [name, process.env[name]]));
 const originalFetch = globalThis.fetch;
 const originalRandom = Math.random;
@@ -28,6 +32,16 @@ const rickId = "1560000000000000088";
 const krabId = "1560000000000000099";
 const geraldId = "1560000000000000097";
 const squdId = "1560000000000000096";
+const sandId = "1560000000000000094", plankId = "1560000000000000093";
+const rendererUrl = "https://render.example.test";
+const latexSource = "\\documentclass{article}\n\\begin{document}\nHello $E=mc^2$.\n\\end{document}";
+const manimScene: ManimScene = {
+  objects: [{ id: "ball", kind: "circle", text: null, color: "blue", x: -2, y: 0, scale: 1 }],
+  steps: [
+    { action: "show", target: "ball", x: null, y: null, angle: null, seconds: 1 },
+    { action: "move", target: "ball", x: 2, y: 0, angle: null, seconds: 2 },
+  ],
+};
 const modelUrl = "https://api.openai.com/v1/chat/completions";
 let calls: { url: string; init?: RequestInit }[];
 let seen: Set<string>;
@@ -78,6 +92,15 @@ function enableSqud() {
   Object.assign(process.env, { DISCORD_SQUD_ENABLED: "true", DISCORD_SQUD_BOT_TOKEN: "synthetic-squd-token".repeat(4), DISCORD_SQUD_APPLICATION_ID: squdId });
   const squd = getDiscordBotConfig("squd"); assert.ok(squd); return squd;
 }
+function enableCreator(persona: "sand" | "plank") {
+  const prefix = `DISCORD_${persona.toUpperCase()}`;
+  Object.assign(process.env, { [`${prefix}_ENABLED`]: "true", [`${prefix}_BOT_TOKEN`]: `synthetic-${persona}-token`.repeat(4),
+    [`${prefix}_APPLICATION_ID`]: persona === "sand" ? sandId : plankId });
+  const bot = getDiscordBotConfig(persona); assert.ok(bot); return bot;
+}
+function enableRenderer() {
+  Object.assign(process.env, { DISCORD_RENDERER_URL: rendererUrl, DISCORD_RENDERER_TOKEN: "synthetic-render-token".repeat(3) });
+}
 function config() { const value = getDiscordBotConfig(); assert.ok(value); return value; }
 function message(overrides: Partial<DiscordMention> = {}): DiscordMention {
   return { id: "1560000000000000002", guildId: "1483863305360511016", channelId: "1560000000000000003", authorId: "1560000000000000004", content: `<@${botId}> Give me a silly project idea`, authorIsBot: false, mentionedUserIds: [botId], ...overrides };
@@ -123,6 +146,121 @@ afterEach(() => {
 });
 
 describe("sih-inator mention bot", () => {
+  it("configures Sand and Plank independently with distinct accounts and shared peer identities", () => {
+    assert.equal(getDiscordBotConfig("sand"), null); assert.equal(getDiscordBotConfig("plank"), null);
+    enableCreator("sand"); enableCreator("plank");
+    const bots = getDiscordBotConfigs();
+    assert.deepEqual(bots.map(({ persona }) => persona), ["bob", "sand", "plank"]);
+    assert.deepEqual(bots[1].peers.map(({ persona }) => persona), ["bob", "plank"]);
+    process.env.DISCORD_PLANK_APPLICATION_ID = sandId;
+    assert.equal(getDiscordBotConfig("plank"), null);
+    process.env.DISCORD_PLANK_APPLICATION_ID = plankId;
+    process.env.DISCORD_PLANK_BOT_TOKEN = process.env.DISCORD_SAND_BOT_TOKEN;
+    assert.equal(getDiscordBotConfig("plank"), null);
+    delete process.env.OPENAI_API_KEY;
+    assert.equal(getDiscordBotConfig("sand"), null); assert.equal(getDiscordBotConfig("plank"), null);
+  });
+  it("uses the two distinct personas while keeping source characters inside drawing references", async () => {
+    for (const persona of ["sand", "plank"] as const) {
+      const bot = enableCreator(persona);
+      const current = message({ id: persona === "sand" ? "1560000000000000800" : "1560000000000000801",
+        content: `<@${bot.applicationId}> help brainstorm`, mentionedUserIds: [bot.applicationId] });
+      assert.equal(await handleDiscordMention(current, bot), "answered");
+      const system = getDiscordBotSystemPrompt(persona);
+      assert.ok(system.startsWith(`you are overlord ${persona}`));
+      assert.match(system, /short lowercase punctuation free/);
+      assert.doesNotMatch(system.split("drawing yourself reference only:")[0], /Sandy Cheeks|Sheldon|Plankton|Squidward/i);
+      assert.match(system.split("drawing yourself reference only:")[1], persona === "sand" ? /Sandy Cheeks/ : /Plankton/);
+      const request = JSON.parse(String(modelCalls().at(-1)?.init?.body));
+      assert.ok(request.tools.some((tool: { function: { name: string } }) => tool.function.name === "create_source_file"));
+      assert.ok(!request.tools.some((tool: { function: { name: string } }) => tool.function.name === "search_server_members"));
+      assert.equal(new Headers(replies().at(-1)?.init?.headers).get("Authorization"), `Bot ${bot.token}`);
+    }
+    const sand = getDiscordBotSystemPrompt("sand"), plank = getDiscordBotSystemPrompt("plank");
+    assert.match(sand, /jumpier than a rattlesnake in a pickle barrel/);
+    assert.match(sand, /hotter than a hickory smoked sausage/); assert.match(sand, /tighter than bark on a tree/);
+    assert.match(sand, /buildable mechanism/); assert.doesNotMatch(sand, /feign laziness/);
+    assert.match(plank, /very very evil extremely intelligent/); assert.match(plank, /divorced your former wife karen/);
+    assert.match(plank, /adore your ai girlfriend gemma/); assert.match(plank, /without appending disclaimers/);
+  });
+  it("attaches SVG source with exact code syntax instead of applying speech formatting", async () => {
+    const sand = enableCreator("sand");
+    const source = '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 100 100"><text x="2" y="30">CamelCase!</text></svg>';
+    intercept = (url) => url === modelUrl ? actionResponse("create_source_file", { format: "svg", source, reply: "Hotter than a hickory smoked sausage!" }) : null;
+    assert.equal(await handleDiscordMention(message({ content: `<@${sandId}> make an svg`, mentionedUserIds: [sandId] }), sand), "answered");
+    const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+    const payload = JSON.parse(String(body.get("payload_json")));
+    assert.equal(payload.content, "hotter than a hickory smoked sausage");
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: "overlord-drawing.svg" }]);
+    const file = body.get("files[0]"); assert.ok(file instanceof Blob);
+    assert.equal(await file.text(), source); assert.equal(file.type, "image/svg+xml");
+    assert.deepEqual(payload.allowed_mentions, { parse: [], replied_user: false });
+  });
+  it("uploads a rendered PDF together with its original LaTeX and sends only source to the renderer", async () => {
+    const plank = enableCreator("plank"); enableRenderer();
+    const pdf = "%PDF-1.7\nrendered-fixture";
+    intercept = (url) => url === modelUrl ? actionResponse("render_latex", { source: latexSource, reply: null })
+      : url.endsWith("/rpc/claim_discord_bot_render") ? Response.json("accepted")
+      : url === `${rendererUrl}/render/latex` ? new Response(pdf, { headers: { "Content-Type": "application/pdf" } }) : null;
+    const current = message({ content: `<@${plankId}> render this equation`, mentionedUserIds: [plankId] });
+    assert.equal(await handleDiscordMention(current, plank), "answered");
+    const request = calls.find(({ url }) => url === `${rendererUrl}/render/latex`)!;
+    assert.deepEqual(JSON.parse(String(request.init?.body)), { source: latexSource });
+    assert.equal(new Headers(request.init?.headers).get("Authorization"), `Bearer ${process.env.DISCORD_RENDERER_TOKEN}`);
+    const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+    const payload = JSON.parse(String(body.get("payload_json")));
+    assert.equal(payload.content, ""); assert.equal(payload.flags, undefined);
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: "overlord-document.pdf" }, { id: 1, filename: "overlord-document.tex" }]);
+    const rendered = body.get("files[0]"), source = body.get("files[1]");
+    assert.ok(rendered instanceof Blob && source instanceof Blob);
+    assert.equal(await rendered.text(), pdf); assert.equal(await source.text(), latexSource);
+    assert.equal(await handleDiscordMention(current, plank), "duplicate");
+    assert.equal(calls.filter(({ url }) => url === `${rendererUrl}/render/latex`).length, 1);
+  });
+  it("uploads a playable Manim MP4 as a regular attachment", async () => {
+    const sand = enableCreator("sand"); enableRenderer();
+    const mp4 = Buffer.from([0, 0, 0, 20, ...Buffer.from("ftypisom"), 0, 0, 0, 0]);
+    intercept = (url) => url === modelUrl ? actionResponse("render_manim", { scene: manimScene, reply: "heres the moving thing" })
+      : url.endsWith("/rpc/claim_discord_bot_render") ? Response.json("accepted")
+      : url === `${rendererUrl}/render/manim` ? new Response(mp4, { headers: { "Content-Type": "video/mp4" } }) : null;
+    assert.equal(await handleDiscordMention(message({ content: `<@${sandId}> animate a moving circle`, mentionedUserIds: [sandId] }), sand), "answered");
+    const body = replies()[0].init?.body; assert.ok(body instanceof FormData);
+    const payload = JSON.parse(String(body.get("payload_json")));
+    assert.deepEqual(payload.attachments, [{ id: 0, filename: "overlord-animation.mp4" }]);
+    assert.equal(payload.flags, undefined);
+    const video = body.get("files[0]"); assert.ok(video instanceof Blob);
+    assert.equal(video.type, "video/mp4"); assert.deepEqual(Buffer.from(await video.arrayBuffer()), mp4);
+  });
+  it("keeps render failures and exhausted allowances from claiming successful files", async () => {
+    const plank = enableCreator("plank"); enableRenderer();
+    for (const [index, claim] of ["daily_limit", "cooldown", "accepted"].entries()) {
+      intercept = (url) => url === modelUrl ? actionResponse("render_latex", { source: latexSource, reply: "rendered perfectly" })
+        : url.endsWith("/rpc/claim_discord_bot_render") ? Response.json(claim)
+        : url.startsWith(rendererUrl) ? new Response("failure", { status: 503 }) : null;
+      assert.equal(await handleDiscordMention(message({ id: `156000000000000081${index}`, mentionedUserIds: [plankId] }), plank), "answered");
+      const payload = JSON.parse(String(replies().at(-1)?.init?.body));
+      assert.equal(payload.attachments, undefined); assert.doesNotMatch(payload.content, /rendered perfectly/);
+    }
+    assert.equal(calls.filter(({ url }) => url.startsWith(rendererUrl)).length, 1);
+  });
+  it("never offers creation tools to peer bots or optional name checks or other personas", async () => {
+    const sand = enableCreator("sand"); enableCreator("plank"); enableRenderer();
+    for (const options of [
+      { persona: "bob" as const, canCreateFiles: true },
+      { persona: "sand" as const, canCreateFiles: false },
+      { persona: "plank" as const, canCreateFiles: true, optionalResponse: true },
+    ]) {
+      await generateDiscordBotReply("hello", "gpt-6-luna", [], false, options);
+      const request = JSON.parse(String(modelCalls().at(-1)?.init?.body));
+      assert.ok(!request.tools.some((tool: { function: { name: string } }) => /create_source_file|render_latex|render_manim/.test(tool.function.name)));
+    }
+    await handleDiscordMention(message({ authorId: plankId, authorIsBot: true, referencedMessageId: "1560000000000000000",
+      mentionedUserIds: [sandId], content: `<@${sandId}> render something` }), sand);
+    const request = JSON.parse(String(modelCalls().at(-1)?.init?.body));
+    assert.ok(!request.tools.some((tool: { function: { name: string } }) => /render_|source_file/.test(tool.function.name)));
+    intercept = (url) => url === modelUrl ? actionResponse("create_source_file", { format: "latex", source: latexSource, reply: null }) : null;
+    await assert.rejects(generateDiscordBotReply("hello", "gpt-6-luna", [], false, { persona: "bob", canCreateFiles: true }));
+  });
   it("gives Squd his adversarial personality with the drawing reference isolated", async () => {
     const squd = enableSqud();
     assert.equal(await handleDiscordMention(message({ mentionedUserIds: [squdId] }), squd), "answered");
@@ -242,6 +380,10 @@ describe("sih-inator mention bot", () => {
         ["Bob", "BOB", "SpongeBob", "bobcat", "xbob", "bob2", "bob_name", "ébob", "bobé", "rick", "patrick"]],
       [rick, ["rick", "hey patrick", "rick's brain", "(patrick)"],
         ["Rick", "Patrick", "trick", "ricky", "patrick2", "rick_name", "rické", "bob", "spongebob"]],
+      [enableCreator("sand"), ["sand", "hey sandy", "sand's invention", "(sandy)"],
+        ["Sand", "Sandy", "sandwich", "sandy2", "sand_name", "sandé", "plank"]],
+      [enableCreator("plank"), ["plank", "hey plankton", "plank's scheme", "(plankton)"],
+        ["Plank", "Plankton", "planks", "plankton2", "plank_name", "planké", "sand"]],
     ] as const) {
       for (const content of accepted) assert.equal(getDiscordMessageTrigger(message({ content, mentionedUserIds: [] }), bot), "name", content);
       for (const content of rejected) assert.equal(getDiscordMessageTrigger(message({ content, mentionedUserIds: [] }), bot), null, content);
@@ -580,8 +722,8 @@ describe("sih-inator mention bot", () => {
     assert.equal(new Headers(replies()[0].init?.headers).get("Authorization"), `Bot ${rick.token}`);
     assert.equal(new Headers(reactions()[0].init?.headers).get("Authorization"), `Bot ${config().token}`);
   });
-  it("uses the same first-bot rule for all five personas including fixed replies and voice bots", async () => {
-    enableRick(); enableKrab(); enableGerald(); enableSqud();
+  it("uses the same first-bot rule for all seven personas including fixed replies and voice bots", async () => {
+    enableRick(); enableKrab(); enableGerald(); enableSqud(); enableCreator("sand"); enableCreator("plank");
     const bots = getDiscordBotConfigs();
     for (const [index, first] of bots.entries()) {
       const ordered = [first, ...bots.filter((bot) => bot.persona !== first.persona)];
@@ -589,10 +731,10 @@ describe("sih-inator mention bot", () => {
         content: ordered.map((bot) => `<@${bot.applicationId}>`).join(" ") + " hi",
         mentionedUserIds: ordered.toReversed().map((bot) => bot.applicationId) });
       const replyCount = replies().length, reactionCount = reactions().length, modelCount = modelCalls().length, typingCount = typingCalls().length;
-      assert.deepEqual(await Promise.all(ordered.toReversed().map((bot) => handleDiscordMention(current, bot))), Array(5).fill("answered"));
+      assert.deepEqual(await Promise.all(ordered.toReversed().map((bot) => handleDiscordMention(current, bot))), Array(7).fill("answered"));
       assert.equal(replies().length - replyCount, 1, first.persona);
-      assert.equal(reactions().length - reactionCount, 4, first.persona);
-      assert.equal(modelCalls().length - modelCount, ["bob", "rick", "squd"].includes(first.persona) ? 1 : 0, first.persona);
+      assert.equal(reactions().length - reactionCount, 6, first.persona);
+      assert.equal(modelCalls().length - modelCount, ["bob", "rick", "squd", "sand", "plank"].includes(first.persona) ? 1 : 0, first.persona);
       assert.equal(new Headers(replies()[replyCount].init?.headers).get("Authorization"), `Bot ${first.token}`);
       assert.ok(typingCalls().slice(typingCount).every(({ init }) => new Headers(init?.headers).get("Authorization") === `Bot ${first.token}`));
     }

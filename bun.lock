@@ -5,6 +5,7 @@
     "": {
       "name": "websihte",
       "dependencies": {
+        "@xmldom/xmldom": "0.9.12",
         "discord.js": "14.27.0",
         "midi-file": "1.2.4",
         "next": "16.2.9",
@@ -321,6 +322,8 @@
     "@unrs/resolver-binding-win32-x64-msvc": ["@unrs/resolver-binding-win32-x64-msvc@1.12.2", "", { "os": "win32", "cpu": "x64" }, "sha512-nAB74NfSNKknqQ1RrYj6uz8FcXEomu/MATJZxh/x+BArzN2U3JbOYC0APYzUIGhVY3m5hRxA8VPNdPBoG8txlA=="],
 
     "@vladfrangu/async_event_emitter": ["@vladfrangu/async_event_emitter@2.4.7", "", {}, "sha512-Xfe6rpCTxSxfbswi/W/Pz7zp1WWSNn4A0eW4mLkQUewCrXXtMj31lCg+iQyTkh/CkusZSq9eDflu7tjEDXUY6g=="],
+
+    "@xmldom/xmldom": ["@xmldom/xmldom@0.9.12", "", {}, "sha512-5AXjrcMClTryPe9LgZrygpB1lj7s0S9E0+W+AHaVKAVyHanafK86iPSvG5xHVSp/jC+VH1UXu0TAEmY279xH7A=="],
 
     "abcjs": ["abcjs@6.7.2", "", {}, "sha512-cHCyf8j0hAcxTuwZ9l2QznaSlLK1TD2s5oVw6Ig8Kfss6VfJKoNJ1kAzMBwa6DDWeyNl2JH7mN/U+MJ8MYbC5g=="],
 
