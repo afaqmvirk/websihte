@@ -22,39 +22,51 @@ const THEMED_PRIZES: Prize[] = [
   {
     title: "stupidest metric",
     icon: "metric",
+    amount: "$67",
     description: "track something useless",
     sponsor: { name: "Amplitude", src: "/sponsors/amplitude.svg", width: 3840, height: 800 },
   },
   {
     title: "stupidest button",
     icon: "button",
+    amount: "$67",
     description: "make something cool happen with a useless button",
   },
   {
     title: "stupidest API",
     icon: "api",
+    amount: "$67",
     description: "return stupid data",
     sponsor: { name: "Carleton Computer Science Society", src: "/sponsors/ccss.png", width: 1000, height: 204 },
   },
   {
     title: "stupidest AI",
     icon: "ai",
+    amount: "$67",
     description: "build a stupid AI agent",
   },
   {
     title: "the great bob award",
     icon: "bob",
+    amount: "$67",
     description: "all hail overlord bob",
+    sponsor: { name: "MathemaTech", src: "/sponsors/mathematech-logo.png", width: 2000, height: 372 },
   },
   {
     title: "stupidest journey",
     icon: "journey",
+    amount: "$67",
     description: "get to this hackathon from the furthest distance",
   },
 ];
 
 const GENERAL_PRIZES: Prize[] = [
-  { title: "stupidest", icon: "trophy", amount: "$500" },
+  {
+    title: "stupidest",
+    icon: "trophy",
+    amount: "$500",
+    sponsor: { name: "Amplitude", src: "/sponsors/amplitude.svg", width: 3840, height: 800 },
+  },
   { title: "stupider", icon: "medal", amount: "$250" },
   { title: "stupid", icon: "ribbon", amount: "$100" },
 ];
@@ -541,25 +553,28 @@ export default function OttawaPage() {
                 <section aria-label="themed prizes">
                   <ol className={styles.themedPrizeList}>
                     {THEMED_PRIZES.map((prize) => (
-                      <li key={prize.title} className={prize.sponsor ? styles.sponsoredPrize : undefined}>
+                      <li key={prize.title}>
                         <PrizeIcon name={prize.icon} className={styles.prizeIcon} />
                         <div>
                           <h3>{prize.title}</h3>
-                          {prize.amount ? <p className={styles.prizeAmount}>{prize.amount}</p> : null}
                           {prize.description ? (
                             <p className={styles.prizeDescription}>{prize.description}</p>
                           ) : null}
+                          {prize.sponsor ? (
+                            <Image
+                              src={prize.sponsor.src}
+                              alt={prize.sponsor.name}
+                              width={prize.sponsor.width}
+                              height={prize.sponsor.height}
+                              sizes="96px"
+                              className={styles.prizeSponsorLogo}
+                            />
+                          ) : null}
                         </div>
-                        {prize.sponsor ? (
-                          <Image
-                            src={prize.sponsor.src}
-                            alt={prize.sponsor.name}
-                            width={prize.sponsor.width}
-                            height={prize.sponsor.height}
-                            sizes="(max-width: 720px) 28vw, 120px"
-                            className={styles.prizeSponsorLogo}
-                          />
-                        ) : null}
+                        <div className={styles.prizeReward}>
+                          {prize.amount ? <p className={styles.prizeAmount}>{prize.amount}</p> : null}
+                          <p className={styles.prizeExtras}>+ non-cash prizes</p>
+                        </div>
                       </li>
                     ))}
                   </ol>
@@ -570,8 +585,23 @@ export default function OttawaPage() {
                     {GENERAL_PRIZES.map((prize) => (
                       <li key={prize.title}>
                         <PrizeIcon name={prize.icon} className={styles.generalPrizeIcon} />
-                        <h3>{prize.title}</h3>
-                        <p>{prize.amount}</p>
+                        <div className={styles.generalPrizeDetails}>
+                          <h3>{prize.title}</h3>
+                          {prize.sponsor ? (
+                            <Image
+                              src={prize.sponsor.src}
+                              alt={prize.sponsor.name}
+                              width={prize.sponsor.width}
+                              height={prize.sponsor.height}
+                              sizes="144px"
+                              className={styles.prizeSponsorLogo}
+                            />
+                          ) : null}
+                        </div>
+                        <div className={styles.generalPrizeReward}>
+                          <p className={styles.generalPrizeAmount}>{prize.amount}</p>
+                          <p className={styles.prizeExtras}>+ non-cash prizes</p>
+                        </div>
                       </li>
                     ))}
                   </ol>
