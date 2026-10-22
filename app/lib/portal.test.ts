@@ -3,6 +3,7 @@ import { afterEach, beforeEach, test } from "node:test";
 import { NextRequest } from "next/server";
 import { POST as signIn } from "../api/portal/sign-in/route";
 import { POST as signOut } from "../api/portal/sign-out/route";
+import { POST as verifyCode } from "../api/portal/verify-code/route";
 import { proxy } from "../../proxy";
 import { createPortalEmail } from "./portal-email";
 import { findAcceptedMember, saveMemberRsvp } from "./portal-storage";
@@ -14,6 +15,8 @@ const originalEnv = Object.fromEntries(names.map((key) => [key, process.env[key]
 let calls: { url: URL; body: Record<string, unknown> | null }[];
 let admission: string | null;
 let claim: boolean;
+let validCode: boolean;
+let confirmedEmail: boolean;
 const memberId = "99999999-9999-4999-8999-999999999991";
 
 beforeEach(() => {
@@ -24,12 +27,13 @@ beforeEach(() => {
     APPLICATION_EMAIL_REPLY_TO: "applications@stupideas.com", PORTAL_URL: "https://my.stupideas.com",
   });
   delete process.env.VERCEL;
-  calls = []; admission = "accepted"; claim = true;
+  calls = []; admission = "accepted"; claim = true; validCode = true; confirmedEmail = true;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const body = init?.body ? JSON.parse(String(init.body)) : null;
     calls.push({ url, body });
     if (url.pathname === "/rest/v1/rpc/claim_portal_sign_in") return Response.json(claim);
+    if (url.pathname === "/rest/v1/rpc/claim_portal_code_verification") return Response.json(claim);
     if (url.pathname === "/rest/v1/applications") return Response.json(admission ? [{
       id: memberId, full_name: "Test Human", email: "accepted@example.com", admission_status: admission,
     }] : []);
@@ -38,6 +42,14 @@ beforeEach(() => {
       hashed_token: "a".repeat(64), verification_type: "magiclink", email_otp: "123456", redirect_to: "https://unused.invalid",
     });
     if (url.origin === "https://api.resend.com") return Response.json({ id: "email-test" });
+    if (url.pathname === "/auth/v1/verify") {
+      if (!validCode) return Response.json({ error_code: "otp_expired", msg: "Invalid token" }, { status: 403 });
+      return Response.json({
+        access_token: "test-access-token", refresh_token: "test-refresh-token", token_type: "bearer", expires_in: 3600,
+        user: { id: "auth-user", email: "accepted@example.com", email_confirmed_at: confirmedEmail ? "2026-10-22T00:00:00Z" : null },
+      });
+    }
+    if (url.pathname === "/auth/v1/logout") return new Response(null, { status: 204 });
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp") return Response.json([{
       is_local: body.p_is_local, travel_plan: body.p_travel_plan, updated_at: "2026-10-18T18:00:00Z",
     }]);
@@ -55,6 +67,12 @@ afterEach(() => {
 
 function request(body: unknown, origin = "https://my.stupideas.com") {
   return new Request("https://my.stupideas.com/api/portal/sign-in", {
+    method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body),
+  });
+}
+
+function codeRequest(body: unknown, origin = "https://my.stupideas.com") {
+  return new NextRequest("https://my.stupideas.com/api/portal/verify-code", {
     method: "POST", headers: { origin, "Content-Type": "application/json" }, body: JSON.stringify(body),
   });
 }
@@ -110,11 +128,12 @@ test("sign-in creates no link or account for unaccepted applicants and uses a ge
   assert.equal(calls.some(({ url }) => url.pathname.includes("generate_link") || url.origin === "https://api.resend.com"), false);
 });
 
-test("accepted sign-in emails a one-time link only to that applicant, without leaking tokens in the response", async () => {
+test("accepted sign-in emails both a one-time link and code only to that applicant, without leaking credentials in the response", async () => {
   const response = await signIn(request({ email: " ACCEPTED@EXAMPLE.COM " }));
   assert.equal(response.status, 200);
   const message = await response.text();
   assert.equal(message.includes("a".repeat(64)), false);
+  assert.equal(message.includes("123456"), false);
   const email = calls.find(({ url }) => url.origin === "https://api.resend.com")?.body;
   assert.ok(email);
   assert.deepEqual(email.to, ["accepted@example.com"]);
@@ -122,6 +141,8 @@ test("accepted sign-in emails a one-time link only to that applicant, without le
   assert.equal(email.cc, undefined);
   assert.ok(String(email.text).includes("https://my.stupideas.com/confirm?token_hash="));
   assert.ok(String(email.html).includes("https://my.stupideas.com/confirm?token_hash="));
+  assert.ok(String(email.text).includes("123456"));
+  assert.ok(String(email.html).includes("123456"));
   const limiter = calls.find(({ url }) => url.pathname.includes("claim_portal_sign_in"))!;
   assert.match(String(limiter.body?.p_email_hash), /^[a-f0-9]{64}$/);
   assert.equal(response.headers.get("cache-control"), "private, no-store");
@@ -136,6 +157,67 @@ test("rate-limited sign-in does not generate or send another link", async () => 
 test("missing Auth configuration fails closed", async () => {
   delete process.env.SUPABASE_PUBLISHABLE_KEY;
   assert.equal((await signIn(request({ email: "accepted@example.com" }))).status, 503);
+  assert.equal(calls.length, 0);
+});
+
+test("code entry rejects cross-origin, invalid email, and malformed code before contacting any backend", async () => {
+  assert.equal((await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456" }, "https://evil.example"))).status, 403);
+  for (const code of [123456, "12345", "abcdef", "12345678901", null]) {
+    assert.equal((await verifyCode(codeRequest({ email: "accepted@example.com", code }))).status, 400);
+  }
+  assert.equal((await verifyCode(codeRequest({ email: "invalid", code: "123456" }))).status, 400);
+  assert.equal(calls.length, 0);
+});
+
+test("accepted code entry verifies the email OTP, preserves leading zeroes, and sets an HttpOnly session", async () => {
+  const response = await verifyCode(codeRequest({ email: " ACCEPTED@EXAMPLE.COM ", code: "001 234" }));
+  assert.equal(response.status, 200);
+  assert.deepEqual(await response.json(), { destination: "https://my.stupideas.com/" });
+  const verification = calls.find(({ url }) => url.pathname === "/auth/v1/verify")?.body;
+  assert.deepEqual({ email: verification?.email, token: verification?.token, type: verification?.type }, {
+    email: "accepted@example.com", token: "001234", type: "email",
+  });
+  assert.match(response.headers.get("cache-control") || "", /private/);
+  assert.match(response.headers.get("cache-control") || "", /no-store/);
+  assert.ok(response.headers.getSetCookie().some(cookie => cookie.startsWith("sih-portal-auth=") && cookie.includes("HttpOnly")));
+  const limiter = calls.find(({ url }) => url.pathname.includes("claim_portal_code_verification"))!;
+  assert.match(String(limiter.body?.p_email_hash), /^[a-f0-9]{64}$/);
+  assert.match(String(limiter.body?.p_ip_hash), /^[a-f0-9]{64}$/);
+});
+
+test("wrong and expired codes cannot establish a session", async () => {
+  validCode = false;
+  const response = await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456" }));
+  assert.equal(response.status, 401);
+  assert.deepEqual(response.headers.getSetCookie(), []);
+  assert.equal(calls.some(({ url }) => url.pathname === "/rest/v1/applications"), false);
+});
+
+test("code entry requires a confirmed email and current acceptance, with no session cookies on rejection", async () => {
+  confirmedEmail = false;
+  assert.equal((await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456" }))).status, 401);
+  confirmedEmail = true;
+  for (const status of ["pending", "waitlisted", "rejected", null]) {
+    admission = status;
+    const response = await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456", admission_status: "accepted" }));
+    assert.equal(response.status, 401);
+    assert.deepEqual(response.headers.getSetCookie(), []);
+  }
+});
+
+test("shared code retry limits reject attempts before verification, independently of email sending", async () => {
+  claim = false;
+  const response = await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456" }));
+  assert.equal(response.status, 429);
+  assert.equal(response.headers.get("retry-after"), "600");
+  assert.equal(calls.length, 1);
+  assert.equal(calls[0].url.pathname, "/rest/v1/rpc/claim_portal_code_verification");
+  assert.deepEqual(response.headers.getSetCookie(), []);
+});
+
+test("code entry fails closed when Auth configuration is unavailable", async () => {
+  delete process.env.SUPABASE_PUBLISHABLE_KEY;
+  assert.equal((await verifyCode(codeRequest({ email: "accepted@example.com", code: "123456" }))).status, 503);
   assert.equal(calls.length, 0);
 });
 
@@ -183,7 +265,9 @@ test("subdomain root rewrites to the portal while the public homepage stays inta
 });
 
 test("sign-in email escapes HTML and never includes an organizer copy", () => {
-  const email = createPortalEmail("accepted@example.com", "https://my.stupideas.com/confirm?token_hash=test&type=magiclink");
+  const email = createPortalEmail("accepted@example.com", "https://my.stupideas.com/confirm?token_hash=test&type=magiclink", "001234");
   assert.ok(email.html.includes("&amp;type=magiclink"));
+  assert.ok(email.text.includes("001234"));
+  assert.ok(email.html.includes("001234"));
   assert.equal("bcc" in email, false);
 });

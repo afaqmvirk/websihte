@@ -4,7 +4,7 @@ import { sendPortalEmail } from "@/lib/portal-email";
 import { claimPortalSignIn, findAcceptedMember } from "@/lib/portal-storage";
 import { getPortalUrl, isSameOriginRequest, PORTAL_RESPONSE_HEADERS } from "@/lib/portal";
 
-const GENERIC_MESSAGE = "If this email belongs to an accepted applicant, a sign-in link is on its way. Check your spam folder too.";
+const GENERIC_MESSAGE = "If accepted, you'll receive an email with a sign-in link and code.";
 const json = (message: string, status = 200) => Response.json({ message }, { status, headers: PORTAL_RESPONSE_HEADERS });
 
 export async function POST(request: Request) {
@@ -25,13 +25,13 @@ export async function POST(request: Request) {
     const member = await findAcceptedMember(email);
     if (!member) return json(GENERIC_MESSAGE);
     const { data, error } = await createPortalAdmin().auth.admin.generateLink({ type: "magiclink", email });
-    if (error || !data.properties) throw new Error("Could not generate sign-in link");
+    if (error || !data.properties || !/^\d{6,10}$/.test(data.properties.email_otp)) throw new Error("Could not generate sign-in credentials");
     const link = getPortalUrl("/confirm");
     link.searchParams.set("token_hash", data.properties.hashed_token);
     link.searchParams.set("type", data.properties.verification_type);
-    await sendPortalEmail(email, link.toString());
+    await sendPortalEmail(email, link.toString(), data.properties.email_otp);
     return json(GENERIC_MESSAGE);
   } catch {
-    return json("We couldn't send your sign-in link. Please try again in a minute.", 502);
+    return json("We couldn't send your sign-in email. Please try again in a minute.", 502);
   }
 }

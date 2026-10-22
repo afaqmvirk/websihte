@@ -8,6 +8,8 @@ begin
     or has_table_privilege('anon', 'public.portal_sign_in_limits', 'SELECT')
     or has_function_privilege('anon', 'public.save_member_rsvp(uuid,text,boolean,text)', 'EXECUTE')
     or has_function_privilege('authenticated', 'public.claim_portal_sign_in(text,text)', 'EXECUTE')
+    or has_function_privilege('anon', 'public.claim_portal_code_verification(text,text)', 'EXECUTE')
+    or has_function_privilege('authenticated', 'public.claim_portal_code_verification(text,text)', 'EXECUTE')
   then raise exception 'Private portal data or functions are publicly accessible'; end if;
   if exists (select 1 from pg_class where oid in ('public.member_rsvps'::regclass, 'public.portal_sign_in_limits'::regclass) and not relrowsecurity)
   then raise exception 'Portal RLS must be enabled'; end if;
@@ -27,7 +29,7 @@ insert into public.applications (
 );
 
 do $$
-declare v_result record;
+declare v_result record; v_i integer;
 begin
   begin
     perform * from public.save_member_rsvp('99999999-9999-4999-8999-999999999991', 'portal-sql-test@example.invalid', true, null);
@@ -65,6 +67,16 @@ begin
   if not public.claim_portal_sign_in(repeat('1',64), repeat('2',64)) then raise exception 'First email request blocked'; end if;
   if public.claim_portal_sign_in(repeat('1',64), repeat('2',64)) then raise exception 'Rapid duplicate email allowed'; end if;
   if public.claim_portal_sign_in('invalid', repeat('2',64)) then raise exception 'Invalid hash accepted'; end if;
+
+  for v_i in 1..5 loop
+    if not public.claim_portal_code_verification(repeat('3',64), repeat('4',64)) then raise exception 'Code retry blocked early'; end if;
+  end loop;
+  if public.claim_portal_code_verification(repeat('3',64), repeat('4',64)) then raise exception 'Email code limit exceeded'; end if;
+  if public.claim_portal_code_verification('invalid', repeat('4',64)) then raise exception 'Invalid code rate-limit hash accepted'; end if;
+  for v_i in 1..30 loop
+    if not public.claim_portal_code_verification(lpad(to_hex(v_i),64,'0'), repeat('5',64)) then raise exception 'Code IP limit blocked early'; end if;
+  end loop;
+  if public.claim_portal_code_verification(repeat('6',64), repeat('5',64)) then raise exception 'Code IP limit exceeded'; end if;
 end;
 $$;
 
