@@ -54,8 +54,16 @@ export async function saveMemberRsvp(member: PortalMember, isLocal: boolean, tra
 }
 
 export async function claimPortalSignIn(email: string, ip: string) {
+  return claimPortalAttempt("claim_portal_sign_in", email, ip);
+}
+
+export async function claimPortalCodeVerification(email: string, ip: string) {
+  return claimPortalAttempt("claim_portal_code_verification", email, ip);
+}
+
+async function claimPortalAttempt(rpc: string, email: string, ip: string) {
   const hash = (text: string) => createHash("sha256").update(text).digest("hex");
-  const response = await portalStorageRequest("rpc/claim_portal_sign_in", {
+  const response = await portalStorageRequest(`rpc/${rpc}`, {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ p_email_hash: hash(email), p_ip_hash: hash(ip) }),
   });

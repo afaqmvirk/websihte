@@ -83,8 +83,8 @@ The participant dashboard is `/portal` locally. When this Vercel project serves
 cached or indexed. The public and participant pages share `OTTAWA_AGENDA` in
 `app/lib/ottawa-event.ts`.
 
-Apply `20261019013845_accepted_member_portal.sql`, then set these server variables
-in every environment that should support sign-in:
+Apply the portal migrations, including `20261022054406_portal_email_codes.sql`,
+then set these server variables in every environment that should support sign-in:
 
 ```dotenv
 SUPABASE_URL=<existing project URL>
@@ -106,12 +106,14 @@ This does **not** send an acceptance email. Existing applicants remain pending
 until an organizer decides otherwise. Review scores and shortlist recommendations
 do not automatically grant portal access.
 
-The applicant requests a one-time sign-in link using their application email.
-Supabase generates and verifies the link, and Resend sends it only to the
-applicant, without an organizer copy. The confirmation page requires a click
+The applicant requests a sign-in email containing a one-time link and code.
+They can use either option. Supabase generates and verifies both, and Resend sends
+them only to the applicant, without an organizer copy. The confirmation page requires a click
 before consuming the token so mail scanners cannot use it up. Request limits
 are shared across server instances (one per minute/five per hour per email,
-30 per hour per IP). Essential HttpOnly cookies maintain the session.
+30 per hour per IP). Code verification allows five attempts per email and 30 per
+IP per 10-minute window, independently of email sending. Essential HttpOnly
+cookies maintain the session.
 Acceptance is checked against the verified email on every dashboard request and
 RSVP write; changing the decision removes access even from an existing session.
 

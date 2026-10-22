@@ -78,7 +78,7 @@
 .fieldLabel { display: block; margin-bottom: 8px; font-size: 18px; }
 .travelField { margin-top: 20px; }
 .travelNote { color: var(--muted); font-size: 15px; line-height: 1.5; margin-bottom: 12px !important; }
-.page textarea, .page input[type="email"] {
+.page textarea, .page input[type="email"], .page input[type="text"] {
   display: block;
   width: 100%;
   border: 1px solid #999;
@@ -103,6 +103,7 @@
 .signInForm > .fieldLabel { margin-top: 24px; }
 .signInForm > .primaryButton { width: 100%; margin-top: 16px; }
 .signInForm > .secondaryButton, .confirmWrap .primaryButton, .confirmWrap .secondaryButton { margin-top: 24px; }
+.signInForm > .textButton { margin-top: 20px; }
 
 @media (max-width: 700px) {
   .header { gap: 16px; padding: 16px 20px; }
