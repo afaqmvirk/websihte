@@ -74,6 +74,64 @@ and [Google's notice](https://support.google.com/mail/answer/17101213).
 
 Run the email flow checks with `bun test app/api/applications/route.test.ts`.
 
+## Accepted-member portal
+
+The participant dashboard is `/portal` locally. When this Vercel project serves
+`my.stupideas.com`, `proxy.ts` maps the subdomain root to the dashboard and
+`/confirm` to the sign-in confirmation page. The public homepage stays at
+`stupideas.com`. Portal pages, Auth responses, and RSVPs are private and are not
+cached or indexed. The public and participant pages share `OTTAWA_AGENDA` in
+`app/lib/ottawa-event.ts`.
+
+Apply `20261019013845_accepted_member_portal.sql`, then set these server variables
+in every environment that should support sign-in:
+
+```dotenv
+SUPABASE_URL=<existing project URL>
+SUPABASE_SECRET_KEY=<existing server-only secret>
+SUPABASE_PUBLISHABLE_KEY=<active sb_publishable_ key from the same project>
+APPLICATION_EMAIL_API_KEY=<existing sending-only email key>
+PORTAL_URL=https://my.stupideas.com
+```
+
+For local development use `PORTAL_URL=http://localhost:3000/portal`, or use
+`127.0.0.1` consistently for both the browser and this value. A Vercel preview
+can use `PORTAL_URL=https://<preview-host>/portal`. The configured URL controls
+email destinations; incoming Host headers cannot change sign-in links.
+
+To grant access, open Supabase Table Editor → `applications`, find the applicant's
+latest complete Ottawa application, and set `admission_status` to `accepted`.
+The other values are `pending` (the default), `waitlisted`, and `rejected`.
+This does **not** send an acceptance email. Existing applicants remain pending
+until an organizer decides otherwise. Review scores and shortlist recommendations
+do not automatically grant portal access.
+
+The applicant requests a one-time sign-in link using their application email.
+Supabase generates and verifies the link, and Resend sends it only to the
+applicant, without an organizer copy. The confirmation page requires a click
+before consuming the token so mail scanners cannot use it up. Request limits
+are shared across server instances (one per minute/five per hour per email,
+30 per hour per IP). Essential HttpOnly cookies maintain the session.
+Acceptance is checked against the verified email on every dashboard request and
+RSVP write; changing the decision removes access even from an existing session.
+
+The RSVP asks whether the member is local to Ottawa. Non-local members provide
+their arrival plan and see the no-reimbursement / stupidest-journey note. Answers
+can be edited and persist across sessions. Switching to local removes the saved
+travel plan. Organizers can view/export `member_rsvps` in Supabase and match
+`application_id` to `applications.id`. Both tables remain inaccessible to browser
+database roles; applicants cannot supply someone else's ID to update an RSVP.
+
+To launch, add `my.stupideas.com` to this Vercel project's Domains, publish the
+DNS record Vercel specifies for `my` with the domain's DNS provider, and deploy
+with the production `PORTAL_URL` above. Verify HTTPS, request a link for an
+accepted test applicant, and confirm both email delivery and RSVP persistence.
+Do not send bulk acceptance emails as part of deployment.
+
+Run portal checks with `bun test app/lib/portal.test.ts` and execute
+`supabase/tests/member-portal.sql` against a migrated database. The SQL checks
+use synthetic records inside a transaction and roll back all fixture changes.
+
 ## Discord application notifications
 
 Create an incoming webhook in the organizer server's `#firehose` channel

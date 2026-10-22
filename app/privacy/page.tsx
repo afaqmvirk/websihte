@@ -27,11 +27,11 @@ export default function PrivacyPolicyPage() {
           This policy explains how the Stupid Ideas Hackathon Community
           (&ldquo;SIH,&rdquo; &ldquo;we,&rdquo; &ldquo;us&rdquo;) handles
           personal information through this website, our event applications,
-          mailing lists, Discord bot interactions, and direct emails.
+          mailing lists, participant portals, Discord bot interactions, and direct emails.
         </p>
         <p className={styles.date}>
           effective and last updated:{" "}
-          <time dateTime="2026-10-19">October 19, 2026</time>
+          <time dateTime="2026-10-22">October 22, 2026</time>
         </p>
       </header>
 
@@ -42,7 +42,7 @@ export default function PrivacyPolicyPage() {
           </p>
           <h2 id="quick-read">the quick read</h2>
           <ul>
-            <li>We do not use cookies, advertising pixels, or website analytics.</li>
+            <li>We use essential sign-in cookies for the participant portal. We do not use advertising pixels or website analytics.</li>
             <li>
               When you submit an event form, its fields and uploaded files are
               transmitted to the application processor identified on that form.
@@ -96,7 +96,7 @@ export default function PrivacyPolicyPage() {
               <li>LinkedIn and an optional additional profile or portfolio link;</li>
               <li>your answers to application questions;</li>
               <li>T-shirt size and dietary restrictions;</li>
-              <li>event preferences and confirmation that you can attend; and</li>
+              <li>event preferences, RSVP, whether you are local to Ottawa, and travel plans; and</li>
               <li>
                 uploaded files such as an optional résumé, along with your
                 consent and sponsor-sharing choices.
@@ -121,6 +121,17 @@ export default function PrivacyPolicyPage() {
               are for event administration and do not subscribe you to a mailing list.
               We also send the application details and any uploaded résumé to a
               private organizer channel on Discord to notify the team of new applications.
+            </p>
+
+            <h3>when you use the participant portal</h3>
+            <p>
+              Accepted applicants can request a one-time email sign-in link. Supabase Auth
+              verifies your identity, and Resend delivers the sign-in email. Essential,
+              secure sign-in cookies keep you signed in; they are not used for advertising.
+              We check your current acceptance status before showing your dashboard or
+              saving an RSVP. Your RSVP and travel plans are stored privately with your
+              application and used to coordinate attendance and the stupidest journey award.
+              Short-lived hashed email and IP counters help limit sign-in email abuse.
             </p>
 
             <h3>when you interact with our Discord bots</h3>
@@ -316,9 +327,10 @@ export default function PrivacyPolicyPage() {
           <section>
             <h2>6. cookies, analytics, and outside links</h2>
             <p>
-              This website currently sets no cookies and contains no advertising
-              trackers, pixels, session-replay tools, or website analytics. It
-              serves its fonts and images from the site itself.
+              The participant portal uses essential, HttpOnly sign-in cookies to
+              maintain your session. We do not use advertising trackers, pixels,
+              session-replay tools, or website analytics. The website serves its
+              fonts and images from the site itself.
             </p>
             <p>
               The website links to Google Maps, Devpost event pages, sponsors,

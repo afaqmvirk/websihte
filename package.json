@@ -9,6 +9,8 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@supabase/ssr": "0.12.7",
+    "@supabase/supabase-js": "2.118.0",
     "@vercel/sandbox": "3.8.0",
     "@xmldom/xmldom": "0.9.12",
     "discord.js": "14.27.0",
