@@ -441,7 +441,7 @@
 .themedPrizeList li {
   display: grid;
   min-height: 98px;
-  grid-template-columns: 28px minmax(0, 1fr);
+  grid-template-columns: 28px minmax(0, 1fr) max-content;
   gap: 9px;
   align-items: center;
   border: 1px solid #000;
@@ -450,22 +450,35 @@
   padding: 11px;
 }
 
-.themedPrizeList .sponsoredPrize {
-  grid-template-columns: 28px minmax(0, 1fr) minmax(64px, 28%);
-  padding-right: 20px;
+.prizeReward {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 6px;
 }
 
-.sponsoredPrize .prizeDescription {
-  max-width: 22ch;
+.prizeExtras {
+  margin: 0;
+  font-size: 12px;
+  letter-spacing: -0.015em;
+  line-height: 1.15;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .prizeSponsorLogo {
   display: block;
-  width: 100%;
+  width: 96px;
   height: auto;
   max-height: 32px;
   object-fit: contain;
   object-position: right center;
+}
+
+.themedPrizeList .prizeSponsorLogo {
+  max-width: 100%;
+  margin-top: 10px;
+  object-position: left center;
 }
 
 .prizeIcon {
@@ -493,10 +506,12 @@
 }
 
 .prizeAmount {
-  margin-top: 6px;
-  font-size: 15px;
+  font-size: clamp(44px, 4vw, 56px);
   font-weight: 700;
-  line-height: 1.08;
+  letter-spacing: -0.04em;
+  line-height: 0.9;
+  text-align: right;
+  white-space: nowrap;
 }
 
 .prizeDescription {
@@ -543,15 +558,33 @@
   color: #fff;
 }
 
-.generalPrizeList h3 {
+.generalPrizeDetails {
   grid-area: title;
+  min-width: 0;
+}
+
+.generalPrizeList h3 {
   font-size: clamp(17px, 1.35vw, 22px);
   font-weight: 500;
   line-height: 0.95;
 }
 
-.generalPrizeList p {
+.generalPrizeReward {
   grid-area: amount;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 10px;
+}
+
+.generalPrizeDetails .prizeSponsorLogo {
+  width: min(100%, 144px);
+  margin-top: 10px;
+  filter: invert(1);
+  object-position: left center;
+}
+
+.generalPrizeAmount {
   margin: 0;
   font-size: clamp(64px, 6vw, 80px);
   font-weight: 700;
