@@ -5,18 +5,10 @@ import Link from "next/link";
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type ChangeEvent, type FocusEvent, type FormEvent } from "react";
 import { APP_READY_GATES, markAppReady } from "@/components/shared/app-ready";
 import { OTTAWA_FAQ } from "@/lib/ottawa-faq";
+import { OTTAWA_AGENDA as AGENDA } from "@/lib/ottawa-event";
 import { discordInviteUrl, instagramUrl } from "@/site";
 import { PrizeIcon, type PrizeIconName } from "./prize-icon";
 import styles from "./page.module.css";
-
-const AGENDA = [
-  { time: "09:00", label: "doors + breakfast" },
-  { time: "10:00", label: "opening nonsense" },
-  { time: "10:30", label: "build time" },
-  { time: "13:00", label: "food time" },
-  { time: "17:30", label: "demoes" },
-  { time: "19:00", label: "prizes + goodbye" },
-];
 
 type Prize = {
   title: string;
