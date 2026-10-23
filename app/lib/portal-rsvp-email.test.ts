@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test } from "node:test";
-import { createRsvpEmail, rsvpTicketCode, sendRsvpEmail } from "./portal-rsvp-email";
+import { createRsvpEmail, sendRsvpEmail } from "./portal-rsvp-email";
 import { RSVP_ATTENDANCE_NOTE, type PortalRsvp } from "./portal";
 
 const originalFetch=globalThis.fetch;
@@ -16,7 +16,11 @@ test("RSVP confirmation contains the saved answers, policy and an embedded PNG w
   assert.deepEqual(email.to,[member.email]);
   assert.ok(email.text.includes(rsvp.travel_plan!));
   assert.ok(email.text.includes(RSVP_ATTENDANCE_NOTE));
-  assert.ok(email.text.includes(rsvpTicketCode(rsvp.qr_token!)));
+  for (const content of [email.text, email.html]) {
+    assert.ok(!content.includes(rsvp.qr_token!));
+    assert.ok(!content.includes("sih:ottawa-2026:"));
+    assert.ok(!content.includes("Scanning reveals your RSVP"));
+  }
   assert.ok(email.text.includes("09:30–20:00 EST"));
   assert.ok(email.text.includes("19:00 EST"));
   assert.ok(email.html.includes('src="cid:rsvp-qr"'));

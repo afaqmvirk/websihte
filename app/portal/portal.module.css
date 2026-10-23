@@ -68,7 +68,6 @@
 .checkInCode h3 { margin: 0 0 8px; font-size: 18px; }
 .checkInCode p { font-size: 14px; color: var(--muted); }
 .checkInCode img { display: block; width: 240px; max-width: 100%; height: auto; margin: 12px 0; background: #fff; }
-.checkInCode code { display: block; font-size: 12px; overflow-wrap: anywhere; }
 .radioOptions { display: flex; gap: 32px; margin-top: 6px; }
 .radioOption { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .radioOption > input { accent-color: var(--ink); width: 18px; height: 18px; margin: 0; }

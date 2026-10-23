@@ -23,8 +23,7 @@ export async function createRsvpEmail(member: PortalMember, rsvp: PortalRsvp) {
     ...(cancelled ? [] : [
       `Local to Ottawa: ${rsvp.is_local ? "yes" : "no"}.`,
       ...(!rsvp.is_local ? [`Travel + accommodation plan:\n${rsvp.travel_plan || ""}`] : []),
-      "Show the QR code below to an organizer at check-in. Scanning reveals your RSVP; the organizer confirms check-in separately.",
-      `Check-in code: ${rsvpTicketCode(rsvp.qr_token!)}`,
+      "Show the QR code below to an organizer at check-in.",
       RSVP_ATTENDANCE_NOTE,
     ]),
     cancelled ? "You can RSVP again before your original deadline in the portal. For help after the deadline, reply to this email." : "You can review or edit your RSVP before your deadline in the portal. You can cancel even after the deadline.",
