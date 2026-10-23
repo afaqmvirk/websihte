@@ -82,9 +82,8 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
         <div className={styles.savedRsvp}>
           <div className={styles.checkInCode}>
             <h3>your check-in QR code</h3>
-            <p>Show this to an organizer when you arrive. Scanning reveals your RSVP; the organizer confirms check-in separately.</p>
+            <p>Show this to an organizer when you arrive.</p>
             <Image src="/api/portal/rsvp/qr" alt="Your personal check-in QR code" width={240} height={240} unoptimized />
-            {saved.qr_token && <code>sih:ottawa-2026:{saved.qr_token}</code>}
           </div>
           <dl className={styles.savedAnswers}>
             <div><dt>local to ottawa</dt><dd>{saved.is_local ? "yes" : "no"}</dd></div>
