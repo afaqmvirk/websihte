@@ -1,6 +1,7 @@
 import { getPortalMember } from "@/lib/portal-auth";
 import { RsvpWindowError, saveMemberRsvp } from "@/lib/portal-storage";
 import { isSameOriginRequest, parseRsvp, PORTAL_RESPONSE_HEADERS } from "@/lib/portal";
+import { sendRsvpEmail } from "@/lib/portal-rsvp-email";
 
 export async function POST(request: Request) {
   const json = (body: object, status = 200) => Response.json(body, { status, headers: PORTAL_RESPONSE_HEADERS });
@@ -14,7 +15,8 @@ export async function POST(request: Request) {
     const answer = parseRsvp(body);
     if (!answer) return json({ message: "Please say whether you're local to Ottawa and, if not, explain how you intend to arrive and where you plan to stay (2,000 characters or fewer)." }, 400);
     const rsvp = await saveMemberRsvp(member, answer.isLocal, answer.travelPlan);
-    return json({ rsvp, message: "RSVP saved. See you in Ottawa!" });
+    const emailSent = await sendRsvpEmail(member,rsvp);
+    return json({ rsvp, emailSent, message: emailSent ? "RSVP saved. A confirmation email with your check-in QR code has been sent to your application email." : "RSVP saved, but we couldn't send the confirmation email. Your RSVP and check-in QR code are available here in the portal." });
   } catch (error) {
     if (error instanceof RsvpWindowError) return json({ message: error.message, reason: error.reason }, 409);
     return json({ message: "We couldn't save your RSVP. Your answers are still here; please try again." }, 502);

@@ -1,6 +1,7 @@
 import { getPortalMember } from "@/lib/portal-auth";
 import { cancelMemberRsvp } from "@/lib/portal-storage";
 import { isSameOriginRequest, PORTAL_RESPONSE_HEADERS } from "@/lib/portal";
+import { sendRsvpEmail } from "@/lib/portal-rsvp-email";
 
 export async function POST(request: Request) {
   const json = (body: object, status = 200) => Response.json(body, { status, headers: PORTAL_RESPONSE_HEADERS });
@@ -16,7 +17,8 @@ export async function POST(request: Request) {
     }
     const rsvp = await cancelMemberRsvp(member);
     if (!rsvp) return json({ message: "There is no RSVP to cancel. Please refresh your dashboard." }, 409);
-    return json({ rsvp, message: "Your RSVP is cancelled. You're no longer marked as attending." });
+    const emailSent = await sendRsvpEmail(member,rsvp);
+    return json({ rsvp, emailSent, message: emailSent ? "Your RSVP is cancelled. A confirmation email has been sent; you're no longer marked as attending." : "Your RSVP is cancelled. We couldn't send the confirmation email, but you're no longer marked as attending." });
   } catch {
     return json({ message: "We couldn't cancel your RSVP. Please try again." }, 502);
   }

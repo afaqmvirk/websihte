@@ -149,6 +149,27 @@ across sign-ins. Members can RSVP again before the original deadline; after it,
 they must contact the organizers. The edit form's **discard edits** button only
 discards unsaved changes.
 
+Apply `20261023051354_member_rsvp_qr_check_in.sql` before deploying QR support.
+Every RSVP receives a stable random `qr_token` in the private `member_rsvps`
+table. Its QR content is `sih:ottawa-2026:<qr_token>`. The authenticated portal
+serves the member's active ticket as a private PNG, and save/update confirmation
+emails embed the same image using CID. Cancellations send a confirmation without
+a QR image. Email delivery retries keep the same payload and idempotency key;
+delivery failure keeps the saved RSVP and shows a notice in the portal.
+
+The organizer app's `/scan` page looks up the person first. A separate Check in
+button calls the service-only confirmation RPC, which rechecks current
+acceptance, latest submission, and cancellation under row locks before recording
+the organizer and timestamp. Looking up a ticket never changes attendance;
+repeat check-in returns the original record. Browser database roles cannot read
+tickets or invoke either RPC. The portal also shows the no-show eligibility note.
+
+The shared Ottawa schedule and Google/Outlook links use November 15, 2026,
+09:30–20:00 EST, with closing ceremonies at 19:00. The Apple Calendar ICS uses
+the matching UTC interval, `20261115T143000Z` to `20261116T010000Z`.
+Run `bun test app/lib/portal.test.ts app/lib/portal-rsvp-email.test.ts` and
+`supabase/tests/member-portal-check-in.sql` for notification and ticket checks.
+
 To launch, add `my.stupideas.com` to this Vercel project's Domains, publish the
 DNS record Vercel specifies for `my` with the domain's DNS provider, and deploy
 with the production `PORTAL_URL` above. Verify HTTPS, request a link for an

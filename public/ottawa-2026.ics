@@ -6,8 +6,8 @@ METHOD:PUBLISH
 BEGIN:VEVENT
 UID:ottawa-2026@stupidideashackathon.com
 DTSTAMP:20261014T000000Z
-DTSTART:20261115T140000Z
-DTEND:20261116T000000Z
+DTSTART:20261115T143000Z
+DTEND:20261116T010000Z
 SUMMARY:The Stupid Ideas Hackathon Ottawa
 DESCRIPTION:One day to follow your idea all the way through.
 LOCATION:Bayview Yards\, 7 Bayview Station Rd\, Ottawa\, ON K1Y 2C5

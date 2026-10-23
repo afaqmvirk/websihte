@@ -1,12 +1,14 @@
 export const PORTAL_HOST = "my.stupideas.com";
 export const PORTAL_COOKIE = "sih-portal-auth";
 export const TRAVEL_PLAN_LIMIT = 2000;
+export const RSVP_ATTENDANCE_NOTE = "Failure to check-in while RSVP'd without cancelling may affect your eligibility for future SIH events.";
 
 export type PortalRsvp = {
   is_local: boolean;
   travel_plan: string | null;
   updated_at: string;
   cancelled_at: string | null;
+  qr_token?: string;
 };
 
 export type PortalMember = {

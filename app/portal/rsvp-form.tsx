@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState, type FormEvent } from "react";
-import { formatRsvpDeadline, TRAVEL_PLAN_LIMIT, type PortalRsvp } from "@/lib/portal";
+import Image from "next/image";
+import { formatRsvpDeadline, RSVP_ATTENDANCE_NOTE, TRAVEL_PLAN_LIMIT, type PortalRsvp } from "@/lib/portal";
 import styles from "./portal.module.css";
 
 export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
@@ -13,6 +14,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   const [travelPlan, setTravelPlan] = useState(initialRsvp?.travel_plan || "");
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
+  const [notice, setNotice] = useState("");
   const [closed, setClosed] = useState(initiallyClosed);
   const [confirmingCancel, setConfirmingCancel] = useState(false);
   const savedHeading = useRef<HTMLHeadingElement>(null);
@@ -38,7 +40,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
         if (data.reason === "closed") setClosed(true);
         throw new Error(data.message || "We couldn't save your RSVP. Please try again.");
       }
-      setSaved(data.rsvp); setEditing(false);
+      setSaved(data.rsvp); setEditing(false); setNotice(data.message || "RSVP saved.");
       requestAnimationFrame(() => savedHeading.current?.focus());
     } catch (error) { setError(error instanceof Error ? error.message : "We couldn't save your RSVP. Your answers are still here; please try again."); }
     finally { setSaving(false); }
@@ -53,7 +55,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
       });
       const data = await response.json();
       if (!response.ok) throw new Error(data.message || "We couldn't cancel your RSVP. Please try again.");
-      setSaved(data.rsvp); setEditing(false); setConfirmingCancel(false);
+      setSaved(data.rsvp); setEditing(false); setConfirmingCancel(false); setNotice(data.message || "RSVP cancelled.");
       requestAnimationFrame(() => savedHeading.current?.focus());
     } catch (error) { setError(error instanceof Error ? error.message : "We couldn't cancel your RSVP. Please try again."); }
     finally { setSaving(false); }
@@ -67,6 +69,8 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
           {!closed && (saved?.cancelled_at ? " You can RSVP again until then." : " You can save and edit your RSVP until then. You can cancel even after the deadline.")}</>
           : "Your RSVP deadline will appear here once your acceptance email has been sent."}
       </p>
+      <p className={styles.rsvpPolicy}>{RSVP_ATTENDANCE_NOTE}</p>
+      {notice && <p className={styles.rsvpDeadline} role="status">{notice}</p>}
       {closed && !saved?.cancelled_at && <p className={styles.rsvpDeadline} role="status">{saved ? "Your saved RSVP is below. You can still cancel it." : "No RSVP was submitted."} For help, email <a href="mailto:applications@stupideas.com">applications@stupideas.com</a>.</p>}
       {saved?.cancelled_at && (!editing || !canRsvp) ? (
         <div className={styles.savedRsvp}>
@@ -76,6 +80,12 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
         </div>
       ) : saved && (!editing || !canRsvp) ? (
         <div className={styles.savedRsvp}>
+          <div className={styles.checkInCode}>
+            <h3>your check-in QR code</h3>
+            <p>Show this to an organizer when you arrive. Scanning reveals your RSVP; the organizer confirms check-in separately.</p>
+            <Image src="/api/portal/rsvp/qr" alt="Your personal check-in QR code" width={240} height={240} unoptimized />
+            {saved.qr_token && <code>sih:ottawa-2026:{saved.qr_token}</code>}
+          </div>
           <dl className={styles.savedAnswers}>
             <div><dt>local to ottawa</dt><dd>{saved.is_local ? "yes" : "no"}</dd></div>
             {!saved.is_local && <div><dt>travel + accommodation plan</dt><dd>{saved.travel_plan}</dd></div>}

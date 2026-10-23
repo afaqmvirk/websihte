@@ -47,7 +47,7 @@ export async function findAcceptedMember(email: string): Promise<PortalMember | 
 
 export async function getMemberRsvp(member: PortalMember): Promise<PortalRsvp | null> {
   const query = new URLSearchParams({
-    select: "is_local,travel_plan,updated_at,cancelled_at", application_id: `eq.${member.id}`, limit: "1",
+    select: "is_local,travel_plan,updated_at,cancelled_at,qr_token", application_id: `eq.${member.id}`, limit: "1",
   });
   const response = await portalStorageRequest(`member_rsvps?${query}`);
   return (await response.json() as PortalRsvp[])[0] || null;
@@ -76,7 +76,9 @@ export async function saveMemberRsvp(member: PortalMember, isLocal: boolean, tra
   if (!rsvp) throw new Error("RSVP was not returned");
   // The existing save RPC keeps its return signature; a successful save always
   // clears cancellation, and still enforces the original RSVP deadline.
-  return { ...rsvp, cancelled_at: null };
+  let qrToken: string | undefined;
+  try { qrToken = (await getMemberRsvp(member))?.qr_token; } catch { /* The RSVP was saved; a ticket lookup can be retried on reload. */ }
+  return { ...rsvp, cancelled_at: null, ...(qrToken ? {qr_token:qrToken} : {}) };
 }
 
 export async function cancelMemberRsvp(member: PortalMember): Promise<PortalRsvp | null> {
