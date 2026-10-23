@@ -100,8 +100,8 @@ test("switching to local clears stored travel details and ignores caller identit
 });
 
 test("deadline labels name the last RSVP day in Ottawa, regardless of the viewer's timezone", () => {
-  assert.equal(formatRsvpDeadline("2026-10-30T04:00:00Z"), "October 29, 2026 (EDT, Ottawa time)");
-  assert.equal(formatRsvpDeadline("2026-11-03T05:00:00Z"), "November 2, 2026 (EST, Ottawa time)");
+  assert.equal(formatRsvpDeadline("2026-10-30T03:59:00Z"), "October 29, 2026 at 11:59 PM EDT");
+  assert.equal(formatRsvpDeadline("2026-11-03T04:59:00Z"), "November 2, 2026 at 11:59 PM EST");
 });
 
 test("the deadline comes from the database using only the verified application ID", async () => {

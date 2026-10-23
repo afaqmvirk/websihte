@@ -63,7 +63,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
     <section id="rsvp" className={styles.rsvpCard} aria-labelledby="rsvp-heading" aria-busy={saving}>
       <h2 id="rsvp-heading" tabIndex={-1} ref={savedHeading}>{saved?.cancelled_at && (!editing || !canRsvp) ? "RSVP cancelled" : closed ? "RSVP closed" : saved && !editing ? "RSVP saved" : "RSVP"}</h2>
       <p className={styles.rsvpDeadline}>
-        {deadline ? <>{closed ? "RSVP closed at" : "RSVP by"} <time dateTime={deadline}>midnight at the end of {formatRsvpDeadline(deadline)}</time>.
+        {deadline ? <>{closed ? "RSVP closed on" : "RSVP by"} <time dateTime={deadline}>{formatRsvpDeadline(deadline)}</time>.
           {!closed && (saved?.cancelled_at ? " You can RSVP again until then." : " You can save and edit your RSVP until then. You can cancel even after the deadline.")}</>
           : "Your RSVP deadline will appear here once your acceptance email has been sent."}
       </p>

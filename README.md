@@ -119,9 +119,14 @@ RSVP write; changing the decision removes access even from an existing session.
 
 Apply `20261023025307_member_rsvp_deadline.sql` after the organizer admission
 migration (`20261022060736_organizer_admission_decisions.sql` in `sih-organizer`).
-Each RSVP closes at midnight in `America/Toronto`, at the end of the seventh day
-after the acceptance email's recorded `email_sent_at` date. For example, an
-October 22 acceptance closes at the end of October 29 (October 30 at 00:00 EDT).
+Apply the organizer's `exact_admission_rsvp_deadline` migration for the shared
+11:59 PM cutoff and the timestamp stored with each acceptance email.
+Each RSVP closes at 11:59 PM in `America/Toronto`, seven calendar days after
+acceptance. The exact timestamp is stored with the acceptance notification and
+printed in the email, including EST or EDT. Retries retain that timestamp.
+Earlier notifications without a stored timestamp use 11:59 PM seven days after
+their recorded `email_sent_at` date. For example, an October 22 acceptance closes
+on October 29 at 11:59 PM EDT.
 The dashboard shows the exact date and timezone, and the database rejects both
 new RSVPs and edits at or after that instant. Before a successful acceptance
 email is recorded, RSVP remains closed and the dashboard explains why. Marking
