@@ -28,8 +28,8 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
           {OTTAWA_EVENT.venue} · {OTTAWA_EVENT.address}
         </a>
         <nav className={styles.communityLinks} aria-label="community links">
-          <a href={discordInviteUrl} target="_blank" rel="noopener noreferrer">Discord</a>
-          <a href={instagramUrl} target="_blank" rel="noopener noreferrer">Instagram</a>
+          <a className={styles.primaryButton} href={discordInviteUrl} target="_blank" rel="noopener noreferrer">Join Discord</a>
+          <a className={styles.primaryButton} href={instagramUrl} target="_blank" rel="noopener noreferrer">Follow Instagram</a>
         </nav>
       </header>
       <div className={styles.dashboardGrid}>
