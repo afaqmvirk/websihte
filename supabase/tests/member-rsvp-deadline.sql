@@ -40,10 +40,10 @@ begin
   -- Deliberately change the database session timezone to catch accidental use.
   perform set_config('TimeZone','Asia/Tokyo',true);
   for fixture in select * from (values
-    ('2026-10-22T12:00:00Z'::timestamptz, '2026-10-30T04:00:00Z'::timestamptz),
-    ('2026-10-23T02:00:00Z'::timestamptz, '2026-10-30T04:00:00Z'::timestamptz),
-    ('2026-10-26T12:00:00Z'::timestamptz, '2026-11-03T05:00:00Z'::timestamptz),
-    ('2026-03-02T12:00:00Z'::timestamptz, '2026-03-10T04:00:00Z'::timestamptz)
+    ('2026-10-22T12:00:00Z'::timestamptz, '2026-10-30T03:59:00Z'::timestamptz),
+    ('2026-10-23T02:00:00Z'::timestamptz, '2026-10-30T03:59:00Z'::timestamptz),
+    ('2026-10-26T12:00:00Z'::timestamptz, '2026-11-03T04:59:00Z'::timestamptz),
+    ('2026-03-02T12:00:00Z'::timestamptz, '2026-03-10T03:59:00Z'::timestamptz)
   ) as dates(sent_at,deadline) loop
     update public.application_admissions set email_sent_at=fixture.sent_at where application_id=applicant_id;
     if public.member_rsvp_deadline(applicant_id) is distinct from fixture.deadline
