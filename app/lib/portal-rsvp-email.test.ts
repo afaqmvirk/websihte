@@ -22,7 +22,8 @@ test("RSVP confirmation contains the saved answers, policy and an embedded PNG w
     assert.ok(!content.includes("Scanning reveals your RSVP"));
   }
   assert.ok(email.text.includes("09:30–20:00 EST"));
-  assert.ok(email.text.includes("19:00 EST"));
+  assert.ok(email.text.includes("Opening ceremonies start at 10AM EST."));
+  assert.ok(!email.text.includes("Closing ceremonies start"));
   assert.ok(email.html.includes('src="cid:rsvp-qr"'));
   assert.equal(email.attachments?.[0].content_id,"rsvp-qr");
   const png=Buffer.from(email.attachments![0].content,"base64");
