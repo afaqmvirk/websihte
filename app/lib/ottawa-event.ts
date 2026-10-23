@@ -5,6 +5,7 @@ export const OTTAWA_EVENT = {
   venue: "Bayview Yards",
   address: "7 Bayview Station Rd, Ottawa, ON K1Y 2C5",
   mapsUrl: "https://www.google.com/maps/search/?api=1&query=Bayview+Yards+7+Bayview+Station+Road+Ottawa",
+  mapEmbedUrl: "https://maps.google.com/maps?q=Bayview+Yards+7+Bayview+Station+Road+Ottawa&output=embed",
   calendarUrl: "https://www.stupideas.com/ottawa-2026.ics",
 } as const;
 

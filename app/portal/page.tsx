@@ -1,6 +1,7 @@
 import { getPortalMember } from "@/lib/portal-auth";
 import { getMemberRsvp, getMemberRsvpWindow } from "@/lib/portal-storage";
 import { OTTAWA_AGENDA, OTTAWA_EVENT } from "@/lib/ottawa-event";
+import { discordInviteUrl, instagramUrl } from "@/site";
 import PortalShell from "./portal-shell";
 import RsvpForm from "./rsvp-form";
 import SignInForm from "./sign-in-form";
@@ -26,6 +27,10 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
         <a href={OTTAWA_EVENT.mapsUrl} target="_blank" rel="noopener noreferrer">
           {OTTAWA_EVENT.venue} · {OTTAWA_EVENT.address}
         </a>
+        <nav className={styles.communityLinks} aria-label="community links">
+          <a href={discordInviteUrl} target="_blank" rel="noopener noreferrer">Discord</a>
+          <a href={instagramUrl} target="_blank" rel="noopener noreferrer">Instagram</a>
+        </nav>
       </header>
       <div className={styles.dashboardGrid}>
         <section id="schedule" className={styles.scheduleCard} aria-labelledby="schedule-heading">
@@ -35,6 +40,11 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
               <li key={item.time}><time dateTime={`${OTTAWA_EVENT.date}T${item.time}:00-05:00`}>{item.time}</time><span>{item.label}</span></li>
             ))}
           </ol>
+          <section className={styles.venueMap} aria-labelledby="venue-heading">
+            <h3 id="venue-heading">getting here</h3>
+            <iframe src={OTTAWA_EVENT.mapEmbedUrl} title="Map to Bayview Yards in Ottawa" loading="lazy" referrerPolicy="no-referrer" />
+            <a href={OTTAWA_EVENT.mapsUrl} target="_blank" rel="noopener noreferrer">get directions to {OTTAWA_EVENT.venue}</a>
+          </section>
         </section>
         <RsvpForm initialRsvp={rsvp} deadline={window.deadline} initiallyClosed={window.closed} />
       </div>
