@@ -1,6 +1,6 @@
 import { getPortalMember } from "@/lib/portal-auth";
 import { getMemberRsvp, getMemberRsvpWindow } from "@/lib/portal-storage";
-import { OTTAWA_AGENDA, OTTAWA_EVENT } from "@/lib/ottawa-event";
+import { OTTAWA_AGENDA, OTTAWA_CALENDAR_LINKS, OTTAWA_EVENT } from "@/lib/ottawa-event";
 import { discordInviteUrl, instagramUrl } from "@/site";
 import PortalShell from "./portal-shell";
 import RsvpForm from "./rsvp-form";
@@ -23,7 +23,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
     <PortalShell member={member}>
       <header className={styles.eventHeader}>
         <h1>ottawa</h1>
-        <p><time dateTime={OTTAWA_EVENT.date}>{OTTAWA_EVENT.dateLabel}</time> · 09:00–19:00 EST</p>
+        <p><time dateTime={OTTAWA_EVENT.date}>{OTTAWA_EVENT.dateLabel}</time> · {OTTAWA_EVENT.hoursLabel}</p>
         <a href={OTTAWA_EVENT.mapsUrl} target="_blank" rel="noopener noreferrer">
           {OTTAWA_EVENT.venue} · {OTTAWA_EVENT.address}
         </a>
@@ -34,7 +34,12 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       </header>
       <div className={styles.dashboardGrid}>
         <section id="schedule" className={styles.scheduleCard} aria-labelledby="schedule-heading">
-          <div className={styles.scheduleTitle}><h2 id="schedule-heading">schedule</h2><a href={OTTAWA_EVENT.calendarUrl} className={styles.textLink}>add to calendar</a></div>
+          <div className={styles.scheduleTitle}><h2 id="schedule-heading">schedule</h2></div>
+          <nav className={styles.calendarLinks} aria-label="add event to calendar">
+            {OTTAWA_CALENDAR_LINKS.map(link => (
+              <a key={link.label} className={styles.primaryButton} href={link.href} target="_blank" rel="noopener noreferrer">+ {link.label}</a>
+            ))}
+          </nav>
           <ol className={styles.agenda}>
             {OTTAWA_AGENDA.map((item) => (
               <li key={item.time}><time dateTime={`${OTTAWA_EVENT.date}T${item.time}:00-05:00`}>{item.time}</time><span>{item.label}</span></li>
