@@ -328,7 +328,10 @@ storage is added to the Vercel function bundle. Node's built-in SQLite is used i
 production; Bun's built-in SQLite supports local tests.
 
 At most eight matching title/artist candidates go to the existing Luna call.
-The model selects one ID and cannot write notes. The 18 recent pop/meme hooks
+For artist-only requests, the server first picks one matching song using the
+message ID, so repeated requests can play different songs without depending on
+the model's favourite. Named titles keep their normal matches. The model selects
+one ID and cannot write notes. The 18 recent pop/meme hooks
 and ten original familiar references remain exact local fallbacks, including
 APT., Espresso, Golden, Megalovania, Among Us Drip, the Weezer lick, and happy bday.
 They use the same selection tool and renderer. Catalog labels are untrusted
@@ -347,7 +350,9 @@ The message contains one audio attachment with no caption. Named requests use
 the matching melody reference. A message-ID seed selects a playable section
 throughout the full melodic track, targeting 10–15 seconds of audio. The selected
 section and playing mistakes stay stable on retries; another message can start
-elsewhere. Short hooks finish naturally without looping or invented notes.
+elsewhere. Short scores can also start later when at least six seconds remain;
+tiny signature riffs stay whole. Short hooks finish naturally without looping or
+invented notes.
 The MIDI cache retains bounded copies of the source files rather than a single
 compiled opening. The modern references have eight locally compiled sections
 selected with the same message seed and shared section compiler.

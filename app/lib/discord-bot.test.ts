@@ -406,6 +406,19 @@ describe("sih-inator mention bot", () => {
     intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song: "arbitrary_song" }) : null;
     await assert.rejects(generateDiscordBotReply("play espresso", "gpt-6-luna", [], false, { persona: "squd" }));
   });
+  it("passes each Discord message seed through to the selected song section", async () => {
+    const song = "os_4158329";
+    intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song }) : null;
+    const answers = [];
+    for (const performanceSeed of [...Array.from({ length: 8 }, (_, index) => `message-${index}`), "message-0"]) {
+      const answer = await generateDiscordBotReply("play Espresso", "gpt-6-luna", [], false, { persona: "squd", performanceSeed });
+      assert.deepEqual(answer.clarinetScore, await getClarinetLibraryScore(song, performanceSeed));
+      answers.push(answer);
+    }
+    assert.ok(new Set(answers.map((answer) => JSON.stringify(answer.clarinetScore))).size > 1);
+    assert.deepEqual(answers[0], answers.at(-1));
+    assert.equal(modelCalls().length, 9);
+  });
   it("posts a scored library melody using the same native voice transport", async () => {
     const squd = enableSqud(), song = (await searchClarinetLibrary("Espresso"))[0].song;
     intercept = (url) => url === modelUrl ? actionResponse("play_clarinet_reference", { song }) : null;
