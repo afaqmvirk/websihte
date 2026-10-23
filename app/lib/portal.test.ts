@@ -4,9 +4,10 @@ import { NextRequest } from "next/server";
 import { POST as signIn } from "../api/portal/sign-in/route";
 import { POST as signOut } from "../api/portal/sign-out/route";
 import { POST as verifyCode } from "../api/portal/verify-code/route";
+import { POST as cancelRsvp } from "../api/portal/rsvp/cancel/route";
 import { proxy } from "../../proxy";
 import { createPortalEmail } from "./portal-email";
-import { findAcceptedMember, getMemberRsvpWindow, RsvpWindowError, saveMemberRsvp } from "./portal-storage";
+import { cancelMemberRsvp, findAcceptedMember, getMemberRsvp, getMemberRsvpWindow, RsvpWindowError, saveMemberRsvp } from "./portal-storage";
 import { formatRsvpDeadline, getPortalUrl, isSameOriginRequest, parseRsvp, TRAVEL_PLAN_LIMIT } from "./portal";
 
 const originalFetch = globalThis.fetch;
@@ -18,6 +19,7 @@ let claim: boolean;
 let validCode: boolean;
 let confirmedEmail: boolean;
 let rsvpError: string | null;
+let cancellationExists: boolean;
 const memberId = "99999999-9999-4999-8999-999999999991";
 
 beforeEach(() => {
@@ -30,6 +32,7 @@ beforeEach(() => {
   delete process.env.VERCEL;
   calls = []; admission = "accepted"; claim = true; validCode = true; confirmedEmail = true;
   rsvpError = null;
+  cancellationExists = true;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const body = init?.body ? JSON.parse(String(init.body)) : null;
@@ -53,6 +56,9 @@ beforeEach(() => {
     }
     if (url.pathname === "/auth/v1/logout") return new Response(null, { status: 204 });
     if (url.pathname === "/rest/v1/rpc/member_rsvp_deadline") return Response.json("2026-10-30T04:00:00+00:00");
+    if (url.pathname === "/rest/v1/rpc/cancel_member_rsvp" || url.pathname === "/rest/v1/member_rsvps") return Response.json(cancellationExists ? [{
+      is_local: false, travel_plan: "train; staying with a friend", updated_at: "2026-10-31T18:00:00Z", cancelled_at: "2026-10-31T18:00:00Z",
+    }] : []);
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp" && rsvpError) return Response.json({ message: rsvpError }, { status: 400 });
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp") return Response.json([{
       is_local: body.p_is_local, travel_plan: body.p_travel_plan, updated_at: "2026-10-18T18:00:00Z",
@@ -135,7 +141,37 @@ test("pending, waitlisted, rejected, and unknown applicants have no member acces
 test("RSVP storage sends verified member identity to the acceptance-checking RPC", async () => {
   const rsvp = await saveMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" }, false, "train");
   assert.equal(rsvp.travel_plan, "train");
+  assert.equal(rsvp.cancelled_at, null);
   assert.deepEqual(calls[0].body, { p_application_id: memberId, p_email: "accepted@example.com", p_is_local: false, p_travel_plan: "train" });
+});
+
+test("cancellation uses only verified identity and does not gate on the RSVP deadline", async () => {
+  const rsvp = await cancelMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" });
+  assert.equal(rsvp?.cancelled_at, "2026-10-31T18:00:00Z");
+  assert.equal(rsvp?.travel_plan, "train; staying with a friend");
+  assert.deepEqual(calls.map(({ url }) => url.pathname), ["/rest/v1/rpc/cancel_member_rsvp"]);
+  assert.deepEqual(calls[0].body, { p_application_id: memberId, p_email: "accepted@example.com" });
+  cancellationExists = false;
+  assert.equal(await cancelMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" }), null);
+});
+
+test("cancelled status persists when the dashboard reloads", async () => {
+  const rsvp = await getMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" });
+  assert.equal(rsvp?.cancelled_at, "2026-10-31T18:00:00Z");
+  assert.ok(calls[0].url.searchParams.get("select")?.includes("cancelled_at"));
+  assert.equal(calls[0].url.searchParams.get("application_id"), `eq.${memberId}`);
+});
+
+test("cancellation rejects cross-origin and oversized requests before any backend access", async () => {
+  const response = await cancelRsvp(new Request("https://my.stupideas.com/api/portal/rsvp/cancel", {
+    method: "POST", headers: { origin: "https://evil.example", "Content-Type": "application/json" }, body: JSON.stringify({ confirmed: true }),
+  }));
+  assert.equal(response.status, 403);
+  assert.equal(response.headers.get("cache-control"), "private, no-store");
+  assert.equal((await cancelRsvp(new Request("https://my.stupideas.com/api/portal/rsvp/cancel", {
+    method: "POST", headers: { origin: "https://my.stupideas.com", "content-length": "16385" },
+  }))).status, 413);
+  assert.equal(calls.length, 0);
 });
 
 test("sign-in rejects cross-origin and invalid requests before calling any backend", async () => {

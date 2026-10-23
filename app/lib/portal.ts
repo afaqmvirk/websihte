@@ -6,6 +6,7 @@ export type PortalRsvp = {
   is_local: boolean;
   travel_plan: string | null;
   updated_at: string;
+  cancelled_at: string | null;
 };
 
 export type PortalMember = {

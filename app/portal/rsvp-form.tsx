@@ -14,7 +14,9 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [closed, setClosed] = useState(initiallyClosed);
+  const [confirmingCancel, setConfirmingCancel] = useState(false);
   const savedHeading = useRef<HTMLHeadingElement>(null);
+  const keepRsvpButton = useRef<HTMLButtonElement>(null);
   const canRsvp = deadline !== null && !closed;
 
   useEffect(() => {
@@ -42,22 +44,60 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
     finally { setSaving(false); }
   }
 
+  async function cancelRsvp() {
+    setError(""); setSaving(true);
+    try {
+      const response = await fetch("/api/portal/rsvp/cancel", {
+        method: "POST", headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ confirmed: true }),
+      });
+      const data = await response.json();
+      if (!response.ok) throw new Error(data.message || "We couldn't cancel your RSVP. Please try again.");
+      setSaved(data.rsvp); setEditing(false); setConfirmingCancel(false);
+      requestAnimationFrame(() => savedHeading.current?.focus());
+    } catch (error) { setError(error instanceof Error ? error.message : "We couldn't cancel your RSVP. Please try again."); }
+    finally { setSaving(false); }
+  }
+
   return (
-    <section id="rsvp" className={styles.rsvpCard} aria-labelledby="rsvp-heading">
-      <h2 id="rsvp-heading" tabIndex={-1} ref={savedHeading}>{closed ? "RSVP closed" : saved && !editing ? "RSVP saved" : "RSVP"}</h2>
+    <section id="rsvp" className={styles.rsvpCard} aria-labelledby="rsvp-heading" aria-busy={saving}>
+      <h2 id="rsvp-heading" tabIndex={-1} ref={savedHeading}>{saved?.cancelled_at && (!editing || !canRsvp) ? "RSVP cancelled" : closed ? "RSVP closed" : saved && !editing ? "RSVP saved" : "RSVP"}</h2>
       <p className={styles.rsvpDeadline}>
         {deadline ? <>{closed ? "RSVP closed at" : "RSVP by"} <time dateTime={deadline}>midnight at the end of {formatRsvpDeadline(deadline)}</time>.
-          {!closed && " You can save and edit your RSVP until then."}</>
+          {!closed && (saved?.cancelled_at ? " You can RSVP again until then." : " You can save and edit your RSVP until then. You can cancel even after the deadline.")}</>
           : "Your RSVP deadline will appear here once your acceptance email has been sent."}
       </p>
-      {closed && <p className={styles.rsvpDeadline} role="status">{saved ? "Your saved RSVP is below." : "No RSVP was submitted."} For help, email <a href="mailto:applications@stupideas.com">applications@stupideas.com</a>.</p>}
-      {saved && (!editing || !canRsvp) ? (
+      {closed && !saved?.cancelled_at && <p className={styles.rsvpDeadline} role="status">{saved ? "Your saved RSVP is below. You can still cancel it." : "No RSVP was submitted."} For help, email <a href="mailto:applications@stupideas.com">applications@stupideas.com</a>.</p>}
+      {saved?.cancelled_at && (!editing || !canRsvp) ? (
+        <div className={styles.savedRsvp}>
+          <p className={styles.rsvpDeadline} role="status">You&apos;re no longer marked as attending.</p>
+          {canRsvp ? <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>RSVP again</button>
+            : <p className={styles.rsvpDeadline}>{closed ? "To RSVP again after the deadline, email " : "To RSVP again, email "}<a href="mailto:applications@stupideas.com">applications@stupideas.com</a>.</p>}
+        </div>
+      ) : saved && (!editing || !canRsvp) ? (
         <div className={styles.savedRsvp}>
           <dl className={styles.savedAnswers}>
             <div><dt>local to ottawa</dt><dd>{saved.is_local ? "yes" : "no"}</dd></div>
             {!saved.is_local && <div><dt>travel + accommodation plan</dt><dd>{saved.travel_plan}</dd></div>}
           </dl>
-          {canRsvp && <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>edit RSVP</button>}
+          {confirmingCancel ? (
+            <div className={styles.cancelConfirmation} role="group" aria-labelledby="cancel-rsvp-heading">
+              <h3 id="cancel-rsvp-heading">cancel your RSVP?</h3>
+              <p>You will no longer be marked as attending. {canRsvp ? "You can RSVP again until the deadline." : "The deadline has passed, so you'll need to contact us if you want to RSVP again."}</p>
+              <div className={styles.rsvpActions}>
+                <button className={styles.primaryButton} disabled={saving} onClick={cancelRsvp}>{saving ? "cancelling…" : "yes, cancel RSVP"}</button>
+                <button ref={keepRsvpButton} className={styles.textButton} disabled={saving} onClick={() => { setConfirmingCancel(false); setError(""); }}>keep RSVP</button>
+              </div>
+            </div>
+          ) : (
+            <div className={styles.rsvpActions}>
+              {canRsvp && <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>edit RSVP</button>}
+              <button className={styles.textButton} onClick={() => {
+                setConfirmingCancel(true); setError("");
+                requestAnimationFrame(() => keepRsvpButton.current?.focus());
+              }}>cancel RSVP</button>
+            </div>
+          )}
         </div>
       ) : canRsvp ? (
         <form onSubmit={submit} className={styles.rsvpForm} aria-busy={saving}>
@@ -82,15 +122,15 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
                 aria-describedby="travel-note" value={travelPlan} onChange={(event) => setTravelPlan(event.target.value)} />
             </div>
           )}
-          {error && <p className={styles.error} role="alert">{error}</p>}
           <button className={styles.primaryButton} type="submit" disabled={saving || !local}>
             {saving ? "saving…" : "save RSVP"}
           </button>
           {saved ? <button className={styles.textButton} type="button" disabled={saving} onClick={() => {
             setLocal(saved.is_local ? "yes" : "no"); setTravelPlan(saved.travel_plan || ""); setEditing(false); setError("");
-          }}>cancel</button> : null}
+          }}>discard edits</button> : null}
         </form>
       ) : null}
+      {error && <p className={styles.error} role="alert">{error}</p>}
     </section>
   );
 }
