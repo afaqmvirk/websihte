@@ -135,6 +135,15 @@ travel plan. Organizers can view/export `member_rsvps` in Supabase and match
 `application_id` to `applications.id`. Both tables remain inaccessible to browser
 database roles; applicants cannot supply someone else's ID to update an RSVP.
 
+Apply the `cancel_member_rsvp` migration to enable cancellation. An attending
+member can choose **cancel RSVP**, then **yes, cancel RSVP**, even after the RSVP
+deadline. Cancellation records `member_rsvps.cancelled_at` and preserves the row
+and its answers; it does not change the admission decision. Count attending
+RSVPs with `cancelled_at is null`. The dashboard retains the cancelled status
+across sign-ins. Members can RSVP again before the original deadline; after it,
+they must contact the organizers. The edit form's **discard edits** button only
+discards unsaved changes.
+
 To launch, add `my.stupideas.com` to this Vercel project's Domains, publish the
 DNS record Vercel specifies for `my` with the domain's DNS provider, and deploy
 with the production `PORTAL_URL` above. Verify HTTPS, request a link for an
@@ -142,7 +151,8 @@ accepted test applicant, and confirm both email delivery and RSVP persistence.
 Do not send bulk acceptance emails as part of deployment.
 
 Run portal checks with `bun test app/lib/portal.test.ts` and execute
-`supabase/tests/member-portal.sql` and `supabase/tests/member-rsvp-deadline.sql`
+`supabase/tests/member-portal.sql`, `supabase/tests/member-rsvp-deadline.sql`, and
+`supabase/tests/member-rsvp-cancellation.sql`
 against a migrated database. The SQL checks
 use synthetic records inside a transaction and roll back all fixture changes.
 
