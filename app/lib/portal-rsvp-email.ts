@@ -18,7 +18,7 @@ export async function createRsvpEmail(member: PortalMember, rsvp: PortalRsvp) {
   const paragraphs = [
     `Hi ${member.full_name.trim() || "there"},`,
     cancelled ? "Your RSVP for Stupid Ideas Hackathon Ottawa is cancelled. You're no longer marked as attending." : "Your RSVP for Stupid Ideas Hackathon Ottawa is saved. You're confirmed as attending. This email reflects your latest submitted answers.",
-    `${OTTAWA_EVENT.dateLabel} · ${OTTAWA_EVENT.hoursLabel}. Closing ceremonies start at 19:00 EST.`,
+    `${OTTAWA_EVENT.dateLabel} · ${OTTAWA_EVENT.hoursLabel}. Opening ceremonies start at 10AM EST.`,
     `${OTTAWA_EVENT.venue} · ${OTTAWA_EVENT.address}`,
     ...(cancelled ? [] : [
       `Local to Ottawa: ${rsvp.is_local ? "yes" : "no"}.`,
