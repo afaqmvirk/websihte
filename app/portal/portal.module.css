@@ -54,6 +54,7 @@
 .agenda time { font-family: "Courier New", monospace; font-size: 14px; }
 .rsvpForm fieldset { min-width: 0; border: 0; padding: 0; margin: 24px 0 0; }
 .rsvpForm legend { font-size: 18px; }
+.rsvpDeadline { margin-top: 12px !important; color: var(--muted); font-size: 15px; line-height: 1.5; }
 .radioOptions { display: flex; gap: 32px; margin-top: 6px; }
 .radioOption { display: flex; align-items: center; gap: 10px; min-height: 44px; cursor: pointer; }
 .radioOption > input { accent-color: var(--ink); width: 18px; height: 18px; margin: 0; }

@@ -1,5 +1,5 @@
 import { getPortalMember } from "@/lib/portal-auth";
-import { saveMemberRsvp } from "@/lib/portal-storage";
+import { RsvpWindowError, saveMemberRsvp } from "@/lib/portal-storage";
 import { isSameOriginRequest, parseRsvp, PORTAL_RESPONSE_HEADERS } from "@/lib/portal";
 
 export async function POST(request: Request) {
@@ -12,8 +12,11 @@ export async function POST(request: Request) {
     let body: unknown;
     try { body = await request.json(); } catch { return json({ message: "We couldn't read your RSVP. Please try again." }, 400); }
     const answer = parseRsvp(body);
-    if (!answer) return json({ message: "Please say whether you're local to Ottawa and, if not, tell us how you intend to arrive (2,000 characters or fewer)." }, 400);
+    if (!answer) return json({ message: "Please say whether you're local to Ottawa and, if not, explain how you intend to arrive and where you plan to stay (2,000 characters or fewer)." }, 400);
     const rsvp = await saveMemberRsvp(member, answer.isLocal, answer.travelPlan);
     return json({ rsvp, message: "RSVP saved. See you in Ottawa!" });
-  } catch { return json({ message: "We couldn't save your RSVP. Your answers are still here; please try again." }, 502); }
+  } catch (error) {
+    if (error instanceof RsvpWindowError) return json({ message: error.message, reason: error.reason }, 409);
+    return json({ message: "We couldn't save your RSVP. Your answers are still here; please try again." }, 502);
+  }
 }

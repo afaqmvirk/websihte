@@ -1,5 +1,5 @@
 import { getPortalMember } from "@/lib/portal-auth";
-import { getMemberRsvp } from "@/lib/portal-storage";
+import { getMemberRsvp, getMemberRsvpWindow } from "@/lib/portal-storage";
 import { OTTAWA_AGENDA, OTTAWA_EVENT } from "@/lib/ottawa-event";
 import PortalShell from "./portal-shell";
 import RsvpForm from "./rsvp-form";
@@ -16,7 +16,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
       <SignInForm invalidLink={params.error === "link"} />
     </PortalShell>
   );
-  const rsvp = await getMemberRsvp(member);
+  const [rsvp, window] = await Promise.all([getMemberRsvp(member), getMemberRsvpWindow(member)]);
 
   return (
     <PortalShell member={member}>
@@ -36,7 +36,7 @@ export default async function PortalPage({ searchParams }: { searchParams: Promi
             ))}
           </ol>
         </section>
-        <RsvpForm initialRsvp={rsvp} />
+        <RsvpForm initialRsvp={rsvp} deadline={window.deadline} initiallyClosed={window.closed} />
       </div>
     </PortalShell>
   );

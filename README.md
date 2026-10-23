@@ -117,9 +117,20 @@ cookies maintain the session.
 Acceptance is checked against the verified email on every dashboard request and
 RSVP write; changing the decision removes access even from an existing session.
 
-The RSVP asks whether the member is local to Ottawa. Non-local members provide
-their arrival plan and see the no-reimbursement / stupidest-journey note. Answers
-can be edited and persist across sessions. Switching to local removes the saved
+Apply `20261023025307_member_rsvp_deadline.sql` after the organizer admission
+migration (`20261022060736_organizer_admission_decisions.sql` in `sih-organizer`).
+Each RSVP closes at midnight in `America/Toronto`, at the end of the seventh day
+after the acceptance email's recorded `email_sent_at` date. For example, an
+October 22 acceptance closes at the end of October 29 (October 30 at 00:00 EDT).
+The dashboard shows the exact date and timezone, and the database rejects both
+new RSVPs and edits at or after that instant. Before a successful acceptance
+email is recorded, RSVP remains closed and the dashboard explains why. Marking
+an application accepted manually does not start an RSVP window.
+
+The RSVP asks whether the member is local to Ottawa. Non-local members explain
+how they intend to arrive and where they plan to stay, and see the
+no-reimbursement / stupidest-journey note. Answers can be edited until the
+deadline and persist across sessions afterwards. Switching to local removes the saved
 travel plan. Organizers can view/export `member_rsvps` in Supabase and match
 `application_id` to `applications.id`. Both tables remain inaccessible to browser
 database roles; applicants cannot supply someone else's ID to update an RSVP.
@@ -131,7 +142,8 @@ accepted test applicant, and confirm both email delivery and RSVP persistence.
 Do not send bulk acceptance emails as part of deployment.
 
 Run portal checks with `bun test app/lib/portal.test.ts` and execute
-`supabase/tests/member-portal.sql` against a migrated database. The SQL checks
+`supabase/tests/member-portal.sql` and `supabase/tests/member-rsvp-deadline.sql`
+against a migrated database. The SQL checks
 use synthetic records inside a transaction and roll back all fixture changes.
 
 ## Discord application notifications

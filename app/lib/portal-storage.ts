@@ -3,6 +3,14 @@ import { getApplicationStorageConfig } from "./application-storage";
 import { OTTAWA_EVENT } from "./ottawa-event";
 import type { PortalMember, PortalRsvp } from "./portal";
 
+export class RsvpWindowError extends Error {
+  constructor(public readonly reason: "closed" | "pending") {
+    super(reason === "closed"
+      ? "The RSVP deadline has passed. Please contact applications@stupideas.com if you need help."
+      : "RSVP opens once your acceptance email has been sent. Please check back soon.");
+  }
+}
+
 // This module is used by server routes only. No private application data or key
 // is sent to the browser; components import public types from portal.ts.
 export async function portalStorageRequest(path: string, init: RequestInit = {}) {
@@ -13,7 +21,14 @@ export async function portalStorageRequest(path: string, init: RequestInit = {})
   const response = await fetch(`${config.url}/rest/v1/${path}`, {
     ...init, headers, cache: "no-store", signal: AbortSignal.timeout(10_000),
   });
-  if (!response.ok) throw new Error("Portal storage request failed");
+  if (!response.ok) {
+    if (path === "rpc/save_member_rsvp") {
+      const error = await response.json().catch(() => null);
+      if (error?.message === "member_rsvp_closed") throw new RsvpWindowError("closed");
+      if (error?.message === "member_rsvp_not_open") throw new RsvpWindowError("pending");
+    }
+    throw new Error("Portal storage request failed");
+  }
   return response;
 }
 
@@ -38,8 +53,17 @@ export async function getMemberRsvp(member: PortalMember): Promise<PortalRsvp | 
   return (await response.json() as PortalRsvp[])[0] || null;
 }
 
+export async function getMemberRsvpWindow(member: PortalMember) {
+  const response = await portalStorageRequest("rpc/member_rsvp_deadline", {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_application_id: member.id }),
+  });
+  const deadline = await response.json() as string | null;
+  return { deadline, closed: deadline !== null && Date.now() >= new Date(deadline).getTime() };
+}
+
 export async function saveMemberRsvp(member: PortalMember, isLocal: boolean, travelPlan: string | null) {
-  // The RPC rechecks acceptance under a row lock before writing. A browser can
+  // The RPC rechecks acceptance and the deadline under a row lock. A browser can
   // never choose an application ID, email, or admission status.
   const response = await portalStorageRequest("rpc/save_member_rsvp", {
     method: "POST", headers: { "Content-Type": "application/json" },
