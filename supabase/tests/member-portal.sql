@@ -16,6 +16,9 @@ begin
 end;
 $$;
 
+insert into auth.users(id, email, email_confirmed_at)
+values ('99999999-9999-4999-8999-999999999990', 'portal-sql-owner@example.invalid', now());
+
 set local role service_role;
 
 insert into public.applications (
@@ -37,6 +40,10 @@ begin
   exception when insufficient_privilege then null; end;
 
   update public.applications set admission_status = 'accepted' where id = '99999999-9999-4999-8999-999999999991';
+  insert into public.application_admissions(application_id, decision, notification_id, decided_by,
+    email_status, email_payload, email_sent_at)
+  values ('99999999-9999-4999-8999-999999999991', 'accepted', gen_random_uuid(),
+    '99999999-9999-4999-8999-999999999990', 'sent', '{}', now());
   begin
     perform * from public.save_member_rsvp('99999999-9999-4999-8999-999999999991', 'someone-else@example.invalid', true, null);
     raise exception 'Wrong email was allowed to RSVP';

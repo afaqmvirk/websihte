@@ -14,6 +14,18 @@ export type PortalMember = {
   email: string;
 };
 
+export function formatRsvpDeadline(deadline: string) {
+  // Midnight closes the preceding day. Name that day so the cutoff is unambiguous.
+  const lastDay = new Date(new Date(deadline).getTime() - 1);
+  const date = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto", month: "long", day: "numeric", year: "numeric",
+  }).format(lastDay);
+  const zone = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Toronto", timeZoneName: "short",
+  }).formatToParts(lastDay).find((part) => part.type === "timeZoneName")?.value;
+  return `${date} (${zone}, Ottawa time)`;
+}
+
 export function isPortalHost(host: string) {
   return host.toLowerCase().split(":")[0] === PORTAL_HOST;
 }

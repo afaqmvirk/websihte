@@ -6,8 +6,8 @@ import { POST as signOut } from "../api/portal/sign-out/route";
 import { POST as verifyCode } from "../api/portal/verify-code/route";
 import { proxy } from "../../proxy";
 import { createPortalEmail } from "./portal-email";
-import { findAcceptedMember, saveMemberRsvp } from "./portal-storage";
-import { getPortalUrl, isSameOriginRequest, parseRsvp, TRAVEL_PLAN_LIMIT } from "./portal";
+import { findAcceptedMember, getMemberRsvpWindow, RsvpWindowError, saveMemberRsvp } from "./portal-storage";
+import { formatRsvpDeadline, getPortalUrl, isSameOriginRequest, parseRsvp, TRAVEL_PLAN_LIMIT } from "./portal";
 
 const originalFetch = globalThis.fetch;
 const names = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_PUBLISHABLE_KEY", "APPLICATION_EMAIL_API_KEY", "APPLICATION_EMAIL_FROM", "APPLICATION_EMAIL_TO", "APPLICATION_EMAIL_REPLY_TO", "PORTAL_URL", "VERCEL"] as const;
@@ -17,6 +17,7 @@ let admission: string | null;
 let claim: boolean;
 let validCode: boolean;
 let confirmedEmail: boolean;
+let rsvpError: string | null;
 const memberId = "99999999-9999-4999-8999-999999999991";
 
 beforeEach(() => {
@@ -28,6 +29,7 @@ beforeEach(() => {
   });
   delete process.env.VERCEL;
   calls = []; admission = "accepted"; claim = true; validCode = true; confirmedEmail = true;
+  rsvpError = null;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const body = init?.body ? JSON.parse(String(init.body)) : null;
@@ -50,6 +52,8 @@ beforeEach(() => {
       });
     }
     if (url.pathname === "/auth/v1/logout") return new Response(null, { status: 204 });
+    if (url.pathname === "/rest/v1/rpc/member_rsvp_deadline") return Response.json("2026-10-30T04:00:00+00:00");
+    if (url.pathname === "/rest/v1/rpc/save_member_rsvp" && rsvpError) return Response.json({ message: rsvpError }, { status: 400 });
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp") return Response.json([{
       is_local: body.p_is_local, travel_plan: body.p_travel_plan, updated_at: "2026-10-18T18:00:00Z",
     }]);
@@ -87,6 +91,28 @@ test("RSVP requires an explicit boolean and a non-empty travel plan for visitors
 
 test("switching to local clears stored travel details and ignores caller identity fields", () => {
   assert.deepEqual(parseRsvp({ isLocal: true, travelPlan: "old plan", applicationId: "someone-else", email: "someone@example.com" }), { isLocal: true, travelPlan: null });
+});
+
+test("deadline labels name the last RSVP day in Ottawa, regardless of the viewer's timezone", () => {
+  assert.equal(formatRsvpDeadline("2026-10-30T04:00:00Z"), "October 29, 2026 (EDT, Ottawa time)");
+  assert.equal(formatRsvpDeadline("2026-11-03T05:00:00Z"), "November 2, 2026 (EST, Ottawa time)");
+});
+
+test("the deadline comes from the database using only the verified application ID", async () => {
+  const window = await getMemberRsvpWindow({ id: memberId, email: "accepted@example.com", full_name: "Test Human" });
+  assert.equal(window.deadline, "2026-10-30T04:00:00+00:00");
+  assert.deepEqual(calls[0].body, { p_application_id: memberId });
+});
+
+test("database deadline errors become actionable RSVP errors without exposing backend details", async () => {
+  const member = { id: memberId, email: "accepted@example.com", full_name: "Test Human" };
+  for (const reason of ["closed", "pending"] as const) {
+    rsvpError = reason === "closed" ? "member_rsvp_closed" : "member_rsvp_not_open";
+    await assert.rejects(saveMemberRsvp(member, true, null), (error: unknown) =>
+      error instanceof RsvpWindowError && error.reason === reason);
+  }
+  rsvpError = "private database detail";
+  await assert.rejects(saveMemberRsvp(member, true, null), { message: "Portal storage request failed" });
 });
 
 test("member lookup uses only the latest complete Ottawa application and returns no private answers", async () => {
