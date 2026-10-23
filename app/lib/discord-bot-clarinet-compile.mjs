@@ -47,8 +47,13 @@ export function compileClarinetPassage(input, tempo, performanceSeed) {
   const random = () => { state ^= state << 13; state ^= state >>> 17; state ^= state << 5; return (state >>> 0) / 2 ** 32; };
   const maxSeconds = 10.5 + random() * 3;
   const end = events.reduce((maximum, note) => Math.max(maximum, note.time + note.beats), 0);
+  // A short source may never meet the random 10.5–13.5s target. Still vary its
+  // start when at least six seconds remain; tiny signature riffs stay whole.
+  const sourceSeconds = (end - events[0].time) * 60 / bpm;
+  const minimumSeconds = Math.min(10, Math.max(6, sourceSeconds * 0.6));
+  const startSeconds = sourceSeconds < maxSeconds ? minimumSeconds : maxSeconds;
   const starts = events.flatMap((note, index) => index <= events.length - 4
-    && (!index || note.time !== events[index - 1].time) && (end - note.time) * 60 / bpm >= maxSeconds ? [index] : []);
+    && (!index || note.time !== events[index - 1].time) && (end - note.time) * 60 / bpm >= startSeconds ? [index] : []);
   if (!starts.length) starts.push(0); // Short hooks finish naturally, without looping or inventing notes.
   if (performanceSeed !== undefined) for (let index = 0; index < Math.min(32, starts.length); index++) {
     const chosen = index + Math.floor(random() * (starts.length - index));
@@ -61,7 +66,7 @@ export function compileClarinetPassage(input, tempo, performanceSeed) {
       const score = compileClarinetExcerpt(events.slice(start, start + 600).filter((note) => (note.time - origin) * 60 / bpm < 45),
         bpm, { maxSeconds, maxNotes: 128 });
       const seconds = score.notes.reduce((sum, note) => sum + note.beats, 0) * 60 / bpm;
-      if (seconds >= 10 || performanceSeed === undefined) return score;
+      if (seconds >= minimumSeconds || performanceSeed === undefined) return score;
       if (seconds > bestSeconds) { best = score; bestSeconds = seconds; }
     } catch { /* Try another real section of this melody. */ }
   }

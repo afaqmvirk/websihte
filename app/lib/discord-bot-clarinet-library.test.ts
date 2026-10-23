@@ -20,6 +20,9 @@ const rows = [
   { hash: "7".repeat(32), title: "Bohemian Rhapsody", artist: "Queen 3 (1)", genre: "Rock" },
   { hash: "8".repeat(32), title: "By The Way", artist: "Red Hot Chili Peppers", genre: "Rock" },
   { hash: "9".repeat(32), title: "Stand By Me", artist: "Ben E. King", genre: "Pop" },
+  { hash: "a".repeat(32), title: "God Is A Woman", artist: "Ariana Grande", genre: "Pop" },
+  { hash: "b".repeat(32), title: "One Last Time", artist: "Ariana Grande", genre: "Pop" },
+  { hash: "c".repeat(32), title: "Dangerous Woman", artist: "Ariana Grande 2 (1)", genre: "Pop" },
 ];
 const midi = Buffer.from(writeMidi({ header: { format: 0, numTracks: 1, ticksPerBeat: 480 }, tracks: [[
   ...[60, 62, 64, 65].flatMap((noteNumber) => [
@@ -83,6 +86,20 @@ describe("Squd whole-archive melody library", () => {
     assert.deepEqual(await library.search("abba", 0), []);
     assert.ok((await library.search("abba", 500)).length <= 8);
   });
+  it("chooses different artist songs by message before giving the model its allowed ID", async () => {
+    const library = fixture(), query = "play something by Ariana Grande";
+    const choices = await Promise.all(Array.from({ length: 32 }, (_, index) => library.select(query, [], `message-${index}`)));
+    assert.ok(choices.every((entries) => entries.length === 1 && entries[0].artists.every((artist) => artist.startsWith("Ariana Grande"))));
+    assert.equal(new Set(choices.map(([entry]) => entry.title)).size, 4); // Three archive songs plus Positions.
+    assert.deepEqual(await library.select(query, [], "message-0"), choices[0]);
+    assert.deepEqual(await library.select("play it again", [query], "message-0"), choices[0]);
+    assert.ok((await library.search(query)).length > 1); // Public search remains ranked and complete.
+    for (const seed of ["message-0", "message-1", "message-2"]) {
+      assert.equal((await library.select("play Positions by Ariana Grande", [], seed))[0].title, "Positions");
+      assert.deepEqual(await library.select("play zqxv by Ariana Grande", [], seed), []);
+      assert.equal((await library.select("play Queen", [], seed))[0].title, "Queen");
+    }
+  });
   it("looks up unnamed files by validated ID and extracts real MIDI notes on demand", async () => {
     let calls = 0;
     const library = createClarinetLibrary(async () => ({ search: () => rows }), { ...archive, midi: async () => { calls++; return midi; } });
@@ -126,6 +143,8 @@ describe("Squd whole-archive melody library", () => {
     assert.ok(new Set(scores.map((score) => JSON.stringify(score))).size > 1);
     assert.deepEqual(await getClarinetLibraryScore("core_weezer_buddy_holly", "message-0"),
       await getClarinetLibraryScore("core_weezer_buddy_holly", "message-1"));
+    const short = curated.entries.find((entry) => entry.song === "os_2715117")!;
+    assert.ok(new Set(short.passages.map((score) => JSON.stringify(score))).size > 1);
   });
   it("caches source MIDI without freezing every later message to one section", async () => {
     let downloads = 0;

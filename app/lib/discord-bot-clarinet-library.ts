@@ -25,6 +25,19 @@ const artistAliases = [
   [/freddie mercury|freddy mercury|brian may|roger taylor|john deacon/i, "queen"],
   [/benny andersson|benny anderson|bjorn ulvaeus|bjorn valaeus/i, "abba"],
 ] as const;
+const normalizeQuery = (query: string) => normalize(query.slice(0, 2000).replace(/<@!?\d+>/g, ""))
+  .replace(/\brick ?roll(?:ed|ing)?\b/g, "never gonna give you up rick astley");
+
+function entryArtists(entry: ClarinetLibraryEntry) {
+  const artists = [...new Set(entry.artists.flatMap((artist) => [normalize(artist), artistKey(artist)]))].filter(Boolean);
+  for (const [pattern, alias] of artistAliases) if (artists.some((artist) => pattern.test(artist))) artists.push(alias);
+  return artists;
+}
+
+function artistOnlyRequest(query: string, artists: string[]) {
+  const tokens = words(query);
+  return tokens.length > 0 && artists.some((artist) => tokens.every((token) => artist.split(" ").includes(token)));
+}
 
 function almostEqual(a: string, b: string) {
   if (a === b) return true;
@@ -59,12 +72,10 @@ function rank(entries: ClarinetLibraryEntry[], query: string, limit: number) {
       const fuzzy = coverage === 1 && queryCoverage >= 0.6 || tokens.length === 1 && matched > 0 && tokens[0].length >= 4;
       return ((exact && queryCoverage >= 0.6) || compact ? 100 + Math.min(80, title.length) : 0) + (fuzzy ? coverage * 35 + matched : 0);
     }));
-    const artists = [...new Set(entry.artists.flatMap((artist) => [normalize(artist), artistKey(artist)]))].filter(Boolean);
-    for (const [pattern, alias] of artistAliases) if (artists.some((artist) => pattern.test(artist))) artists.push(alias);
+    const artists = entryArtists(entry);
     const artistHit = artists.some((artist) => phrase.includes(` ${artist} `));
     // Artist names can broaden an artist-only request, but cannot rescue an unknown title.
-    const artistTokens = words(query);
-    const artistOnly = artistTokens.length > 0 && artists.some((artist) => artistTokens.every((token) => artist.split(" ").includes(token)));
+    const artistOnly = artistOnlyRequest(query, artists);
     const versionLabel = entry.artists.some((artist) => /\s+\d+(?:\s*\(\d+\))?$/.test(artist));
     const wrongArtist = artistRequested.length > 0 && !artists.some((artist) => artistRequested.every((token) => artist.split(" ").some((word) => almostEqual(token, word))));
     return { entry, score: wrongArtist ? 0 : titleScore + (artistHit && (titleScore > 0 || artistOnly) ? 25 : 0), versionLabel };
@@ -105,9 +116,8 @@ export function createClarinetLibrary(catalog: () => Promise<SongCatalog>, archi
     try { return await request; } finally { pendingMidi.delete(song); }
   }
   async function search(query: string, limit = 8): Promise<ClarinetLibraryEntry[]> {
-    let normalized = normalize(query.slice(0, 2000).replace(/<@!?\d+>/g, ""));
+    const normalized = normalizeQuery(query);
     if (!normalized || !Number.isInteger(limit) || limit < 1) return [];
-    normalized = normalized.replace(/\brick ?roll(?:ed|ing)?\b/g, "never gonna give you up rick astley");
     const direct = rank(curated.entries, normalized, limit);
     // Keep the existing exact hooks available even if the archive host is temporarily down.
     if (direct.some((entry) => [entry.title, ...(entry.aliases ?? [])].some((name) => ` ${normalized} `.includes(` ${normalize(name)} `)))) return direct;
@@ -121,15 +131,24 @@ export function createClarinetLibrary(catalog: () => Promise<SongCatalog>, archi
   }
   return {
     search,
-    async select(question: string, history: string[] = []) {
+    async select(question: string, history: string[] = [], performanceSeed?: string) {
+      function choose(query: string, matches: ClarinetLibraryEntry[]) {
+        if (performanceSeed === undefined) return matches;
+        const normalized = normalizeQuery(query), title = requestedTitle(normalized);
+        // An exact title always keeps its normal matches, even if an artist shares that name.
+        if (matches.some((entry) => [entry.title, ...(entry.aliases ?? [])].some((name) => normalize(name) === title))) return matches;
+        const choices = matches.filter((entry) => artistOnlyRequest(normalized, entryArtists(entry)));
+        // Choose on the server so the model cannot keep preferring the same artist's hit.
+        return choices.length ? [choices[clarinetPassageIndex(`artist:${normalized}:${performanceSeed}`, choices.length)]] : matches;
+      }
       const current = await search(question);
-      if (current.length) return current;
+      if (current.length) return choose(question, current);
       if (!words(question).length && /\b(?:random|anything|something)\b/i.test(question)) {
         return (await Promise.all(popular.map((title) => search(title, 1)))).flat().slice(0, 8);
       }
       if (!words(question).length && /\b(?:again|that|it|same)\b/i.test(question)) {
         for (const text of history.slice(-3).reverse()) {
-          const matches = await search(text); if (matches.length) return matches;
+          const matches = await search(text); if (matches.length) return choose(text, matches);
         }
       }
       return [];

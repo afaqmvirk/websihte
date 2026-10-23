@@ -248,7 +248,7 @@ async function requestDiscordBotReply(
   const canRender = canCreateFiles && !!getDiscordRendererConfig();
   const canLookupMembers = (options.persona ?? "bob") === "bob" && !!options.memberLookup && lookup.count < 2;
   const librarySongs = options.persona === "squd"
-    ? await selectClarinetLibrarySongs(question, history.filter((message) => message.role === "user").map((message) => message.content)).catch(() => []) : [];
+    ? await selectClarinetLibrarySongs(question, history.filter((message) => message.role === "user").map((message) => message.content), options.performanceSeed).catch(() => []) : [];
   const response = await fetch(OPENAI_API, {
     method: "POST", headers: { Authorization: `Bearer ${key}`, "Content-Type": "application/json" },
     body: JSON.stringify({
