@@ -19,6 +19,7 @@ begin
     values(applicant_id,replace(applicant_id::text,'-','')||replace(applicant_id::text,'-',''),'ottawa-2026','Synthetic Check-in',applicant_id::text||'@check-in.invalid','Synthetic School','M','none','https://example.invalid','Fixture','Fixture',true,'test','complete','accepted');
   insert into public.member_rsvps(application_id,is_local) values(applicant_id,true) returning qr_token into token;
   if token is null then raise exception 'No persistent QR token'; end if;
+  perform public.record_member_consent(applicant_id,applicant_id::text||'@check-in.invalid',true,'Synthetic Check-in',true,true,false);
   result := public.organizer_lookup_rsvp(organizer_id,token);
   if result->>'status'<>'ready' or result->>'full_name'<>'Synthetic Check-in'
     or exists(select 1 from public.member_rsvps where application_id=applicant_id and checked_in_at is not null)
