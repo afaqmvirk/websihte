@@ -13,7 +13,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
 }) {
   const [saved, setSaved] = useState(initialRsvp);
   const [editing, setEditing] = useState(!initialRsvp);
-  const [local, setLocal] = useState<"yes" | "no" | "">(initialRsvp ? initialRsvp.is_local ? "yes" : "no" : "");
+  const [local, setLocal] = useState<"yes" | "no" | "">(initialRsvp?.is_local === true ? "yes" : initialRsvp?.is_local === false ? "no" : "");
   const [travelPlan, setTravelPlan] = useState(initialRsvp?.travel_plan || "");
   const [consent, setConsent] = useState({ ...emptyConsent, isAdult: typeof initialRsvp?.is_adult === "boolean" ? initialRsvp.is_adult ? "yes" as const : "no" as const : "" as const });
   const [guardianFile, setGuardianFile] = useState<File | null>(null);
@@ -78,7 +78,24 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
       <p className={styles.rsvpPolicy}>{RSVP_ATTENDANCE_NOTE}</p>
       {notice && <p className={styles.rsvpDeadline} role="status">{notice}</p>}
       {closed && !saved?.cancelled_at && <p className={styles.rsvpDeadline} role="status">{saved ? "Your saved RSVP is below. You can still cancel it." : "No RSVP was submitted."} For help, email <a href="mailto:applications@stupideas.com">applications@stupideas.com</a>.</p>}
-      {saved?.cancelled_at && (!editing || !canRsvp) ? (
+      {!saved?.cancelled_at && !confirmingCancel && (
+        <div className={styles.rsvpActions}>
+          <button className={styles.dangerButton} type="button" disabled={saving} onClick={() => {
+            setConfirmingCancel(true); setError("");
+            requestAnimationFrame(() => keepRsvpButton.current?.focus());
+          }}>cancel RSVP</button>
+        </div>
+      )}
+      {confirmingCancel ? (
+        <div className={styles.cancelConfirmation} role="group" aria-labelledby="cancel-rsvp-heading">
+          <h3 id="cancel-rsvp-heading">cancel your RSVP?</h3>
+          <p>{saved ? "You will no longer be marked as attending." : "This tells us you won't be attending."} {canRsvp ? "You can RSVP again until the deadline." : closed ? "The deadline has passed, so you'll need to contact us if you want to RSVP again." : "You can RSVP once your acceptance email has been sent."}</p>
+          <div className={styles.rsvpActions}>
+            <button className={styles.dangerButton} type="button" disabled={saving} onClick={cancelRsvp}>{saving ? "cancelling…" : "yes, cancel RSVP"}</button>
+            <button ref={keepRsvpButton} className={styles.textButton} type="button" disabled={saving} onClick={() => { setConfirmingCancel(false); setError(""); }}>{saved ? "keep RSVP" : "go back"}</button>
+          </div>
+        </div>
+      ) : saved?.cancelled_at && (!editing || !canRsvp) ? (
         <div className={styles.savedRsvp}>
           <p className={styles.rsvpDeadline} role="status">You&apos;re no longer marked as attending.</p>
           {canRsvp ? <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>RSVP again</button>
@@ -96,22 +113,9 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
             <div><dt>local to ottawa</dt><dd>{saved.is_local ? "yes" : "no"}</dd></div>
             {!saved.is_local && <div><dt>travel + accommodation plan</dt><dd>{saved.travel_plan}</dd></div>}
           </dl>
-          {confirmingCancel ? (
-            <div className={styles.cancelConfirmation} role="group" aria-labelledby="cancel-rsvp-heading">
-              <h3 id="cancel-rsvp-heading">cancel your RSVP?</h3>
-              <p>You will no longer be marked as attending. {canRsvp ? "You can RSVP again until the deadline." : "The deadline has passed, so you'll need to contact us if you want to RSVP again."}</p>
-              <div className={styles.rsvpActions}>
-                <button className={styles.primaryButton} disabled={saving} onClick={cancelRsvp}>{saving ? "cancelling…" : "yes, cancel RSVP"}</button>
-                <button ref={keepRsvpButton} className={styles.textButton} disabled={saving} onClick={() => { setConfirmingCancel(false); setError(""); }}>keep RSVP</button>
-              </div>
-            </div>
-          ) : (
+          {canRsvp && (
             <div className={styles.rsvpActions}>
-              {canRsvp && <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>edit RSVP</button>}
-              <button className={styles.textButton} onClick={() => {
-                setConfirmingCancel(true); setError("");
-                requestAnimationFrame(() => keepRsvpButton.current?.focus());
-              }}>cancel RSVP</button>
+              <button className={styles.secondaryButton} onClick={() => { setEditing(true); setError(""); }}>edit RSVP</button>
             </div>
           )}
         </div>
@@ -145,7 +149,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
             {saving ? "saving…" : "save RSVP"}
           </button>
           {saved ? <button className={styles.textButton} type="button" disabled={saving} onClick={() => {
-            setLocal(saved.is_local ? "yes" : "no"); setTravelPlan(saved.travel_plan || ""); setEditing(false); setError("");
+            setLocal(saved.is_local === true ? "yes" : saved.is_local === false ? "no" : ""); setTravelPlan(saved.travel_plan || ""); setEditing(false); setError("");
           }}>discard edits</button> : null}
         </form>
       ) : null}

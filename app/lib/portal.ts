@@ -4,7 +4,7 @@ export const TRAVEL_PLAN_LIMIT = 2000;
 export const RSVP_ATTENDANCE_NOTE = "Failure to check-in while RSVP'd without cancelling may affect your eligibility for future SIH events.";
 
 export type PortalRsvp = {
-  is_local: boolean;
+  is_local: boolean | null;
   travel_plan: string | null;
   updated_at: string;
   cancelled_at: string | null;
