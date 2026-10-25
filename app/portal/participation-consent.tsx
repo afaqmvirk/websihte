@@ -57,7 +57,7 @@ export default function ParticipationConsent({ rsvp, onSaved }: { rsvp: PortalRs
       <dl className={styles.savedAnswers}>
         <div><dt>18 or older on November 15</dt><dd>{rsvp.is_adult ? "yes" : "no"}</dd></div>
         {rsvp.is_adult === false && <div><dt>parent / guardian consent</dt><dd>{rsvp.guardian_upload_status === "approved" ? "approved" : rsvp.guardian_upload_status === "pending" ? "uploaded — awaiting organizer review" : rsvp.guardian_upload_status === "rejected" ? "replacement needed" : "signed form required before check-in"}</dd></div>}
-        <div><dt>optional photo/video permission</dt><dd>{!rsvp.media_consent ? "declined" : rsvp.is_adult ? "opted in" : !rsvp.guardian_completed_at ? "awaiting parent permission" : rsvp.guardian_media_consent ? "opted in" : "declined by parent / guardian"}</dd></div>
+        <div><dt>photo/video permission</dt><dd>{!rsvp.media_consent ? "declined" : rsvp.is_adult ? "opted in" : !rsvp.guardian_completed_at ? "awaiting parent permission" : rsvp.guardian_media_consent ? "opted in" : "declined by parent / guardian"}</dd></div>
       </dl>
       {rsvp.is_adult === false && <div className={styles.guardianUpload}>
         <p>Download the form, have your parent or legal guardian read and sign it, then upload the signed PDF or a clear photo of the completed signature page. An organizer must approve it before check-in. You can upload even after the RSVP deadline.</p>
