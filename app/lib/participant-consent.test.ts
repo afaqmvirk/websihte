@@ -29,6 +29,20 @@ test("saved minor portal offers download/upload and shows review feedback withou
   expect(html).toContain("Please add a signature.");
   expect(html).not.toContain("resend parent-form email");
 });
+test("completed summaries are hidden, while minors without a submitted form can still upload", () => {
+  const saved = { is_local: true, travel_plan: null, updated_at: "2026-10-25T12:00:00Z", cancelled_at: null,
+    consent_version: CONSENT_VERSION, signature_name: "Fixture Attendee", code_accepted_at: "2026-10-25T12:00:00Z", liability_accepted_at: "2026-10-25T12:00:00Z", media_consent: true };
+  const render = (rsvp: import("./portal").PortalRsvp) => renderToStaticMarkup(createElement(ParticipationConsent, { rsvp, onSaved: () => {} }));
+  expect(render({ ...saved, is_adult: true })).toBe("");
+  expect(render({ ...saved, is_adult: false, guardian_uploaded_at: "2026-10-25T13:00:00Z", guardian_upload_status: "pending" })).toBe("");
+  expect(render({ ...saved, is_adult: false, guardian_upload_status: "approved", guardian_completed_at: "2026-10-25T14:00:00Z" })).toBe("");
+  const missing = render({ ...saved, is_adult: false });
+  expect(missing).toContain("download parent / guardian form");
+  expect(missing).toContain("upload signed form");
+  expect(missing).not.toContain("Code of Conduct and liability waiver accepted.");
+  expect(missing).not.toContain("update participation forms");
+  expect(missing).not.toContain("photo/video permission");
+});
 test("parent upload and private download deny unverified visitors; foreign upload origins fail first", async () => {
   const response = await upload(new Request("https://my.stupideas.com/api/portal/guardian/upload", { method: "POST", headers: { Origin: "https://attacker.invalid" } }));
   expect(response.status).toBe(403);
