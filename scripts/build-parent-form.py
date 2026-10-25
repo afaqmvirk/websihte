@@ -2,9 +2,8 @@
 import json, sys
 from pathlib import Path
 from xml.sax.saxutils import escape
-from reportlab.platypus import SimpleDocTemplate, Paragraph, Spacer, PageBreak, Flowable, KeepTogether
+from reportlab.platypus import SimpleDocTemplate, Paragraph, PageBreak, Flowable, KeepTogether
 from reportlab.lib.styles import getSampleStyleSheet, ParagraphStyle
-from reportlab.lib.enums import TA_LEFT
 from reportlab.lib.colors import black, white, HexColor
 from reportlab.lib.pagesizes import letter
 
@@ -46,17 +45,15 @@ def footer(c, doc):
     c.drawRightString(558,32,"Page " + str(doc.page)); c.restoreState()
 
 story=[Paragraph("Parent / guardian consent",styles["Heading1"]),paragraph(data["organizer"]),
-       paragraph(data["event"]),paragraph("Doors open 9:30 AM EST. Opening ceremonies start 10 AM EST. Event ends 8 PM EST.","Fine"),
-       paragraph("For attendees under 18 on November 15, 2026. A parent or legal guardian must read the attached terms, complete and sign this form. The attendee then uploads the entire signed PDF, or clear photos of all completed signature pages, in their portal for organizer review. Keep the attached terms. Required fields and boxes below must be completed.","Fine"),
+       paragraph(data["event"]),paragraph(data["parentForm"]["introduction"],"Fine"),
        Fields([("participant_name","Participant full legal name")]),
        Fields([("guardian_name","Parent / legal guardian full legal name")]),
        Fields([("relationship","Relationship to participant"),("guardian_email","Parent / guardian email")]),
        Fields([("guardian_phone","Parent / guardian phone")])]
 story += [paragraph(x) for x in data["parentDeclarations"]]
-story += [Check("required_consent","REQUIRED: I am at least 18, have authority as this participant's parent or legal guardian, and agree to the declarations above and the attached Code of Conduct and Liability Release Waiver."),
-          Check("optional_media_permission","OPTIONAL: I authorize the attached Optional Media Release for this participant. Leave unchecked to decline. This does not affect participation; media permission also requires the participant to opt in."),
-          Fields([("guardian_signature","Parent / guardian signature"),("signature_date","Date signed (YYYY-MM-DD)")]),
-          paragraph("The participant cannot sign this form on the guardian's behalf. Upload a PDF, JPG or PNG up to 4 MB. Do not email the signed form.","Fine")]
+story += [Check("required_consent",data["parentForm"]["requiredConsent"]),
+          Check("optional_media_permission",data["parentForm"]["mediaConsent"]),
+          Fields([("guardian_signature","Parent / guardian signature"),("signature_date","Date signed (YYYY-MM-DD)")])]
 for document in data["documents"].values():
     story += [PageBreak(),Paragraph(escape(document["title"]),styles["Heading1"]),paragraph(document["introduction"])]
     for section in document["sections"]:
