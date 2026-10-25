@@ -6,6 +6,7 @@ import { formatRsvpDeadline, RSVP_ATTENDANCE_NOTE, TRAVEL_PLAN_LIMIT, type Porta
 import styles from "./portal.module.css";
 import ConsentFields, { consentPayload, emptyConsent } from "./consent-fields";
 import ParticipationConsent from "./participation-consent";
+import GuardianFileInput, { uploadAfterConsent } from "./guardian-file-input";
 
 export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   initialRsvp: PortalRsvp | null; deadline: string | null; initiallyClosed: boolean;
@@ -15,6 +16,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   const [local, setLocal] = useState<"yes" | "no" | "">(initialRsvp ? initialRsvp.is_local ? "yes" : "no" : "");
   const [travelPlan, setTravelPlan] = useState(initialRsvp?.travel_plan || "");
   const [consent, setConsent] = useState({ ...emptyConsent, isAdult: typeof initialRsvp?.is_adult === "boolean" ? initialRsvp.is_adult ? "yes" as const : "no" as const : "" as const });
+  const [guardianFile, setGuardianFile] = useState<File | null>(null);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -43,7 +45,8 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
         if (data.reason === "closed") setClosed(true);
         throw new Error(data.message || "We couldn't save your RSVP. Please try again.");
       }
-      setSaved(data.rsvp); setEditing(false); setNotice(data.message || "RSVP saved.");
+      const result = await uploadAfterConsent(data, guardianFile);
+      setSaved(result.rsvp); setEditing(false); setNotice(result.message || "RSVP saved."); setGuardianFile(null);
       requestAnimationFrame(() => savedHeading.current?.focus());
     } catch (error) { setError(error instanceof Error ? error.message : "We couldn't save your RSVP. Your answers are still here; please try again."); }
     finally { setSaving(false); }
@@ -135,7 +138,9 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
                 aria-describedby="travel-note" value={travelPlan} onChange={(event) => setTravelPlan(event.target.value)} />
             </div>
           )}
-          <ConsentFields value={consent} onChange={setConsent} disabled={saving} prefix="rsvp" />
+          <ConsentFields value={consent} onChange={setConsent} disabled={saving} prefix="rsvp">
+            <GuardianFileInput id="rsvp-guardian-file" file={guardianFile} onChange={setGuardianFile} disabled={saving} />
+          </ConsentFields>
           <button className={styles.primaryButton} type="submit" disabled={saving || !local}>
             {saving ? "saving…" : "save RSVP"}
           </button>
