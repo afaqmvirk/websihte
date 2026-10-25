@@ -27,9 +27,26 @@ begin
     email_status,email_payload,email_sent_at)
   values(applicant_id,'accepted',gen_random_uuid(),owner_id,'sent','{}',now());
 
-  if exists(select 1 from public.cancel_member_rsvp(applicant_id,applicant_email))
-  then raise exception 'Cancellation created a missing RSVP'; end if;
+  -- Declining must work without attendance answers, consent, or an open window.
+  update public.application_admissions set email_sent_at=null where application_id=applicant_id;
+  select * into result from public.cancel_member_rsvp(applicant_id,applicant_email);
+  if result.cancelled_at is null or result.is_local is not null or result.travel_plan is not null
+  then raise exception 'Declining before the first RSVP did not record an unanswered cancellation'; end if;
+  if (select signature_name is not null or code_accepted_at is not null or liability_accepted_at is not null
+      from public.member_rsvps where application_id=applicant_id)
+  then raise exception 'Declining invented participation consent'; end if;
+  first_cancellation := result.cancelled_at;
+  select * into result from public.cancel_member_rsvp(applicant_id,applicant_email);
+  if result.cancelled_at is distinct from first_cancellation
+  then raise exception 'Repeated decline changed its timestamp'; end if;
+  begin
+    update public.member_rsvps set cancelled_at=null where application_id=applicant_id;
+    raise exception 'An unanswered decline became an active RSVP';
+  exception when check_violation then null; end;
+  update public.application_admissions set email_sent_at=now() where application_id=applicant_id;
   perform * from public.save_member_rsvp(applicant_id,applicant_email,false,'train; staying with a friend');
+  if (select cancelled_at is not null from public.member_rsvps where application_id=applicant_id)
+  then raise exception 'RSVP after declining did not restore attendance'; end if;
   begin
     perform * from public.cancel_member_rsvp(applicant_id,'someone-else@example.invalid');
     raise exception 'Wrong email cancelled an RSVP';
@@ -65,6 +82,11 @@ begin
   then raise exception 'Expired save undid cancellation'; end if;
   if (select admission_status from public.applications where id=applicant_id) <> 'accepted'
   then raise exception 'Cancellation changed the admission decision'; end if;
+
+  delete from public.member_rsvps where application_id=applicant_id;
+  select * into result from public.cancel_member_rsvp(applicant_id,applicant_email);
+  if result.cancelled_at is null or result.is_local is not null or result.travel_plan is not null
+  then raise exception 'Declining after the deadline required a previous RSVP'; end if;
 
   update public.applications set admission_status='rejected' where id=applicant_id;
   begin

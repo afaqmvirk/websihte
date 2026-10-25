@@ -22,6 +22,7 @@ let validCode: boolean;
 let confirmedEmail: boolean;
 let rsvpError: string | null;
 let cancellationExists: boolean;
+let cancellationHasAnswers: boolean;
 const memberId = "99999999-9999-4999-8999-999999999991";
 
 beforeEach(() => {
@@ -35,6 +36,7 @@ beforeEach(() => {
   calls = []; admission = "accepted"; claim = true; validCode = true; confirmedEmail = true;
   rsvpError = null;
   cancellationExists = true;
+  cancellationHasAnswers = true;
   globalThis.fetch = async (input, init) => {
     const url = new URL(String(input));
     const body = init?.body ? JSON.parse(String(init.body)) : null;
@@ -59,7 +61,8 @@ beforeEach(() => {
     if (url.pathname === "/auth/v1/logout") return new Response(null, { status: 204 });
     if (url.pathname === "/rest/v1/rpc/member_rsvp_deadline") return Response.json("2026-10-30T04:00:00+00:00");
     if (url.pathname === "/rest/v1/rpc/cancel_member_rsvp" || url.pathname === "/rest/v1/member_rsvps") return Response.json(cancellationExists ? [{
-      is_local: false, travel_plan: "train; staying with a friend", updated_at: "2026-10-31T18:00:00Z", cancelled_at: "2026-10-31T18:00:00Z",
+      is_local: cancellationHasAnswers ? false : null, travel_plan: cancellationHasAnswers ? "train; staying with a friend" : null,
+      updated_at: "2026-10-31T18:00:00Z", cancelled_at: "2026-10-31T18:00:00Z",
     }] : []);
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp_with_consent" && rsvpError) return Response.json({ message: rsvpError }, { status: 400 });
     if (url.pathname === "/rest/v1/rpc/save_member_rsvp_with_consent") return Response.json([{
@@ -163,6 +166,16 @@ test("cancelled status persists when the dashboard reloads", async () => {
   assert.equal(rsvp?.cancelled_at, "2026-10-31T18:00:00Z");
   assert.ok(calls[0].url.searchParams.get("select")?.includes("cancelled_at"));
   assert.equal(calls[0].url.searchParams.get("application_id"), `eq.${memberId}`);
+});
+
+test("a decline without a prior RSVP preserves unanswered travel details when reloaded", async () => {
+  cancellationHasAnswers = false;
+  const member = { id: memberId, email: "accepted@example.com", full_name: "Test Human" };
+  const rsvp = await cancelMemberRsvp(member);
+  assert.equal(rsvp?.is_local, null);
+  assert.equal(rsvp?.travel_plan, null);
+  assert.ok(rsvp?.cancelled_at);
+  assert.deepEqual(await getMemberRsvp(member), rsvp);
 });
 
 test("cancellation rejects cross-origin and oversized requests before any backend access", async () => {
