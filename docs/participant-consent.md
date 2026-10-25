@@ -35,6 +35,12 @@ do not silently replace the archived terms. Participant acceptance history and
 signed uploads are private. Minor media permission takes effect only if both the
 attendee and parent opt in.
 
+Parent pack revision `ottawa-2026-parent-2026-10-25` removes schedule, upload,
+electronic-signature instructions and extra explanatory text from its signature
+page. Its exact copy and PDF digest are archived separately in the same table,
+referencing participant terms `ottawa-2026-2026-10-24`. The previously archived
+pack and signed submissions remain intact; the participant terms are unchanged.
+
 To rebuild the blank parent pack, run `bun scripts/build-parent-form.ts <python>`
 with ReportLab installed. Render and inspect every page, inspect both AcroForm
 fields and page widgets, and update the archived digest/version as appropriate.

@@ -1,13 +1,19 @@
 export const CONSENT_VERSION = "ottawa-2026-2026-10-24";
+export const PARENT_FORM_VERSION = "ottawa-2026-parent-2026-10-25";
 export const ORGANIZER_NAME = "Stupid Ideas Hackathon Community";
 export const CONSENT_CONTACT = "applications@stupideas.com";
 export const PARENT_FORM_DOWNLOAD = "/forms/sih-ottawa-2026-parent-guardian-consent.pdf";
 export const CONSENT_EVENT = "Stupid Ideas Hackathon Ottawa on November 15, 2026 at Bayview Yards, 7 Bayview Station Rd, Ottawa, Ontario";
 export const PARENT_DECLARATIONS = [
   "I am at least 18 and am the participant's parent or legal guardian with authority to give this consent. I have read the attached Code of Conduct and Event Policy and Liability Release Waiver, including the risks, negligence release, and limits on waiving a minor's rights. I consent to the participant attending and participating in this event and agree to the parent/guardian provisions in section 6 of the waiver in my own capacity and, only to the extent permitted by law, on the participant's behalf.",
-  "I will arrange appropriate travel and pickup, discuss the event rules and risks with the participant, and authorize the emergency assistance described in the waiver within the limits of applicable law. Nothing in this form waives a right of a minor that I cannot lawfully waive.",
-  "By signing below, I confirm that this information is accurate and I give this consent voluntarily. If I sign electronically, I intend my electronic signature to be my signature for this form. The signed form and its review record will be retained privately. Contact applications@stupideas.com for a copy or an alternative signing arrangement.",
+  "I authorize the emergency assistance described in the waiver within the limits of applicable law. Nothing in this form waives a right of a minor that I cannot lawfully waive.",
+  "By signing below, I confirm that this information is accurate and I give this consent voluntarily.",
 ];
+export const PARENT_FORM_COPY = {
+  introduction: "For attendees under 18 on November 15, 2026. A parent or legal guardian must read the attached terms, complete and sign this form.",
+  requiredConsent: "REQUIRED: I am at least 18, have authority as this participant's parent or legal guardian, and agree to the declarations above and the attached Code of Conduct and Liability Release Waiver.",
+  mediaConsent: "OPTIONAL: I authorize the attached Optional Media Release for this participant.",
+};
 
 type Document = { title: string; introduction: string; sections: { title: string; paragraphs: string[] }[] };
 
