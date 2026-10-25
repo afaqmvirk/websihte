@@ -26,9 +26,9 @@ export default function ConsentFields({ value, onChange, disabled, prefix, child
       {children}
     </>}
     <label className={styles.agreementChoice}><input type="checkbox" required checked={value.codeAccepted} onChange={event => update({ codeAccepted: event.target.checked })} /><span>I have read and agree to the <a href={documentHref("code-of-conduct")} target="_blank" rel="noreferrer">SIH Code of Conduct and Event Policy</a>.</span></label>
-    <label className={styles.agreementChoice}><input type="checkbox" required checked={value.waiverAccepted} onChange={event => update({ waiverAccepted: event.target.checked })} /><span>I have read and accept the <a href={documentHref("liability-waiver")} target="_blank" rel="noreferrer">SIH Liability Release Waiver</a>.{value.isAdult === "no" ? " I am providing the minor participant acknowledgment; my parent or guardian must also complete their form." : ""}</span></label>
+    <label className={styles.agreementChoice}><input type="checkbox" required checked={value.waiverAccepted} onChange={event => update({ waiverAccepted: event.target.checked })} /><span>I have read and accept the <a href={documentHref("liability-waiver")} target="_blank" rel="noreferrer">SIH Liability Release Waiver</a>.</span></label>
+    <label className={styles.agreementChoice}><input type="checkbox" checked={value.mediaConsent} onChange={event => update({ mediaConsent: event.target.checked })} /><span>I agree to the <a href={documentHref("media-release")} target="_blank" rel="noreferrer">photo/video authorization</a>.</span></label>
     <label className={styles.fieldLabel} htmlFor={`${prefix}-signature`}>type your full legal name as your electronic signature</label>
     <input id={`${prefix}-signature`} type="text" required minLength={2} maxLength={160} value={value.signature} onChange={event => update({ signature: event.target.value })} autoComplete="name" />
-    <label className={styles.agreementChoice}><input type="checkbox" checked={value.mediaConsent} onChange={event => update({ mediaConsent: event.target.checked })} /><span>I agree to the <a href={documentHref("media-release")} target="_blank" rel="noreferrer">optional photo/video authorization</a>.</span></label>
   </fieldset>;
 }
