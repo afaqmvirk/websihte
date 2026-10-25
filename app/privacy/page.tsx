@@ -133,6 +133,25 @@ export default function PrivacyPolicyPage() {
               application and used to coordinate attendance and the stupidest journey award.
               Short-lived hashed email and IP counters help limit sign-in email abuse.
             </p>
+            <p>
+              We also record whether you will be 18 or older on the event date, your
+              electronic signature, the versions and times of your Code of Conduct and
+              liability-waiver acceptance, and your separate optional photo/video choice.
+              For participants under 18, we collect the parent or legal guardian&apos;s
+              name, email, contact phone number, relationship, signature,
+              and consent choices on the signed form you upload. An approved organizer
+              reviews the signed form before it is marked approved for check-in.
+            </p>
+            <p>
+              These records are stored privately in Supabase and used to document
+              consent, coordinate safeguarding and check-in, and address event-related
+              questions or claims. Automated application notifications do not send
+              guardian contact details or signatures to Discord or sponsors. Signed
+              parent forms are kept in private file storage, with access checked by
+              our server for the applicant and approved organizers. You
+              can request a copy of your signed version or withdraw optional media
+              permission by contacting applications@stupideas.com.
+            </p>
 
             <h3>when you interact with our Discord bots</h3>
             <p>

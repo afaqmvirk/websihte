@@ -24,6 +24,9 @@ export async function createRsvpEmail(member: PortalMember, rsvp: PortalRsvp) {
       `Local to Ottawa: ${rsvp.is_local ? "yes" : "no"}.`,
       ...(!rsvp.is_local ? [`Travel + accommodation plan:\n${rsvp.travel_plan || ""}`] : []),
       "Show the QR code below to an organizer at check-in.",
+      ...(rsvp.is_adult === false ? [rsvp.guardian_completed_at
+        ? "Your parent/guardian form has been approved."
+        : "Before check-in, download the parent/guardian form from your portal, have your parent or legal guardian sign it, and upload the signed copy for organizer review."] : []),
       RSVP_ATTENDANCE_NOTE,
     ]),
     cancelled ? "You can RSVP again before your original deadline in the portal. For help after the deadline, reply to this email." : "You can review or edit your RSVP before your deadline in the portal. You can cancel even after the deadline.",

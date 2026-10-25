@@ -4,6 +4,8 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import Image from "next/image";
 import { formatRsvpDeadline, RSVP_ATTENDANCE_NOTE, TRAVEL_PLAN_LIMIT, type PortalRsvp } from "@/lib/portal";
 import styles from "./portal.module.css";
+import ConsentFields, { consentPayload, emptyConsent } from "./consent-fields";
+import ParticipationConsent from "./participation-consent";
 
 export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   initialRsvp: PortalRsvp | null; deadline: string | null; initiallyClosed: boolean;
@@ -12,6 +14,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
   const [editing, setEditing] = useState(!initialRsvp);
   const [local, setLocal] = useState<"yes" | "no" | "">(initialRsvp ? initialRsvp.is_local ? "yes" : "no" : "");
   const [travelPlan, setTravelPlan] = useState(initialRsvp?.travel_plan || "");
+  const [consent, setConsent] = useState({ ...emptyConsent, isAdult: typeof initialRsvp?.is_adult === "boolean" ? initialRsvp.is_adult ? "yes" as const : "no" as const : "" as const });
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
@@ -33,7 +36,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
     try {
       const response = await fetch("/api/portal/rsvp", {
         method: "POST", headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ isLocal: local === "yes", travelPlan }),
+        body: JSON.stringify({ isLocal: local === "yes", travelPlan, ...consentPayload(consent) }),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -80,6 +83,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
         </div>
       ) : saved && (!editing || !canRsvp) ? (
         <div className={styles.savedRsvp}>
+          <ParticipationConsent rsvp={saved} onSaved={(rsvp, message) => { setSaved(rsvp); setNotice(message); }} />
           <div className={styles.checkInCode}>
             <h3>your check-in QR code</h3>
             <p>Show this to an organizer when you arrive.</p>
@@ -131,6 +135,7 @@ export default function RsvpForm({ initialRsvp, deadline, initiallyClosed }: {
                 aria-describedby="travel-note" value={travelPlan} onChange={(event) => setTravelPlan(event.target.value)} />
             </div>
           )}
+          <ConsentFields value={consent} onChange={setConsent} disabled={saving} prefix="rsvp" />
           <button className={styles.primaryButton} type="submit" disabled={saving || !local}>
             {saving ? "saving…" : "save RSVP"}
           </button>

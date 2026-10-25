@@ -2,6 +2,14 @@ import { createHash } from "node:crypto";
 import { getApplicationStorageConfig } from "./application-storage";
 import { OTTAWA_EVENT } from "./ottawa-event";
 import type { PortalMember, PortalRsvp } from "./portal";
+import type { ConsentAnswer } from "./participant-documents";
+
+export class PortalRequestError extends Error {
+  constructor(message: string, public readonly status: number) { super(message); }
+}
+
+const rsvpFields = ["is_local", "travel_plan", "updated_at", "cancelled_at", "qr_token", "is_adult", "consent_version", "signature_name", "code_accepted_at", "liability_accepted_at", "media_consent", "guardian_uploaded_at", "guardian_completed_at", "guardian_media_consent", "guardian_upload_status", "guardian_filename", "guardian_review_note"] as const;
+const safeRsvp = (record: PortalRsvp) => Object.fromEntries(rsvpFields.filter(key => record[key] !== undefined).map(key => [key, record[key]])) as PortalRsvp;
 
 export class RsvpWindowError extends Error {
   constructor(public readonly reason: "closed" | "pending") {
@@ -22,10 +30,13 @@ export async function portalStorageRequest(path: string, init: RequestInit = {})
     ...init, headers, cache: "no-store", signal: AbortSignal.timeout(10_000),
   });
   if (!response.ok) {
-    if (path === "rpc/save_member_rsvp") {
+    if (path.startsWith("rpc/")) {
       const error = await response.json().catch(() => null);
       if (error?.message === "member_rsvp_closed") throw new RsvpWindowError("closed");
       if (error?.message === "member_rsvp_not_open") throw new RsvpWindowError("pending");
+      if (error?.message === "member_rsvp_inactive") throw new PortalRequestError("You need an active saved RSVP before completing these forms.", 409);
+      if (error?.message === "guardian_upload_ineligible") throw new PortalRequestError("Save an active under-18 RSVP and required participation forms first.", 409);
+      if (error?.message === "guardian_upload_rate_limited") throw new PortalRequestError("You've uploaded several forms recently. Please try again in an hour.", 429);
     }
     throw new Error("Portal storage request failed");
   }
@@ -47,10 +58,11 @@ export async function findAcceptedMember(email: string): Promise<PortalMember | 
 
 export async function getMemberRsvp(member: PortalMember): Promise<PortalRsvp | null> {
   const query = new URLSearchParams({
-    select: "is_local,travel_plan,updated_at,cancelled_at,qr_token", application_id: `eq.${member.id}`, limit: "1",
+    select: rsvpFields.join(","), application_id: `eq.${member.id}`, limit: "1",
   });
   const response = await portalStorageRequest(`member_rsvps?${query}`);
-  return (await response.json() as PortalRsvp[])[0] || null;
+  const record = (await response.json() as PortalRsvp[])[0];
+  return record ? safeRsvp(record) : null;
 }
 
 export async function getMemberRsvpWindow(member: PortalMember) {
@@ -62,23 +74,33 @@ export async function getMemberRsvpWindow(member: PortalMember) {
   return { deadline, closed: deadline !== null && Date.now() >= new Date(deadline).getTime() };
 }
 
-export async function saveMemberRsvp(member: PortalMember, isLocal: boolean, travelPlan: string | null) {
+export async function saveMemberRsvp(member: PortalMember, isLocal: boolean, travelPlan: string | null, consent: ConsentAnswer) {
   // The RPC rechecks acceptance and the deadline under a row lock. A browser can
   // never choose an application ID, email, or admission status.
-  const response = await portalStorageRequest("rpc/save_member_rsvp", {
+  const response = await portalStorageRequest("rpc/save_member_rsvp_with_consent", {
     method: "POST", headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       p_application_id: member.id, p_email: member.email,
       p_is_local: isLocal, p_travel_plan: travelPlan,
+      ...consentArguments(consent),
     }),
   });
   const [rsvp] = await response.json() as PortalRsvp[];
   if (!rsvp) throw new Error("RSVP was not returned");
-  // The existing save RPC keeps its return signature; a successful save always
-  // clears cancellation, and still enforces the original RSVP deadline.
-  let qrToken: string | undefined;
-  try { qrToken = (await getMemberRsvp(member))?.qr_token; } catch { /* The RSVP was saved; a ticket lookup can be retried on reload. */ }
-  return { ...rsvp, cancelled_at: null, ...(qrToken ? {qr_token:qrToken} : {}) };
+  return safeRsvp({ ...rsvp, cancelled_at: null });
+}
+
+function consentArguments(consent: ConsentAnswer) {
+  return { p_is_adult: consent.isAdult, p_signature: consent.signature, p_code_accepted: consent.codeAccepted,
+    p_waiver_accepted: consent.waiverAccepted, p_media_consent: consent.mediaConsent };
+}
+
+export async function recordMemberConsent(member: PortalMember, consent: ConsentAnswer) {
+  const response = await portalStorageRequest("rpc/record_member_consent", { method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ p_application_id: member.id, p_email: member.email, ...consentArguments(consent) }) });
+  const [rsvp] = await response.json() as PortalRsvp[];
+  if (!rsvp) throw new Error("Consent was not returned");
+  return safeRsvp(rsvp);
 }
 
 export async function cancelMemberRsvp(member: PortalMember): Promise<PortalRsvp | null> {
@@ -87,7 +109,7 @@ export async function cancelMemberRsvp(member: PortalMember): Promise<PortalRsvp
     body: JSON.stringify({ p_application_id: member.id, p_email: member.email }),
   });
   const [rsvp] = await response.json() as PortalRsvp[];
-  return rsvp || null;
+  return rsvp ? safeRsvp(rsvp) : null;
 }
 
 export async function claimPortalSignIn(email: string, ip: string) {

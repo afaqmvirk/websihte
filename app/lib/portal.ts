@@ -9,7 +9,24 @@ export type PortalRsvp = {
   updated_at: string;
   cancelled_at: string | null;
   qr_token?: string;
+  is_adult?: boolean | null;
+  consent_version?: string | null;
+  signature_name?: string | null;
+  code_accepted_at?: string | null;
+  liability_accepted_at?: string | null;
+  media_consent?: boolean;
+  guardian_uploaded_at?: string | null;
+  guardian_completed_at?: string | null;
+  guardian_media_consent?: boolean;
+  guardian_upload_status?: "pending" | "approved" | "rejected" | null;
+  guardian_filename?: string | null;
+  guardian_review_note?: string | null;
 };
+
+export function hasParticipantConsent(rsvp: PortalRsvp | null) {
+  return Boolean(rsvp && typeof rsvp.is_adult === "boolean" && rsvp.consent_version === CONSENT_VERSION
+    && rsvp.signature_name && rsvp.code_accepted_at && rsvp.liability_accepted_at);
+}
 
 export type PortalMember = {
   id: string;
@@ -68,3 +85,4 @@ export const PORTAL_RESPONSE_HEADERS = {
   "Referrer-Policy": "strict-origin",
   "X-Robots-Tag": "noindex, nofollow",
 } as const;
+import { CONSENT_VERSION } from "./participant-documents";

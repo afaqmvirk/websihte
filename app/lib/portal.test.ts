@@ -9,6 +9,8 @@ import { proxy } from "../../proxy";
 import { createPortalEmail } from "./portal-email";
 import { cancelMemberRsvp, findAcceptedMember, getMemberRsvp, getMemberRsvpWindow, RsvpWindowError, saveMemberRsvp } from "./portal-storage";
 import { formatRsvpDeadline, getPortalUrl, isSameOriginRequest, parseRsvp, TRAVEL_PLAN_LIMIT } from "./portal";
+import type { ConsentAnswer } from "./participant-documents";
+const consent: ConsentAnswer = { isAdult: true, signature: "Test Human", codeAccepted: true, waiverAccepted: true, mediaConsent: false };
 
 const originalFetch = globalThis.fetch;
 const names = ["SUPABASE_URL", "SUPABASE_SECRET_KEY", "SUPABASE_PUBLISHABLE_KEY", "APPLICATION_EMAIL_API_KEY", "APPLICATION_EMAIL_FROM", "APPLICATION_EMAIL_TO", "APPLICATION_EMAIL_REPLY_TO", "PORTAL_URL", "VERCEL"] as const;
@@ -59,8 +61,8 @@ beforeEach(() => {
     if (url.pathname === "/rest/v1/rpc/cancel_member_rsvp" || url.pathname === "/rest/v1/member_rsvps") return Response.json(cancellationExists ? [{
       is_local: false, travel_plan: "train; staying with a friend", updated_at: "2026-10-31T18:00:00Z", cancelled_at: "2026-10-31T18:00:00Z",
     }] : []);
-    if (url.pathname === "/rest/v1/rpc/save_member_rsvp" && rsvpError) return Response.json({ message: rsvpError }, { status: 400 });
-    if (url.pathname === "/rest/v1/rpc/save_member_rsvp") return Response.json([{
+    if (url.pathname === "/rest/v1/rpc/save_member_rsvp_with_consent" && rsvpError) return Response.json({ message: rsvpError }, { status: 400 });
+    if (url.pathname === "/rest/v1/rpc/save_member_rsvp_with_consent") return Response.json([{
       is_local: body.p_is_local, travel_plan: body.p_travel_plan, updated_at: "2026-10-18T18:00:00Z",
     }]);
     throw new Error(`Unexpected request: ${url.origin}${url.pathname}`);
@@ -114,11 +116,11 @@ test("database deadline errors become actionable RSVP errors without exposing ba
   const member = { id: memberId, email: "accepted@example.com", full_name: "Test Human" };
   for (const reason of ["closed", "pending"] as const) {
     rsvpError = reason === "closed" ? "member_rsvp_closed" : "member_rsvp_not_open";
-    await assert.rejects(saveMemberRsvp(member, true, null), (error: unknown) =>
+    await assert.rejects(saveMemberRsvp(member, true, null, consent), (error: unknown) =>
       error instanceof RsvpWindowError && error.reason === reason);
   }
   rsvpError = "private database detail";
-  await assert.rejects(saveMemberRsvp(member, true, null), { message: "Portal storage request failed" });
+  await assert.rejects(saveMemberRsvp(member, true, null, consent), { message: "Portal storage request failed" });
 });
 
 test("member lookup uses only the latest complete Ottawa application and returns no private answers", async () => {
@@ -139,10 +141,11 @@ test("pending, waitlisted, rejected, and unknown applicants have no member acces
 });
 
 test("RSVP storage sends verified member identity to the acceptance-checking RPC", async () => {
-  const rsvp = await saveMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" }, false, "train");
+  const rsvp = await saveMemberRsvp({ id: memberId, email: "accepted@example.com", full_name: "Test Human" }, false, "train", consent);
   assert.equal(rsvp.travel_plan, "train");
   assert.equal(rsvp.cancelled_at, null);
-  assert.deepEqual(calls[0].body, { p_application_id: memberId, p_email: "accepted@example.com", p_is_local: false, p_travel_plan: "train" });
+  assert.deepEqual(calls[0].body, { p_application_id: memberId, p_email: "accepted@example.com", p_is_local: false, p_travel_plan: "train",
+    p_is_adult: true, p_signature: "Test Human", p_code_accepted: true, p_waiver_accepted: true, p_media_consent: false });
 });
 
 test("cancellation uses only verified identity and does not gate on the RSVP deadline", async () => {
