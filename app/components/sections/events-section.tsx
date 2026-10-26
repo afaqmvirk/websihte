@@ -37,6 +37,21 @@ export const EVENT_YEARS: EventYear[] = [
         date: "TBD",
         href: "",
       },
+      {
+        city: "dubai",
+        date: "TBD",
+        href: "",
+      },
+      {
+        city: "windsor",
+        date: "TBD",
+        href: "",
+      },
+      {
+        city: "bucharest",
+        date: "TBD",
+        href: "",
+      },
     ],
   },
   {
