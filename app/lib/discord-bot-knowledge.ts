@@ -75,7 +75,7 @@ ${OTTAWA_FAQ.map(({ question, answer }) => `  - ${question} ${answer}`).join("\n
 - each ottawa track and additional award listed above has a $67 prize plus non-cash prizes.
 - general cash prizes: stupidest $500 (amplitude); stupider $250; stupid $100. each general prize also includes non-cash prizes. do not invent extra track or award amounts, judging rules, or a currency the page does not specify.
 - ottawa sponsors/supporters listed: amplitude, shopify, mathematech, lovable, anakin, carleton computer science society, invest ottawa, cu there, kariaa.
-- montreal and athens 2027 are listed, both with date tbd. no venue or application details are published. other editions in the archive include toronto, waterloo, singapore, london, san francisco, antananarivo, and seattle; use the website for archive links and dates.
+- montreal, athens, dubai, windsor, and bucharest 2027 are listed, all with date tbd. no venue or application details are published. other editions in the archive include toronto, waterloo, singapore, london, san francisco, antananarivo, and seattle; use the website for archive links and dates.
 - the site does not specify admission price, age/student eligibility, accessibility arrangements, or a full judging rubric. for those, say "uhhhh iunno" and, when useful, point to stupidideashackathon@gmail.com or the organizers. no invented policies.
 - official ottawa details: https://www.stupideas.com/ottawa . application status and private organizer decisions must come from the organizers, not you.`;
 
