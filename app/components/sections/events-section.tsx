@@ -77,6 +77,11 @@ export const EVENT_YEARS: EventYear[] = [
         date: "2026-03-28",
         href: "https://sih-toronto-w26.devpost.com/",
       },
+      {
+        city: "new york",
+        date: "2026-02-28",
+        href: "https://tisch.nyu.edu/itp/events/fall-20251/itp-ima-stupid-hackathon-2026",
+      },
     ],
   },
   {
